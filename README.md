@@ -44,7 +44,8 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | CI (build + test on PR), semantic versioning, release-please | ✅ (see `.github/workflows/`) |
 | `PrivacyInfo.xcprivacy` (no required-reason APIs; data-type declaration pending a privacy sign-off) | ✅ |
 | `PurseHeadlessCheckout.host(for:)` — the concrete `PluginHost` every coordinator runs through | ✅ |
-| XCFramework signing/distribution, SwiftLint/SwiftFormat, Demo app, docs | planned |
+| Demo app (`Demo/Demo.xcodeproj`) — builds, launches, exercises the engine end to end | ✅ (see below) |
+| XCFramework signing/distribution, SwiftLint/SwiftFormat, docs | planned |
 
 ## Development
 
@@ -67,6 +68,25 @@ a simulator destination.
 
 Before changing anything, read [AGENTS.md](AGENTS.md): it lists the invariants that must not be
 broken and why each one exists.
+
+## Demo app
+
+`Demo/Demo.xcodeproj` — a real, minimal UIKit app: session decode → `PurseHeadlessCheckout` →
+`host(for:)` → `CardCoordinator` → `submitPayment()`, the same calls any merchant integration makes.
+Builds and launches today (`xcodebuild build -project Demo/Demo.xcodeproj -scheme Demo -destination
+"platform=iOS Simulator,id=$SIM_ID" CODE_SIGNING_ALLOWED=NO`); the embedded frameworks
+(`PurseHeadlessCheckout.framework`, and `PurseSecureFields.framework` transitively) install and load
+without a crash, confirmed on-device in the simulator, not just compiled.
+
+**What it can't do yet, honestly**: it runs against a hand-built canned session and a stubbed
+`/validate` (`MockURLProtocol.swift`) — there is no real merchant sandbox behind it. The one payment
+method it can exercise fully without real credentials is a **saved card that pays without a CVV**
+(`merchant_specifics.pay_token_no_cvv`), because that's the only card flow that mounts no Secure
+Fields form and makes no call to a real Vault. A fresh card, or a saved card that still needs its
+CVV, would open a real Secure Fields form talking to a real Vault tenant over its own network
+session — that needs a real sandbox tenant id, which isn't in this environment yet (same for Apple
+Pay's merchant id, PayPal's client id, and Klarna's client token). Wiring those in, and the release
+build actually authorizing a sandbox payment, is SDK-12264/12266's remaining AC once those arrive.
 
 ## License
 
