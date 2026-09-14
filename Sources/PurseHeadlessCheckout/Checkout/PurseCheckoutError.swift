@@ -42,6 +42,8 @@ public enum PurseCheckoutError: PurseError {
     case methodNotSimulable(itemId: String)
     /// The simulation API refused the request or returned nothing usable.
     case loanSimulationFailed(String, underlying: (any Error)?)
+    /// Any operation after `teardown()`.
+    case checkoutTornDown
 
     public var code: PurseErrorCode {
         switch self {
@@ -60,6 +62,7 @@ public enum PurseCheckoutError: PurseError {
         case let .walletOperationFailed(_, code): code
         case .methodNotSimulable: .methodIsNotSimulable
         case .loanSimulationFailed: .invalidLoanSimulation
+        case .checkoutTornDown: .checkoutTornDown
         }
     }
 
@@ -108,6 +111,8 @@ public enum PurseCheckoutError: PurseError {
             "\(itemId) is not simulable"
         case let .loanSimulationFailed(detail, _):
             detail
+        case .checkoutTornDown:
+            "this checkout has been torn down and can no longer be used"
         }
     }
 }

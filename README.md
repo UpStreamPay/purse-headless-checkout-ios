@@ -39,6 +39,7 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | Saved methods (rename, delete, favorite, delete-all), save-at-submit registration | ✅ |
 | BNPL loan simulation | ✅ |
 | Theming (`PurseTheme`, mapped onto Secure Fields' own style) | ✅ |
+| `teardown()`/`isTornDown`, process-death state restoration, error-code coverage meta-test | ✅ |
 | XCFramework distribution, monitoring, docs | planned |
 
 ## Development
