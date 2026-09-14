@@ -149,13 +149,24 @@ plugin whose native step must run *after* `/validate`, not before.
 
 swift-testing runs **suites in parallel**, and `StubURLProtocol` holds process-wide state. Handlers
 are therefore keyed by **host**, and each suite that stubs the network must own a host no other
-suite uses — pick a different `PurseEnvironment` tier if you need one
-(`SubmitPaymentTests` uses sandbox, `RedirectHandoffTests` uses test, `CardPluginTests` uses an
-explicit `api.example` root).
+suite uses — pick a different `PurseEnvironment` tier if you need one. All four real tiers are
+claimed: `SubmitPaymentTests` uses sandbox and test (one suite each, in the same file),
+`CoPaymentTests` uses development, `SavedSecondaryBalanceTests` uses production. `PayPalTests`,
+`KlarnaTests` and `CardPluginTests` build their own `PartnerUIContext` directly with a fictional
+`apiRoot`, sidestepping the tier limit entirely — prefer that when the test doesn't need a real
+`PurseHeadlessCheckout` end to end.
 
 Getting this wrong does not fail loudly: the other suite's response arrives instead of yours, and
-the test fails with a confusing assertion about the wrong body. It has already cost three debugging
-rounds. `@Suite(.serialized)` only serializes *within* a suite — it does nothing across them.
+the test fails with a confusing assertion about the wrong body — including a nonsensical-looking
+value that turns out to be a *different* suite's fixture. It has already cost four debugging rounds.
+`@Suite(.serialized)` only serializes *within* a suite — it does nothing across them.
+
+**`InitGuard.shared` has the identical hazard, one layer down.** It is a process-global singleton
+keyed by `sessionId:partner:method:amount`, and a **terminal** `/init` failure is cached there
+(`spent`) indefinitely — never evicted on failure, only on success or LRU capacity. A test that
+deliberately drives a real terminal failure through `PaymentAPIClient.initPayment` poisons that key
+for any later test that happens to reuse the same `(sessionId, partner, method, amount)` — reset it
+around such a test: `await InitGuard.shared.reset()` before, and in a `defer` after.
 
 ## Redirects
 
