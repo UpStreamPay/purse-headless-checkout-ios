@@ -1,0 +1,14 @@
+{
+  "originHash" : "d667c87b0a9744a2160d59f207b102d5fbbd13bb197700cbdd6f7d22dfd09ba9",
+  "pins" : [
+    {
+      "identity" : "purse-securefields-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "git@github.com:UpStreamPay/purse-securefields-ios.git",
+      "state" : {
+        "revision" : "5df309aa517b2fc2fa9d0b9c56ebba5a54b7345a"
+      }
+    }
+  ],
+  "version" : 3
+}

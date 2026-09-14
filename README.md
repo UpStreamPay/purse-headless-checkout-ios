@@ -29,7 +29,8 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | Error taxonomy (33 codes, shared with web and Android) | ✅ |
 | Payment model, splitter, reactive state | ✅ |
 | Plugin contract, registry, redirect resolution, `/validate` pipeline | ✅ |
-| Card payment via Secure Fields, 3-D Secure | blocked — see below |
+| Card payment via Secure Fields (fresh, saved, CVV-only) | ✅ |
+| 3-D Secure / redirect presentation | planned |
 | Apple Pay, PayPal, Klarna, redirection, gift cards | planned |
 | Saved methods, BNPL, theming, hooks | planned |
 | XCFramework distribution, monitoring, docs | planned |
@@ -60,9 +61,9 @@ broken and why each one exists.
 
 MIT — see [LICENSE](LICENSE).
 
-## Known blocker: Secure Fields cannot be consumed from SPM yet
+## Known issue: Secure Fields tags cannot be resolved from SPM
 
-Card entry depends on [`purse-securefields-ios`](https://github.com/UpStreamPay/purse-securefields-ios),
+This SDK depends on [`purse-securefields-ios`](https://github.com/UpStreamPay/purse-securefields-ios),
 which publishes each tag as an SPM **binary target** pointing at a GitHub release asset:
 
 ```
@@ -76,7 +77,10 @@ returns `404` to SwiftPM. Verified: unauthenticated `404`; HTTP basic auth with 
 does not use it. So `swift package resolve` fails for **any** consumer, including this SDK and any
 merchant app.
 
-Until it is fixed, this package does not declare the dependency and ships no card plugin.
+**Workaround in force.** `Package.swift` pins the **revision** `5df309a` — the commit `v1.8.0` was
+cut from, before the release workflow rewrote its manifest into a binary target. That resolves and
+builds from source, and is the exact code `v1.8.0` ships. Swap it for `from: "1.8.0"` once the
+distribution issue is fixed.
 
 Ways out, in rough order of cost — this is a call for the team that owns that repo:
 
@@ -85,4 +89,5 @@ Ways out, in rough order of cost — this is a call for the team that owns that 
 3. Publish the tag as a **source** package for private consumers instead of a binary target.
 
 Relevant to SDK-12264, whose acceptance criteria require both an XCFramework over SPM *and* a
-documented private-repo authentication procedure. As published, those two cannot both hold.
+documented private-repo authentication procedure. As published, those two cannot both hold — and the
+same trap is waiting for *this* SDK's own release workflow, which was going to copy that mechanism.

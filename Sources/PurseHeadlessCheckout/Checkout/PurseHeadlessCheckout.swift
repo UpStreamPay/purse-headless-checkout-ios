@@ -128,7 +128,6 @@ public final class PurseHeadlessCheckout: ObservableObject {
         self.meansOfPayment = built.meansOfPayment
         self.splitter = PursePaymentSplitter(orderAmount: built.amount)
 
-        registry.install(RedirectionModule())
         refresh()
 
         // Nothing else ever called `sync()`, so the offset stayed 0 and every "server-corrected"

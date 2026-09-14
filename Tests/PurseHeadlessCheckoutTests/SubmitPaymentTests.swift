@@ -55,6 +55,8 @@ struct SubmitPaymentTests {
     }
 
     private static let successBody = #"{"global_status":"SUCCESS","results":[]}"#
+    /// The host the sandbox session's API root resolves to — this suite's slice of the shared stub.
+    private static let host = "api.purse-sandbox.com"
 
     /// A plugin whose `postValidation` throws — Klarna's does exactly this on a declined
     /// authorization, *after* `/validate` has already charged the payment.
@@ -91,8 +93,8 @@ struct SubmitPaymentTests {
     // MARK: Happy path
 
     @Test func submitsOneValidateItemPerSplit() async throws {
-        StubURLProtocol.reset()
-        StubURLProtocol.set("/validate", .ok(Self.successBody))
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/validate", .ok(Self.successBody), host: Self.host)
 
         let checkout = try makeCheckout()
         try selectCard(checkout)
@@ -101,7 +103,7 @@ struct SubmitPaymentTests {
         #expect(result.isSuccess)
         #expect(checkout.sessionState == .submitted)
 
-        let items = try #require(StubURLProtocol.body(for: "/validate")?.array)
+        let items = try #require(StubURLProtocol.body(for: "/validate", host: Self.host)?.array)
         #expect(items.count == 1)
         #expect(items[0]["partner"]?.stringValue == "purse")
         #expect(items[0]["amount"]?.decimalValue == 100)
@@ -113,8 +115,8 @@ struct SubmitPaymentTests {
     /// A second submit is refused with a code, not silently ignored — Android's deliberate
     /// divergence from web, because a merchant needs something to react to (SDK-12218).
     @Test func aSecondSubmitIsRefusedWithACode() async throws {
-        StubURLProtocol.reset()
-        StubURLProtocol.set("/validate", .ok(Self.successBody))
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/validate", .ok(Self.successBody), host: Self.host)
 
         let checkout = try makeCheckout()
         try selectCard(checkout)
@@ -130,8 +132,8 @@ struct SubmitPaymentTests {
 
     /// A declined payment spends the session exactly as a successful one does.
     @Test func aDeclinedPaymentStillSpendsTheSession() async throws {
-        StubURLProtocol.reset()
-        StubURLProtocol.set("/validate", .ok(#"{"global_status":"FAILED","results":[]}"#))
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/validate", .ok(#"{"global_status":"FAILED","results":[]}"#), host: Self.host)
 
         let checkout = try makeCheckout()
         try selectCard(checkout)
@@ -143,47 +145,47 @@ struct SubmitPaymentTests {
 
     /// Expiry is re-evaluated before every submit, not only at initialisation.
     @Test func anExpiredSessionIsRefusedWithoutCallingThePSP() async throws {
-        StubURLProtocol.reset()
-        StubURLProtocol.set("/validate", .ok(Self.successBody))
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/validate", .ok(Self.successBody), host: Self.host)
 
         let checkout = try makeCheckout(expirationDate: "2000-01-01T00:00:00Z")
         try selectCard(checkout)
 
         await #expect(throws: PurseCheckoutError.self) { try await checkout.submitPayment() }
         #expect(checkout.sessionState == .expired)
-        #expect(!StubURLProtocol.paths.contains { $0.hasSuffix("/validate") })
+        #expect(!StubURLProtocol.paths(host: Self.host).contains { $0.hasSuffix("/validate") })
     }
 
     @Test func anUncoveredSplitIsRefusedWithoutCallingThePSP() async throws {
-        StubURLProtocol.reset()
-        StubURLProtocol.set("/validate", .ok(Self.successBody))
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/validate", .ok(Self.successBody), host: Self.host)
 
         let checkout = try makeCheckout()
         // No primary selected, nothing applied.
         await #expect(throws: PurseCheckoutError.self) { try await checkout.submitPayment() }
-        #expect(!StubURLProtocol.paths.contains { $0.hasSuffix("/validate") })
+        #expect(!StubURLProtocol.paths(host: Self.host).contains { $0.hasSuffix("/validate") })
         // Still submittable once a method is chosen.
         #expect(checkout.sessionState == .ready)
     }
 
     @Test func anIncompleteFormIsRefusedWithoutCallingThePSP() async throws {
-        StubURLProtocol.reset()
-        StubURLProtocol.set("/validate", .ok(Self.successBody))
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/validate", .ok(Self.successBody), host: Self.host)
 
         let checkout = try makeCheckout()
         try selectCard(checkout)
         checkout.setFulfilled("purse-creditcard", false)
 
         await #expect(throws: PurseCheckoutError.self) { try await checkout.submitPayment() }
-        #expect(!StubURLProtocol.paths.contains { $0.hasSuffix("/validate") })
+        #expect(!StubURLProtocol.paths(host: Self.host).contains { $0.hasSuffix("/validate") })
     }
 
     // MARK: Failures
 
     /// A 4xx leaves the checkout usable — the payment definitively did not happen.
     @Test func aRefusedValidateLeavesTheCheckoutSubmittable() async throws {
-        StubURLProtocol.reset()
-        StubURLProtocol.set("/validate", .failure(400, #"{"error":"INVALID_FORM"}"#))
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/validate", .failure(400, #"{"error":"INVALID_FORM"}"#), host: Self.host)
 
         let checkout = try makeCheckout()
         try selectCard(checkout)
@@ -195,7 +197,7 @@ struct SubmitPaymentTests {
     /// No answer came back: the payment may exist, so the session is spent rather than retried.
     /// Retrying here is what double-charges people.
     @Test func anUnknownOutcomeSpendsTheSessionRatherThanInvitingARetry() async throws {
-        StubURLProtocol.reset()
+        StubURLProtocol.reset(host: Self.host)
         // No handler registered for /validate → the stub fails the request with a transport error,
         // which is exactly the "no HTTP status came back" shape.
         let checkout = try makeCheckout()
@@ -216,8 +218,8 @@ struct SubmitPaymentTests {
 
     /// onBeforeValidate throwing aborts before anything is sent, and leaves the checkout usable.
     @Test func aFailingBeforeHookAbortsBeforeAnythingIsSent() async throws {
-        StubURLProtocol.reset()
-        StubURLProtocol.set("/validate", .ok(Self.successBody))
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/validate", .ok(Self.successBody), host: Self.host)
 
         struct HookError: Error {}
         let hooks = PurseCheckoutHooks(onBeforeValidate: { _ in throw HookError() })
@@ -230,14 +232,14 @@ struct SubmitPaymentTests {
         } catch let error as PurseCheckoutError {
             #expect(error.code == .onBeforeValidateHookFailed)
         }
-        #expect(!StubURLProtocol.paths.contains { $0.hasSuffix("/validate") })
+        #expect(!StubURLProtocol.paths(host: Self.host).contains { $0.hasSuffix("/validate") })
         #expect(checkout.sessionState == .ready)
     }
 
     /// onAfterValidate throwing is swallowed — the payment already happened.
     @Test func aFailingAfterHookDoesNotFailThePayment() async throws {
-        StubURLProtocol.reset()
-        StubURLProtocol.set("/validate", .ok(Self.successBody))
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/validate", .ok(Self.successBody), host: Self.host)
 
         struct HookError: Error {}
         let hooks = PurseCheckoutHooks(onAfterValidate: { throw HookError() })
@@ -251,10 +253,12 @@ struct SubmitPaymentTests {
     // MARK: Redirects
 
     @Test func surfacesAPendingRedirect() async throws {
-        StubURLProtocol.reset()
-        StubURLProtocol.set("/validate", .ok(
-            #"{"global_status":"WAITING","results":[],"redirection":{"url":"https://acs.bank.example/3ds"}}"#
-        ))
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set(
+            "/validate",
+            .ok(#"{"global_status":"WAITING","results":[],"redirection":{"url":"https://acs.bank.example/3ds"}}"#),
+            host: Self.host
+        )
 
         let checkout = try makeCheckout()
         try selectCard(checkout)
@@ -264,8 +268,8 @@ struct SubmitPaymentTests {
     }
 
     @Test func noRedirectOnAPlainSuccess() async throws {
-        StubURLProtocol.reset()
-        StubURLProtocol.set("/validate", .ok(Self.successBody))
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/validate", .ok(Self.successBody), host: Self.host)
 
         let checkout = try makeCheckout()
         try selectCard(checkout)
@@ -278,12 +282,16 @@ struct SubmitPaymentTests {
 
     /// A method whose partner product was never installed names itself, rather than failing opaquely.
     @Test func aMissingPluginIsNamed() async throws {
-        StubURLProtocol.reset()
+        StubURLProtocol.reset(host: Self.host)
+        // Strip the built-ins so the card method genuinely resolves to nothing — the shape a
+        // merchant hits when a session offers PayPal but they never linked the PayPal product.
+        let empty = PluginRegistry()
+        empty.reset()
         let checkout = try PurseHeadlessCheckout(
             widgetData: TestSessions.widgetData(
                 paymentSession: TestSessions.paymentSession(amount: 100)
             ),
-            registry: PluginRegistry(),
+            registry: empty,
             urlSession: StubURLProtocol.session()
         )
         try selectCard(checkout)
