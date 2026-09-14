@@ -131,6 +131,33 @@ struct PluginHostTests {
         #expect(await plugin.sessionSetCount == 1)
     }
 
+    /// Not "onSessionSet fires again for the same item" — Android never re-fires it for a
+    /// *surviving* item either, since a survivor's configuration is unchanged by definition
+    /// (nothing to refresh).
+    @Test func rearmsTrackingForAnIdADroppedItemOnceHeld() async throws {
+        let (checkout, plugin) = try checkoutAndPlugin()
+        let method = try primaryMethod(checkout)
+        _ = try checkout.host(for: method)
+        await checkout.pendingSessionSet[method.id]?.value
+        #expect(await plugin.sessionSetCount == 1)
+
+        // A different `labels` set makes this a different configuration under the same id — not a
+        // survivor.
+        try checkout.setSession(TestSessions.widgetData(
+            paymentSession: TestSessions.paymentSession(
+                id: "session-2",
+                amount: 100,
+                protocols: TestSessions.cardProtocol(labels: ["different"])
+            )
+        ))
+        let newMethod = try primaryMethod(checkout)
+        #expect(newMethod.id == method.id)
+
+        _ = try checkout.host(for: newMethod)
+        await checkout.pendingSessionSet[newMethod.id]?.value
+        #expect(await plugin.sessionSetCount == 2)
+    }
+
     @Test func throwsCheckoutTornDownAfterTeardown() throws {
         let (checkout, _) = try checkoutAndPlugin()
         let method = try primaryMethod(checkout)

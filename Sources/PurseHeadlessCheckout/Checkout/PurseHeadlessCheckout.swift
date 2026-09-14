@@ -792,6 +792,14 @@ public final class PurseHeadlessCheckout: ObservableObject {
         // Save-token decisions belong to the item that was on screen when the shopper made them.
         registrationByMethod = registrationByMethod.filter { survivingIds.contains($0.key) }
         registrationBySecondaryToken.removeAll()
+        // A dropped id may be reused by an unrelated item in a later session (ids are
+        // `"{partner}-{method}"`, not content hashes) — Android's `activePlugins.filterKeys`/
+        // `remove` prune.
+        trackedPluginItemIds = trackedPluginItemIds.intersection(survivingIds)
+        for (id, task) in pendingSessionSet where !survivingIds.contains(id) {
+            task.cancel()
+            pendingSessionSet.removeValue(forKey: id)
+        }
 
         // Gift cards were tokenized against the old session and cannot carry over.
         splitter.reset(orderAmount: built.amount)
@@ -1365,6 +1373,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
         // weakly so it would end on deallocation anyway, but a merchant who tears down and keeps
         // the object around is exactly who called this.
         expiryWatchdog?.cancel()
+        for task in pendingSessionSet.values { task.cancel() }
+        pendingSessionSet.removeAll()
+        trackedPluginItemIds.removeAll()
         Task {
             await eventBus.post(.pageUnload)
             await eventBus.flush()

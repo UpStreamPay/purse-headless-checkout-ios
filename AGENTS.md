@@ -286,8 +286,17 @@ assumed either way, and documented on the type itself rather than silently wired
 through in a real app. `item` must be a fresh `PrimaryMethod` or one of its saved `PaymentToken`s
 (anything else is a type error, not a runtime one — `PrimarySource` is the constraint). Asking for a
 host gives the plugin its `onSessionSet` exactly once per item id (`trackedPluginItemIds`), mirroring
-Android's `trackPlugin`. Throws `checkoutTornDown` after `teardown()`, same as every other network
-path.
+Android's `trackPlugin`/`activePlugins`. Throws `checkoutTornDown` after `teardown()`, same as every
+other network path. The returned host holds the checkout `unowned` — it must not outlive it.
+
+**`onSessionSet` does not re-fire for a *surviving* item across `setSession`, by design, matching
+Android.** An item survives only when its configuration is deep-equal to what it was — by definition
+there is nothing to refresh. `trackedPluginItemIds` is pruned to survivors on every `setSession` (and
+cleared at `teardown()`, along with cancelling any still-pending `onSessionSet` `Task`s) purely so a
+**dropped** id, if some later session's item happens to reuse it (ids are `"{partner}-{method}"`, not
+content hashes), is treated as new and correctly re-tracked — not to re-notify anything unchanged.
+Don't read the protocol's "or refreshed" docstring on `onSessionSet` as a promise iOS calls it again
+for every session update; it doesn't, deliberately, same as Android's `PurseHeadlessCheckout.kt`.
 
 The adapter (`PurseHeadlessCheckout.ItemHost`, private, nested) is deliberately thin: every member
 forwards to an existing public method (`setCollected`, `setFulfilled`, `setPrimary`/`setPrimaryToken`,
@@ -309,6 +318,14 @@ Test coverage: `PluginHostTests.swift`. It claims no `PurseEnvironment` tier —
 `setCollected`/`setFulfilled`/`setAsPrimary`/`onSessionSet` are all synchronous or in-process, no
 network involved, so it can safely share a host with another suite (see `WalletTests`' header comment
 for the same reasoning).
+
+**Pre-existing, separate gap, not touched by this change**: `PartnerUIPlugin.onAmountUpdate` (fired
+by Android whenever the splitter's remaining amount moves, e.g. a gift card gets applied/removed
+after a card form is already mounted) has no call site on iOS either, same as `destroyClient` above.
+`host(for:)` only wires `onSessionSet`. A plugin that needs to react to a live amount change mid-form
+has no way to today; flag before assuming it works, and scope it separately if a real MOP needs it —
+it's a distinct feature (Android's `notifyAmountUpdate`, driven off `activePlugins`), not a `host(for:)`
+bug.
 
 ## Error codes with no dedicated case still need a real carrier
 
