@@ -32,8 +32,8 @@ Nine stacked PRs across seven tickets:
 
 | PR | Ticket | Scope |
 |---|---|---|
-| 1 | SDK-12260 | repo skeleton + Core ← **you are here** |
-| 2 | SDK-12260 | payment model, splitter, reactive state |
+| 1 | SDK-12260 | repo skeleton + Core |
+| 2 | SDK-12260 | payment model, splitter, reactive state ← **you are here** |
 | 3 | SDK-12260 | partner-ui contract + card payment end to end |
 | 4 | SDK-12261 | payment method catalogue (Apple Pay, PayPal, Klarna, redirection, gift cards) |
 | 5 | SDK-12262 | saved methods, BNPL, theme, hooks |

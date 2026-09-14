@@ -6,7 +6,8 @@ A headless iOS SDK for Purse payments. It owns the payment engine — session, p
 primary/secondary split, `/validate` — and leaves the checkout UI to you. Same concepts as the web
 `usp-widget` headless SDK and the Purse Android SDK, in Swift.
 
-> **In development.** The Core layer has landed; the checkout surface has not. See
+> **In development.** The engine has landed (session, methods, split, reactive state); payment
+> submission and the partner plugins have not. See
 > [docs/README.md](docs/README.md) for what is built and what is next.
 
 ## Requirements
@@ -26,7 +27,7 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | `InitGuard` — coalescing, retry, fast-reject | ✅ |
 | Server-clock-corrected expiry checking | ✅ |
 | Error taxonomy (33 codes, shared with web and Android) | ✅ |
-| Payment model, splitter, reactive state | planned |
+| Payment model, splitter, reactive state | ✅ |
 | Card payment via Secure Fields, 3-D Secure | planned |
 | Apple Pay, PayPal, Klarna, redirection, gift cards | planned |
 | Saved methods, BNPL, theming, hooks | planned |
