@@ -1,6 +1,6 @@
 // Web: packages/model `LegacyPaymentSession`
 // Same: same fields.
-// Differs: typed `Partner` / `Method` keys.
+// Differs: typed `Partner` / `PaymentMethod` keys.
 
 import Foundation
 
@@ -14,7 +14,7 @@ public struct LegacyPaymentSession: Sendable, Equatable {
     public let success: String?
     public let failure: String?
     public let redirection: String?
-    public let protocols: [Partner: [Method: MethodEntry]]
+    public let protocols: [Partner: [PaymentMethod: MethodEntry]]
     public let vault: SessionVault?
 
     public init(
@@ -26,7 +26,7 @@ public struct LegacyPaymentSession: Sendable, Equatable {
         success: String?,
         failure: String?,
         redirection: String?,
-        protocols: [Partner: [Method: MethodEntry]],
+        protocols: [Partner: [PaymentMethod: MethodEntry]],
         vault: SessionVault?
     ) {
         self.id = id

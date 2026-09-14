@@ -7,9 +7,9 @@ import Foundation
 /// One payment method of a session: its ``partner`` and ``method`` — the pair every plugin is keyed on.
 public struct MethodKey: Sendable, Hashable {
     public let partner: Partner
-    public let method: Method
+    public let method: PaymentMethod
 
-    public init(partner: Partner, method: Method) {
+    public init(partner: Partner, method: PaymentMethod) {
         self.partner = partner
         self.method = method
     }

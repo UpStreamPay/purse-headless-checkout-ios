@@ -73,6 +73,17 @@ public final class PurseHeadlessCheckout: ObservableObject {
     private var splitter: PursePaymentSplitter
     /// Per-item form completeness, armed when an item needs one (a card form, a CVV re-entry).
     private var fulfilledByItem: [String: Bool] = [:]
+    /// What each item's native step produced, threaded into its `/validate` payload.
+    private var collectedByItem: [String: [String: JSONValue]] = [:]
+    /// Set once a `/validate` has answered — a declined payment spends the session just as a
+    /// successful one does, so a second submit must never reach the PSP.
+    private var validationConsumed = false
+    private let registry: PluginRegistry
+    private let hooks: PurseCheckoutHooks?
+    private let serverClock: ServerDatetimeChecker
+    /// Injectable so tests can stub the transport — the seam `purse-ios-securefields` calls
+    /// `testURLSession`. Production callers never pass it.
+    private let urlSession: URLSession
 
     // MARK: Creation
 
@@ -82,7 +93,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
         widgetData: String,
         lockedEnvironment: PurseEnvironment? = nil,
         disabledMethods: Set<MethodKey> = [],
-        instanceId: String = UUID().uuidString
+        hooks: PurseCheckoutHooks? = nil,
+        registry: PluginRegistry = .shared,
+        instanceId: String = UUID().uuidString,
+        urlSession: URLSession = .shared
     ) throws {
         let params = try SessionCodec.decode(widgetData)
         self.params = params
@@ -91,13 +105,24 @@ public final class PurseHeadlessCheckout: ObservableObject {
         self.lockedEnvironment = lockedEnvironment
         self.paymentAPIRoot = Self.resolveAPIRoot(params, locked: lockedEnvironment, environment: environment)
         self.disabledMethods = disabledMethods
+        self.hooks = hooks
+        self.registry = registry
         self.instanceId = instanceId
+        self.urlSession = urlSession
+
+        let datetimeAPI = DatetimeAPIClient(
+            apiKey: params.apiKey,
+            datetimeAPIRoot: environment.datetimeAPIRoot,
+            session: urlSession
+        )
+        self.serverClock = ServerDatetimeChecker(fetchServerTime: { try await datetimeAPI.datetime() })
 
         let built = PaymentSessionBuilder.build(params.paymentSession, disabledMethods: disabledMethods)
         self.session = built
         self.meansOfPayment = built.meansOfPayment
         self.splitter = PursePaymentSplitter(orderAmount: built.amount)
 
+        registry.install(RedirectionModule())
         refresh()
     }
 
@@ -111,6 +136,111 @@ public final class PurseHeadlessCheckout: ObservableObject {
     ) -> String {
         guard locked == nil, let declared = params.apiURL.nonBlank else { return environment.paymentAPIRoot }
         return declared
+    }
+
+    /// The Payment API client for the session in force.
+    private var api: PaymentAPIClient {
+        PaymentAPIClient(
+            apiKey: params.apiKey,
+            apiRoot: paymentAPIRoot,
+            entityId: params.entityId,
+            sessionId: session.id,
+            session: urlSession
+        )
+    }
+
+    // MARK: Submitting
+
+    /// Build the payment: `preValidation` for every split, one `POST /validate`, then each plugin's
+    /// `postValidation`.
+    @discardableResult
+    public func submitPayment(skipOnBeforeValidate: Bool = false) async throws -> ValidationResult {
+        try acquireSubmitLock()
+
+        guard splitter.fulfilled else {
+            sessionState = .ready
+            throw PurseCheckoutError.paymentNotFulfilled("the split does not cover the amount to pay")
+        }
+        if let itemId = unfulfilledItemId {
+            sessionState = .ready
+            throw PurseCheckoutError.itemNotFulfilled(itemId: itemId)
+        }
+
+        // Every selectable item is locked for the duration, then unlocked whatever happens.
+        refresh()
+        defer {
+            sessionState = sessionState == .submitting ? .error : sessionState
+            refresh()
+        }
+
+        let validator = PaymentValidator(api: api, registry: registry)
+        let result: ValidationResult
+        do {
+            result = try await validator.execute(
+                splits: splitter.splits,
+                session: session.source,
+                collectedByItem: collectedByItem,
+                hooks: hooks,
+                skipOnBeforeValidate: skipOnBeforeValidate
+            )
+        } catch {
+            // The session is only spent once /validate actually answered. A hook that aborted, or a
+            // transport failure, leaves it submittable — except when the outcome is unknown, where
+            // the payment may exist and a retry could double-charge.
+            if let checkoutError = error as? PurseCheckoutError,
+               case let .validateFailed(_, underlying) = checkoutError,
+               (underlying as? PaymentAPIError)?.outcomeUnknown == true {
+                validationConsumed = true
+                sessionState = .submitted
+            } else {
+                sessionState = .ready
+            }
+            throw error
+        }
+
+        validationConsumed = true
+        sessionState = .submitted
+        return result
+    }
+
+    /// The redirect the last `/validate` asked for, if any — a 3-D Secure challenge or a PSP page.
+    /// Reaching the returned action's destination is **not** an outcome: the final redirect is
+    /// built server-side and can land on a URL this client cannot read.
+    public func pendingRedirect(for result: ValidationResult) -> RedirectAction? {
+        let primary = splitter.primaryMethod
+        return RedirectionResolver.resolve(
+            validateResponse: result.raw,
+            partner: primary?.partner.wireValue ?? "",
+            method: primary?.method.wireValue ?? "",
+            sessionReturnURL: session.source.redirection
+        )?.withReturnURLPrefix(session.source.redirection)
+    }
+
+    /// Re-checks expiry against the server-corrected clock, then moves `ready`/`error` →
+    /// `submitting`.
+    private func acquireSubmitLock() throws {
+        if validationConsumed {
+            throw PurseCheckoutError.submitBlocked(state: .submitted)
+        }
+        guard sessionState == .ready || sessionState == .error else {
+            throw PurseCheckoutError.submitBlocked(state: sessionState)
+        }
+        if session.expirationDate < Date() {
+            sessionState = .expired
+            throw PurseCheckoutError.sessionExpired(sessionId: session.id)
+        }
+        sessionState = .submitting
+    }
+
+    /// Stash what an item's native step produced, for its next `/validate` payload.
+    public func setCollected(_ itemId: String, _ data: [String: JSONValue]) {
+        collectedByItem[itemId] = data
+    }
+
+    /// Synchronise the expiry clock with the server. Failures are swallowed — a payment must never
+    /// be blocked because a clock-sync call timed out.
+    public func syncServerClock() async {
+        await serverClock.sync()
     }
 
     // MARK: Selecting the primary
@@ -238,6 +368,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
             restorePrimary(id: previousPrimaryId)
         }
 
+        collectedByItem.removeAll()
+        validationConsumed = false
         sessionState = .ready
         refresh()
     }
@@ -272,7 +404,13 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
         // Filtered states mean "never show this" — the item stays in the internal list so a later
         // recompute can still see it, but no merchant ever renders it.
-        let visible = meansOfPayment.filter { $0.disabled?.isFiltered != true }
+        var visible = meansOfPayment.filter { $0.disabled?.isFiltered != true }
+
+        // `submitting` is a published overlay only, never written into the internal list: it must
+        // lift cleanly when the submit ends, without erasing a real disabled state underneath.
+        if sessionState == .submitting {
+            visible = visible.map { $0.disabled == nil ? $0.withDisabled(.submitting) : $0 }
+        }
 
         paymentMethods = visible.filter {
             switch $0 {

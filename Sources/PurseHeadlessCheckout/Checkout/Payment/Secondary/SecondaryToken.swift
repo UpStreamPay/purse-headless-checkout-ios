@@ -19,7 +19,7 @@ public struct SecondaryToken: SplitSource, Sendable, Equatable {
     /// Stable per-instrument id — distinguishes multiple cards of the same method.
     public let id: String
     public let partner: Partner
-    public let method: Method
+    public let method: PaymentMethod
     public let pan: String
     public let cvv: String?
     /// Human label, e.g. a masked PAN. May be blank.
@@ -45,7 +45,7 @@ public struct SecondaryToken: SplitSource, Sendable, Equatable {
     public init(
         id: String,
         partner: Partner,
-        method: Method,
+        method: PaymentMethod,
         pan: String,
         cvv: String?,
         name: String,

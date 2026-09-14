@@ -49,6 +49,22 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | `headless-checkout.ts` | `checkout/PurseHeadlessCheckout.kt` | `Checkout/PurseHeadlessCheckout.swift` |
 | `utils/error/error.ts` (thrown) | `checkout/PurseCheckoutException.kt` | `Checkout/PurseCheckoutError.swift` |
 
+## PartnerUI — landed
+
+| Web | Android | iOS |
+|---|---|---|
+| `commons/Plugin/types.ts` (`Plugin<Context>`) | `partnerui/PartnerUiPlugin.kt` | `PartnerUI/PartnerUIPlugin.swift` |
+| `commons/PartnerUI/types.ts` | `partnerui/PartnerUiContext.kt` | `PartnerUI/PartnerUIPlugin.swift` (`PartnerUIContext`) |
+| `plugins/index.ts` (`getPlugin`) | `partnerui/PluginRegistry.kt` | `PartnerUI/PluginRegistry.swift` |
+| none | `partnerui/PluginHost.kt` | `PartnerUI/PluginHost.swift` |
+| `partner-ui/src/events.ts` | `partnerui/PluginEvent.kt` | `PartnerUI/PluginEvent.swift` |
+| payment-element events | `partnerui/PaymentOutcome.kt` | `PartnerUI/PluginEvent.swift` (`PaymentOutcome`) |
+| `manageRedirection` shapes | `partnerui/redirect/RedirectAction.kt` | `PartnerUI/Redirect/RedirectAction.swift` |
+| `manageRedirection` | `partnerui/redirect/RedirectionResolver.kt` | `PartnerUI/Redirect/RedirectionResolver.swift` |
+| `plugins/generics/redirection` | `plugins/generics/redirection/RedirectionPlugin.kt` | `PartnerUI/Plugins/RedirectionPlugin.swift` |
+| `headless-checkout-validation.ts` | `checkout/validation/PaymentValidator.kt` | `Checkout/Validation/PaymentValidator.swift` |
+| `PurseHeadlessCheckoutHooks` | `checkout/PurseCheckoutHooks.kt` | `Checkout/Validation/PaymentValidator.swift` (`PurseCheckoutHooks`) |
+
 ## Divergences and why
 
 | Topic | Android | iOS | Why |
@@ -70,6 +86,9 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | Partner discovery | `ServiceLoader` over `META-INF/services` | explicit `install()` *(PR 4)* | No `ServiceLoader` and no lazy class loading on this platform (stated in SDK-12264). Android already supports explicit install; iOS makes it the only path. |
 | Google Pay / Apple Pay | `:partner-googlepay` | `PurseCheckoutApplePay` *(PR 4)* | Not a rename — a different partner integration entirely. Net-new work, not a port. |
 | `PATCH` requests | sent as `POST` + `X-HTTP-Method-Override` | real `PATCH` *(PR 5)* | `HttpURLConnection` refuses `PATCH`; `URLSession` does not. |
+| `Method` type name | `Method` | **`PaymentMethod`** | Foundation re-exports the Objective-C runtime's `Method` typedef. A merchant writing `-> Method` gets *"'Method' is ambiguous for type lookup"*, and cannot qualify it because the `PurseHeadlessCheckout` **class shadows the module of the same name**. Verified from a real consumer package, before and after. Web (TypeScript) and Android (Kotlin) have no such collision, so this is the one place naming parity had to give. |
+| Following a redirect | `postValidation` opens an Activity | resolved after submit via `pendingRedirect(for:)` | Same as Android's reason: "follow a redirect" is `window.location` on web and needs nothing but the URL; natively it needs a presenter the pure protocol half must not own. |
+| Partner module discovery | `ServiceLoader` | `PluginRegistry.install(_:)` | No `ServiceLoader`, no lazy class loading (stated in SDK-12264). Android already supports explicit install; iOS makes it the only path. |
 
 ## Vocabulary
 

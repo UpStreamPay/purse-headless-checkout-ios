@@ -28,7 +28,8 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | Server-clock-corrected expiry checking | ✅ |
 | Error taxonomy (33 codes, shared with web and Android) | ✅ |
 | Payment model, splitter, reactive state | ✅ |
-| Card payment via Secure Fields, 3-D Secure | planned |
+| Plugin contract, registry, redirect resolution, `/validate` pipeline | ✅ |
+| Card payment via Secure Fields, 3-D Secure | blocked — see below |
 | Apple Pay, PayPal, Klarna, redirection, gift cards | planned |
 | Saved methods, BNPL, theming, hooks | planned |
 | XCFramework distribution, monitoring, docs | planned |
@@ -58,3 +59,30 @@ broken and why each one exists.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Known blocker: Secure Fields cannot be consumed from SPM yet
+
+Card entry depends on [`purse-securefields-ios`](https://github.com/UpStreamPay/purse-securefields-ios),
+which publishes each tag as an SPM **binary target** pointing at a GitHub release asset:
+
+```
+https://github.com/UpStreamPay/purse-securefields-ios/releases/download/v1.8.0/PurseSecureFields.xcframework.zip
+```
+
+The asset exists and is correctly uploaded — but the repository is **private**, and that URL form
+returns `404` to SwiftPM. Verified: unauthenticated `404`; HTTP basic auth with a valid token (what
+`--netrc-file` sends) `404`; only the REST endpoint
+`/repos/…/releases/assets/<id>` with `Accept: application/octet-stream` returns `200`, and SwiftPM
+does not use it. So `swift package resolve` fails for **any** consumer, including this SDK and any
+merchant app.
+
+Until it is fixed, this package does not declare the dependency and ships no card plugin.
+
+Ways out, in rough order of cost — this is a call for the team that owns that repo:
+
+1. Make the repository (or just its releases) public. The asset URL then resolves for everyone.
+2. Host the XCFramework somewhere that honours basic auth or a token — S3, Artifactory, GitHub Packages.
+3. Publish the tag as a **source** package for private consumers instead of a binary target.
+
+Relevant to SDK-12264, whose acceptance criteria require both an XCFramework over SPM *and* a
+documented private-repo authentication procedure. As published, those two cannot both hold.

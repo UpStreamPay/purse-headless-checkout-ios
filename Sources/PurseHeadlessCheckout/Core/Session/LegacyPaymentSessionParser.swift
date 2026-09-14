@@ -36,14 +36,14 @@ enum LegacyPaymentSessionParser {
         )
     }
 
-    private static func parseProtocols(_ json: JSONValue?) -> [Partner: [Method: MethodEntry]] {
+    private static func parseProtocols(_ json: JSONValue?) -> [Partner: [PaymentMethod: MethodEntry]] {
         guard let partners = json?.objectValue else { return [:] }
 
-        var result: [Partner: [Method: MethodEntry]] = [:]
+        var result: [Partner: [PaymentMethod: MethodEntry]] = [:]
         for (partnerKey, methodsNode) in partners {
             guard let methodsObject = methodsNode.objectValue else { continue }
 
-            var methods: [Method: MethodEntry] = [:]
+            var methods: [PaymentMethod: MethodEntry] = [:]
             for (methodKey, entryNode) in methodsObject {
                 // Must be an *object*, not merely present. A string or number here would subscript
                 // to `nil` for every field and register the method with a fully-defaulted
