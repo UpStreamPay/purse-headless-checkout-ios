@@ -95,9 +95,40 @@ Swift 6 language mode, strict concurrency, and it currently compiles clean — k
 - The public checkout object will be `@MainActor` + `ObservableObject`. UI state belongs on the main
   actor; nothing else does.
 
-`PurseSecureFields`, which this SDK will depend on for card entry, is Swift 5 mode with no
-`Sendable` conformances. It gets wrapped at `@MainActor` with its delegate bridged into a
-continuation — the boundary lives in the card plugin, and nowhere else.
+### Crossing the Swift 5 boundary to PurseSecureFields
+
+`PurseSecureFields` is a Swift 5 module. **None of its public types are `Sendable` to us** — not
+`TokenizationResult`, not even `CardBrand`, which is a plain `String` enum. Swift 5 modules get no
+implicit `Sendable` conformance across the boundary, so any of its values crossing an isolation
+boundary is a hard error under Swift 6.
+
+The rule that follows, verified by building it against the real SDK:
+
+**Convert to our own `Sendable` type inside the `nonisolated` delegate callback, before hopping to
+the main actor.** Never capture one of its types in a main-actor closure, never store one in a
+`Sendable` struct, never hand one to a continuation.
+
+```swift
+nonisolated func secureFieldsDidTokenize(_ result: TokenizationResult) {
+    let tokenization = CardTokenization(            // ← our type, Sendable, built here
+        vaultFormToken: result.vaultFormToken,
+        bin: result.bin,
+        selectedNetworkWireValue: result.selectedNetwork?.rawValue
+    )
+    MainActor.assumeIsolated { resume(.success(tokenization)) }
+}
+```
+
+`assumeIsolated` is sound here and not a wish: every delegate callback arrives on the main thread.
+The SDK hops through `DispatchQueue.main.async` itself before touching the delegate
+(`SecureFieldsManager.swift:371` for the BIN lookup, `:608` for tokenization) and the rest fire from
+UIKit event paths. If that ever changes, this bridge breaks — so it is pinned here.
+
+**Do not reach for `@preconcurrency import`.** The compiler will suggest it, and it downgrades these
+errors to warnings, which buys nothing: the conversion has to happen anyway, because a dependency's
+types have no business in our public surface. A Secure Fields version bump must not be able to
+change the checkout's API by accident, and the brand vocabularies differ regardless (`AMEX` vs
+`AMERICAN_EXPRESS`), so the mapping is mandatory on its own merits.
 
 ## What NOT to do
 
