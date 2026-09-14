@@ -79,6 +79,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// successful one does, so a second submit must never reach the PSP.
     private var validationConsumed = false
     private let registry: PluginRegistry
+    private let configs: SecondaryConfigs
     private let hooks: PurseCheckoutHooks?
     private let serverClock: ServerDatetimeChecker
     /// Web's `WATCHDOG_DURATION`, and Android's `WATCHDOG_INTERVAL_MS`.
@@ -101,6 +102,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
         disabledMethods: Set<MethodKey> = [],
         hooks: PurseCheckoutHooks? = nil,
         registry: PluginRegistry = .shared,
+        secondaryConfigs: SecondaryConfigs = .shared,
         instanceId: String = UUID().uuidString,
         urlSession: URLSession = .shared
     ) throws {
@@ -113,6 +115,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
         self.disabledMethods = disabledMethods
         self.hooks = hooks
         self.registry = registry
+        self.configs = secondaryConfigs
         self.instanceId = instanceId
         self.urlSession = urlSession
 
@@ -123,7 +126,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
         )
         self.serverClock = ServerDatetimeChecker(fetchServerTime: { try await datetimeAPI.datetime() })
 
-        let built = PaymentSessionBuilder.build(params.paymentSession, disabledMethods: disabledMethods)
+        let built = PaymentSessionBuilder.build(
+            params.paymentSession,
+            disabledMethods: disabledMethods,
+            configs: secondaryConfigs
+        )
         self.session = built
         self.meansOfPayment = built.meansOfPayment
         self.splitter = PursePaymentSplitter(orderAmount: built.amount)
@@ -199,7 +206,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
             refresh()
         }
 
-        let validator = PaymentValidator(api: api, registry: registry)
+        let validator = PaymentValidator(api: api, registry: registry, configs: configs)
         let result: ValidationResult
         do {
             result = try await validator.execute(
@@ -360,6 +367,31 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
     // MARK: Secondaries
 
+    /// The secondary methods this session offers — gift cards, vouchers, loyalty.
+    public var secondaryMethods: [SecondaryMethod] {
+        paymentMethods.compactMap {
+            if case let .secondaryMethod(method) = $0 { return method }
+            return nil
+        }
+    }
+
+    /// The issuer rules driving a secondary method — what the shopper's form should ask for. `nil`
+    /// means no configuration is registered for it, so it cannot be tokenized.
+    public func secondaryConfig(for method: SecondaryMethod) -> (any SecondaryConfig)? {
+        configs.config(for: method)
+    }
+
+    /// Turn a typed gift card / voucher into a token that can be drawn into the split. Validates
+    /// against the issuer's own PAN/CVV rules before touching the network.
+    public func getSecondaryToken(
+        method: SecondaryMethod,
+        pan: String,
+        cvv: String? = nil
+    ) async throws -> SecondaryToken {
+        try await SecondaryTokenizer(api: api, configs: configs)
+            .tokenize(method: method, pan: pan, cvv: cvv)
+    }
+
     /// Draw a tokenized secondary instrument into the split. See
     /// ``PursePaymentSplitter/takeSplit(_:requestedAmount:)`` for the refusal rules.
     public func applySecondary(_ token: SecondaryToken, amount: Decimal? = nil) throws {
@@ -427,7 +459,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
         )
         let previousPrimaryId = splitter.primaryMethod?.id
 
-        let built = PaymentSessionBuilder.build(incoming, disabledMethods: disabledMethods)
+        let built = PaymentSessionBuilder.build(
+            incoming,
+            disabledMethods: disabledMethods,
+            configs: configs
+        )
         // The new blob may name a different host; the locked-environment decision is re-applied to
         // it unchanged.
         paymentAPIRoot = Self.resolveAPIRoot(newParams, locked: lockedEnvironment, environment: environment)

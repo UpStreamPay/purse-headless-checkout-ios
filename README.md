@@ -31,7 +31,8 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | Plugin contract, registry, redirect resolution, `/validate` pipeline | ✅ |
 | Card payment via Secure Fields (fresh, saved, CVV-only) | ✅ |
 | Redirect presentation (redirect-based 3-D Secure, PSP pages) | ✅ |
-| Apple Pay, PayPal, Klarna, redirection, gift cards | planned |
+| Gift cards, vouchers, loyalty (7 issuers + host-registrable) | ✅ |
+| Apple Pay, PayPal, Klarna | planned |
 | Saved methods, BNPL, theming, hooks | planned |
 | XCFramework distribution, monitoring, docs | planned |
 
