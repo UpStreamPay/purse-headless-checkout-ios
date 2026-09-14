@@ -57,6 +57,7 @@ let package = Package(
             dependencies: [
                 .product(name: "PurseSecureFields", package: "purse-securefields-ios")
             ],
+            resources: [.copy("PrivacyInfo.xcprivacy")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .target(

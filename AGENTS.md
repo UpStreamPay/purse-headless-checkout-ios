@@ -340,3 +340,28 @@ reaches the engine only through the `PluginHost` protocol.
 The version lives in the git tag and nowhere else. `scripts/generate-version.sh` stamps
 `SDKVersion.swift`; the checked-in value is `0.0.0-SNAPSHOT`. Releases are conventional-commit
 driven through release-please.
+
+## Privacy manifest and lint — where SDK-12264 actually stands
+
+`Sources/PurseHeadlessCheckout/PrivacyInfo.xcprivacy` exists and its
+`NSPrivacyAccessedAPITypes`/`NSPrivacyTracking` sections are real and verified: grepped this
+target's own source *and* `purse-securefields-ios`'s for every required-reason API Apple lists —
+none are used by either. PayPal and Klarna both bundle their own manifest inside their xcframeworks
+already (confirmed by inspecting the resolved artifacts, not assumed) — nothing owed on their
+behalf. Secure Fields itself ships no manifest of its own (same gap as its missing linter) — not
+this repo's to fix, but worth knowing if the merchant's own aggregate manifest ever gets audited.
+
+**`NSPrivacyCollectedDataTypes` is deliberately left empty with a comment, not filled in.** The
+monitoring collector (SDK-12265) sends device model, OS version, screen dimensions and a
+self-generated instance id — never an IDFA/IDFV, never used for tracking — but whether that counts
+as a declarable "collected data type" under Apple's taxonomy, and at what linkage level, is a
+privacy/legal categorization call, not an engineering one. Don't fill it in without that sign-off;
+an engineer's best guess here is exactly the kind of mistake an App Store review — or a customer's
+own privacy audit — will catch later.
+
+**SwiftLint/SwiftFormat were not added.** Neither tool is installed in this environment, so a config
+here could not be run against the ~30-file existing tree to see what it would actually flag before
+committing to it as a CI gate. Adding an unvalidated lint config directly to a *required* CI check
+risks blocking every future PR on an unknown volume of pre-existing violations. Do this properly
+when the tools are available: install both, run against the full tree, fix or explicitly baseline
+what they flag, *then* wire the CI step — not the other way around.
