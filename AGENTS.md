@@ -151,10 +151,14 @@ swift-testing runs **suites in parallel**, and `StubURLProtocol` holds process-w
 are therefore keyed by **host**, and each suite that stubs the network must own a host no other
 suite uses — pick a different `PurseEnvironment` tier if you need one. All four real tiers are
 claimed: `SubmitPaymentTests` uses sandbox and test (one suite each, in the same file),
-`CoPaymentTests` uses development, `SavedSecondaryBalanceTests` uses production. `PayPalTests`,
-`KlarnaTests` and `CardPluginTests` build their own `PartnerUIContext` directly with a fictional
-`apiRoot`, sidestepping the tier limit entirely — prefer that when the test doesn't need a real
-`PurseHeadlessCheckout` end to end.
+`CoPaymentTests` uses development, `SavedSecondaryBalanceTests` uses production. Once a tier is
+taken, the way out is a fictional host instead, not squeezing onto someone else's tier:
+`PayPalTests`, `KlarnaTests`, `CardPluginTests`, `LoanSimulationTests` and `RegistrationTests` build
+their own `PaymentAPIClient`/`PartnerUIContext` directly against a made-up `apiRoot` — `PaymentAPIClient`
+takes any root string, so this sidesteps the tier limit entirely. `WalletTests` does the analogous
+thing for a **full** `PurseHeadlessCheckout` via `walletAPIRootOverride:` (a test-only init
+parameter, same seam `urlSession:` already is) — proof that "all tiers are taken" is never actually
+a blocker, only a prompt to make the thing under test accept its own root.
 
 Getting this wrong does not fail loudly: the other suite's response arrives instead of yours, and
 the test fails with a confusing assertion about the wrong body — including a nonsensical-looking
@@ -241,6 +245,17 @@ under `.build/artifacts/<package>/<product>/*.xcframework/*/*.framework/Modules/
 This is how Klarna's `finalise` (British spelling, not `finalize`) and the exact
 `KlarnaPaymentEventListener` callback signatures were confirmed — a docs page or a guessed signature
 would not have caught either.
+
+**The same discipline applies to our own dependencies, not just PayPal/Klarna.** `PurseTheme`
+(SDK-12262) was designed against an *assumed* gap — "Secure Fields has no styling API, so theming
+has no real integration point yet" — until its actual `SecureFieldsConfig.swift` was read and turned
+out to already carry a real `SecureFieldsStyle` (font/colors/per-state overrides) and
+`SecureFieldsFieldsConfig` (per-field placeholder/accessibility label). The assumption would have
+shipped `PurseTheme` as an inert data type with no wiring; reading the real dependency instead turned
+it into a working feature. The inverse also happened in the same PR: `CardFormTexts.label`/
+`helperText`/`requiredError`/`formatError` really do have no Secure Fields surface (only
+`placeholder` and `accessibilityLabel` exist per field) — confirmed by reading the same file, not
+assumed either way, and documented on the type itself rather than silently wired to nothing.
 
 ## What NOT to do
 

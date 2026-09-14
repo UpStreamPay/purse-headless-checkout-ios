@@ -96,9 +96,15 @@ public struct PartnerUIContext: Sendable {
 public struct PluginOptions: Sendable {
     /// BCP-47 locale (e.g. `"fr-FR"`); `nil` falls back to the device locale.
     public let locale: String?
+    /// Styling for partner-rendered fields (the Secure Fields card form). `nil` uses ``PurseTheme/default``.
+    public let theme: PurseTheme?
+    /// Text overrides for the card form — the card subset of web's `HostedFormUIOptions`.
+    public let cardFormTexts: CardFormTexts
 
-    public init(locale: String? = nil) {
+    public init(locale: String? = nil, theme: PurseTheme? = nil, cardFormTexts: CardFormTexts = CardFormTexts()) {
         self.locale = locale
+        self.theme = theme
+        self.cardFormTexts = cardFormTexts
     }
 }
 

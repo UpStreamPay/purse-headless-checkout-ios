@@ -1,6 +1,6 @@
 # Payment methods by platform — web vs Android vs iOS
 
-Source of truth, checked on 2026-09-14, against this SDK's own PRs #1–#11 and
+Source of truth, checked on 2026-09-14, against this SDK's own PRs #1–#13 and
 `purse-headless-checkout-android/docs/payment-methods-matrix.md`.
 
 - **Web**: `usp-widget/packages/partner-ui/src/plugins/{vaults,generics,partners}/index.ts` and
@@ -64,7 +64,7 @@ value, configured per PSP variant (adyen/ingenico/default) from `/init` rather t
 | Riverty `invoice`, `3x`, `6x`, `9x`, `12x` | ✅ form (IBAN) + client-side simulation text | ❌ dedicated; ✅ if `template/integration_mode = redirection` | ❌ dedicated; ✅ if `template/integration_mode = redirection` | |
 | Younited `installments` | ✅ | ❌ | ❌ | |
 | Scalapay `cb3x-paybylink`, `cb4x-paybylink` | ✅ email form | ❌ | ❌ | |
-| Loan simulation (`simulable` label, `POST /simulation`, `/multi`) | ✅ | ✅ `simulateLoan` / `simulateLoans` | ❌ not yet built (SDK-12262) | Counts and amounts only, no per-instalment dates, on web and Android. Web's total over-counts one instalment; iOS will take Android's corrected arithmetic once built — see the map doc. |
+| Loan simulation (`simulable` label, `POST /simulation`, `/multi`) | ✅ | ✅ `simulateLoan` / `simulateLoans` | ✅ same, Android's corrected arithmetic | Counts and amounts only, no per-instalment dates, on any platform. Web's total over-counts one instalment; iOS and Android both use the corrected math — see the map doc. |
 
 ### Other
 
@@ -72,8 +72,8 @@ value, configured per PSP variant (adyen/ingenico/default) from `/init` rather t
 |---|---|---|---|---|
 | HiPay MB Way (`mbway`) | ✅ phone form | ❌ | ❌ | |
 | Any method with `template = redirection` (Fintecture, Bizum, Oney, Sequra, …) | ✅ | ✅ generic redirection, `partner_data.browser` from the WebView | ✅ generic redirection, `partner_data.browser` from `RedirectionPlugin` | |
-| Saved-card management: rename, delete, favorite, delete all (`wallet_session`) | ✅ | ✅ | ❌ not yet built (SDK-12262) | |
-| Save a fresh card (`payment_preferences.registration`, `token_label`) | ✅ | ✅ | ❌ not yet built (SDK-12262) | iOS's `CardPlugin`/`PayPalPlugin` always send an empty or declined `payment_preferences` today. |
+| Saved-card management: rename, delete, favorite, delete all (`wallet_session`) | ✅ | ✅ | ✅ real `PATCH`, not `POST` + override | |
+| Save a fresh card (`payment_preferences.registration`, `token_label`) | ✅ | ✅ | ✅ | Enhanced centrally in `PaymentValidator`, the same seam every plugin's payload already passes through. |
 
 ## Secondary methods (gift cards, loyalty, vouchers)
 
@@ -93,7 +93,7 @@ Same keys on all three platforms; each is a config, not a plugin.
 | Other secondaries behaviour | Web | Android | iOS |
 |---|---|---|---|
 | Saved gift cards (`integrated_tokens` on a secondary) | ✅ | ✅ | ✅ — background balance resolution, sequential per `/init` (PR #11) |
-| Keep a temporary gift card (registration) | ✅ | ✅ | ❌ not yet built (SDK-12262) |
+| Keep a temporary gift card (registration) | ✅ | ✅ | ✅ |
 | Host-registered issuer config | — (static table) | ✅ `SecondaryConfigs.register` | ✅ `SecondaryConfigs.register` — same extension point on both native platforms, the literal SDK-12261 AC |
 | Splitter autofill middlewares (voucher → loyalty → primary) | ✅ | ❌ | ❌ |
 
@@ -103,9 +103,10 @@ Same keys on all three platforms; each is a config, not a plugin.
   a redirection, and three native SDKs (Apple Pay in place of Google Pay, PayPal, Klarna).
   Everything else web supports is a PSP-hosted form living in the browser, with no native
   equivalent on either native platform, and not planned.
-- **What's still open on iOS that Android already has**: saved-card wallet management
-  (rename/delete/favorite), save-at-submit registration, and loan simulation — all folded into
-  SDK-12262, not yet started as of this doc.
+- **SDK-12262 (saved methods, BNPL, theming) has landed**: saved-card wallet management, save-at-submit
+  registration and loan simulation all ported, plus `PurseTheme` (native `UIColor`/`UIFont`, mapped onto
+  Secure Fields' own `SecureFieldsStyle` — no CSS-string parser, unlike Android's `ThemeValues`, since
+  there is no cross-platform theme config to share).
 - **The three gaps Android and iOS share**, worth a deliberate decision rather than silent scope
   creep: `pci_proxy` cards, `ancv-connect`, and the PayPal BNPL / vaulting pair. The rest of the ❌
   column is "works if the merchant switches the method to `redirection` mode".

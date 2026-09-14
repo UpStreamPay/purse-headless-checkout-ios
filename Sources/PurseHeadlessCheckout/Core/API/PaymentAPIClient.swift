@@ -45,6 +45,40 @@ public struct PaymentAPIClient: Sendable {
         return ValidationResult.fromJSON(response)
     }
 
+    /// `POST {root}/simulation/{entityId}/{partner}/{method}` — one BNPL instalment schedule for
+    /// `product`, web's `FetchPaymentAPI.getSimulation`. Not session-scoped: the merchant entity is
+    /// enough, so the URL skips `/sessions/{sessionId}`.
+    public func getSimulation(partner: Partner, method: PaymentMethod, product: LoanProduct) async throws -> LoanSimulation {
+        let path = simulationPath(partner: partner, method: method)
+        let response = try await execute("POST", path: path, body: .object(product.payload), url: "\(root)\(path)")
+        guard let simulation = LoanSimulation.fromResponse(response) else {
+            throw PaymentAPIError(
+                "Payment API \(path) returned no usable simulation data",
+                errorCode: "INVALID_LOAN_SIMULATION",
+                path: path
+            )
+        }
+        return simulation
+    }
+
+    /// `POST {root}/simulation/{entityId}/{partner}/{method}/multi` — every schedule the partner
+    /// offers for `product`, web's `getSimulationMulti`. Candidates without a `plugin_result` are
+    /// skipped rather than failing the call, matching web.
+    public func getSimulationMulti(
+        partner: Partner, method: PaymentMethod, product: LoanProduct
+    ) async throws -> [LoanSimulation] {
+        let path = simulationPath(partner: partner, method: method) + "/multi"
+        let response = try await execute("POST", path: path, body: .object(product.payload), url: "\(root)\(path)")
+        guard let candidates = response.arrayValue else {
+            throw PaymentAPIError("Payment API \(path) returned a non-array body", path: path)
+        }
+        return candidates.compactMap(LoanSimulation.fromResponse)
+    }
+
+    private func simulationPath(partner: Partner, method: PaymentMethod) -> String {
+        "/simulation/\(entityId)/\(partner.wireValue)/\(method.wireValue)"
+    }
+
     /// `GET /{entityId}/sessions/{sessionId}` — every transaction made so far against this session,
     /// each with its own `status`.
     public func getSession() async throws -> [JSONValue] {

@@ -35,7 +35,10 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | Apple Pay | ✅ (separate `PurseCheckoutApplePay` product) |
 | PayPal | ✅ (separate `PurseCheckoutPayPal` product) |
 | Klarna | ✅ (separate `PurseCheckoutKlarna` product) |
-| Saved methods, BNPL, theming, hooks | planned |
+| Saved gift card background balance resolution | ✅ |
+| Saved methods (rename, delete, favorite, delete-all), save-at-submit registration | ✅ |
+| BNPL loan simulation | ✅ |
+| Theming (`PurseTheme`, mapped onto Secure Fields' own style) | ✅ |
 | XCFramework distribution, monitoring, docs | planned |
 
 ## Development

@@ -134,14 +134,15 @@ public struct PaymentToken: PrimarySource, Sendable, Equatable {
     public internal(set) var disabled: DisabledState?
     /// The opaque value `/validate` pays with.
     public let value: String
-    /// The shopper-given label, when one was saved.
-    public let name: String
+    /// The shopper-given label, when one was saved. Mutated in place by a successful wallet rename.
+    public internal(set) var name: String
     public let label: String
     public let brand: String
     public let holderName: String
     public let maskedPAN: String
     public let expirationDate: String?
-    public let favorite: Bool
+    /// Mutated in place by a successful wallet favorite toggle.
+    public internal(set) var favorite: Bool
     public let tokenSource: TokenSource
     public let createdAt: String?
     /// `network_token.available` — see ``paysWithoutCVV``.
@@ -185,11 +186,14 @@ public struct SavedSecondaryToken: Sendable, Equatable {
     public let pan: String
     /// `pin_code` — the stored security code, when the partner keeps one.
     public let cvv: String?
-    /// Display label — `description.display_token`, else the shopper-given name.
-    public let name: String
+    /// Display label — `description.display_token`, else the shopper-given name. Mutated in place
+    /// by a successful wallet rename.
+    public internal(set) var name: String
     public let expirationDate: String?
     public let createdAt: String?
-    public let favorite: Bool
+    /// Mutated in place when a wallet sync reports a different value — Android's `syncWalletTokens`
+    /// overlay, ported unchanged even though iOS has no dedicated favorite-toggle for this type yet.
+    public internal(set) var favorite: Bool
     /// Spendable balance once resolved; zero until then.
     public internal(set) var balance: Decimal = 0
     public internal(set) var totalBalance: Decimal = 0
