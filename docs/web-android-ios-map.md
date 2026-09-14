@@ -78,6 +78,20 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | `headless-checkout-validation.ts` | `checkout/validation/PaymentValidator.kt` | `Checkout/Validation/PaymentValidator.swift` |
 | `PurseHeadlessCheckoutHooks` | `checkout/PurseCheckoutHooks.kt` | `Checkout/Validation/PaymentValidator.swift` (`PurseCheckoutHooks`) |
 
+## Monitoring — landed (SDK-12265, PR #15)
+
+| Web | Android | iOS |
+|---|---|---|
+| `monitoring/monitoringConfigs.ts` | `checkout/monitoring/CheckoutEventCode.kt` (45 codes) | `Core/Monitoring/CheckoutEventCode.swift` (same 45) |
+| common `Event`, `EventType` | `checkout/monitoring/CheckoutEventBus.kt` (`CheckoutMonitoringEvent`, `EventLevel`) | `Core/Monitoring/CheckoutEventCode.swift` (same types, same file as the codes) |
+| `SimpleQueue.ts` | `core/monitoring/SimpleQueue.kt` | `Core/Monitoring/EventBatchQueue.swift` — an actor, not a lock; same 16/10s/64KB defaults |
+| `checkout-event-bus.ts` (`postFromCode`) | `checkout/monitoring/CheckoutEventBus.kt` — **process-wide singleton** | `Core/Monitoring/CheckoutEventBus.swift` — **per checkout instance**, see the divergence row below |
+| sdk `ApiLogger` (`monitoring-api.ts`) | `core/monitoring/MonitoringApiClient.kt` | `Core/Monitoring/MonitoringAPIClient.swift` |
+| `headless-checkout-validation.ts` `summarizeValidationResults`, error payload | `checkout/monitoring/MonitoringPayloads.kt` | `Checkout/Monitoring/MonitoringPayloads.swift` |
+| `navigator.userAgent` + `screen`, device parse (SDK-12189) | `checkout/monitoring/CheckoutMonitoring.kt` (`androidUserAgent`, `deviceContext`, `screen`) | `Checkout/Monitoring/CheckoutMonitoringContext.swift` |
+| `ApiCallMonitor` (`PARTNER_API_CALL_START`/`_END`) | `core/monitoring/ApiCallMonitor.kt` | **not ported** — see the divergence row below |
+| `pluginIsIncompatibleWithClient` partner-UI event, missing-artifact `METHOD_DISABLED` | `ensureClientCompatibility` probe at session build, `PartnerArtifacts` diagnosis | **not ported** — iOS has neither an `ensureClientCompatibility` probe nor a `PartnerArtifacts` diagnosis to hook into (see their own divergence rows) |
+
 ## Divergences and why
 
 | Topic | Android | iOS | Why |
@@ -128,6 +142,10 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | Secure Fields dependency | `securefields-android:1.4.2` from Maven | `from: "1.9.0"` over https | Was a revision pin: while `purse-securefields-ios` was private, its tags' binary-target release assets 404'd to SwiftPM under every auth method, so no tag resolved for anyone. The repository is public now and the artifact resolves, links and passes — the pin is gone. Note the URL must be `https://`, not `git@github.com:`, which authenticates regardless of visibility and so needs a key CI does not have. |
 | Saved gift card name/expiry backfill from `/init` | `copy(name = it.name.ifBlank { parsed.name }, expirationDate = it.expirationDate ?: parsed.expirationDate…)` | not ported — `name`/`expirationDate`/`createdAt`/`pan`/`cvv` are `let`, not `internal(set) var` | Out of scope for this pass: iOS already sources the display name from the session's own `description.display_token` at build time (see `SavedSecondaryToken`'s doc comment), so Android's defensive fallback has nothing to guard against here. Revisit only if a real issuer is seen sending a blank name at session-build time. |
 | Test-infra: a cached **terminal** `/init` failure | not applicable — Android has no equivalent global test double | `InitGuard.shared` caches a `spent` terminal failure indefinitely, keyed `sessionId:partner:method:amount` | A test driving a real terminal failure through `PaymentAPIClient.initPayment` must `await InitGuard.shared.reset()` before and after, or it poisons that key for any later test reusing the same `(sessionId, partner, method, amount)` — the identical hazard class `StubURLProtocol`'s host-keying already documents, one layer down. See AGENTS.md. |
+| Monitoring event bus lifetime | one process-wide singleton, re-pointed by whichever checkout's `install()` ran last | one per `PurseHeadlessCheckout` instance | Every other piece of mutable checkout state is already per-instance; a shared singleton would be the one exception, and it has a real failure mode (two live checkouts, the second one's events silently redirecting the first's) that this design has no reason to accept. See AGENTS.md. |
+| `HEADLESS_CHECKOUT_METHOD_LOAN_SIM` payload | includes `"amount"` — inconsistent with Android's own SDK-12220 "no raw amount in any event" invariant | `partner`/`method`/`currencyCode` only, no amount | A real inconsistency in the Android source, not a design worth porting; iOS's own privacy tests (`MonitoringPayloadsTests`) hold every event to the stated invariant instead of to Android's actual behaviour. |
+| `ApiCallMonitor` (`PARTNER_API_CALL_START`/`_END`, per-call timing) | a process-wide listener seam `PaymentApiClient` calls into | not ported | Low-value relative to effort for this pass: it traces network timing, not payment outcomes. Every code that matters to "did the payment work and why" is wired; this one is declared in `CheckoutEventCode` for dashboard parity and simply never fires. Revisit if request-level tracing is ever asked for. |
+| `ensureClientCompatibility` probe / `PartnerArtifacts` diagnosis | proactively probes every plugin at session build, posts `PARTNER_UI_EVENT`/`METHOD_DISABLED` for an incompatible or missing one | not ported | Depends on features iOS doesn't have: plugins are resolved fresh per submit here, never proactively probed at session-build time, and there is no `PartnerArtifacts`-style "which product provides this plugin" registry to diagnose a missing one against. Would need those built first, not just the event wiring. |
 
 ## Vocabulary
 

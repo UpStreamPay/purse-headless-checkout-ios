@@ -12,6 +12,9 @@ struct PaymentValidator {
     let api: PaymentAPIClient
     let registry: PluginRegistry
     let configs: SecondaryConfigs
+    /// `nil` in tests that construct a validator directly — monitoring is entirely optional to this
+    /// type, which otherwise has no Checkout-level concerns at all.
+    var eventBus: CheckoutEventBus? = nil
 
     private struct Prepared {
         let plugin: any PartnerUIPlugin
@@ -102,6 +105,9 @@ struct PaymentValidator {
             do {
                 try await onBeforeValidate(splits)
             } catch {
+                await eventBus?.post(.onBeforeValidateHookFailed, .error, monitoringPayload([
+                    "hook": .string("onBeforeValidate"), "message": .string(error.localizedDescription)
+                ]))
                 throw PurseCheckoutError.hookFailed(
                     hook: "onBeforeValidate",
                     underlying: error,
@@ -119,9 +125,16 @@ struct PaymentValidator {
             throw PurseCheckoutError.validateFailed("validate call failed", error)
         }
 
-        // Runs before postValidation, and so before any redirect. Errors are swallowed, like web.
+        // Runs before postValidation, and so before any redirect. Errors are swallowed, like web —
+        // reported as HEADLESS_CHECKOUT_CLIENT_HOOK_ERROR since nothing else will ever see them.
         if let onAfterValidate = hooks?.onAfterValidate {
-            try? await onAfterValidate()
+            do {
+                try await onAfterValidate()
+            } catch {
+                await eventBus?.post(.clientHookError, .error, monitoringPayload([
+                    "hook": .string("onAfterValidate"), "message": .string(error.localizedDescription)
+                ]))
+            }
         }
 
         for item in prepared {
