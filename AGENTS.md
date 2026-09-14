@@ -130,6 +130,35 @@ types have no business in our public surface. A Secure Fields version bump must 
 change the checkout's API by accident, and the brand vocabularies differ regardless (`AMEX` vs
 `AMERICAN_EXPRESS`), so the mapping is mandatory on its own merits.
 
+## Tests: the stub is global, suites are not
+
+swift-testing runs **suites in parallel**, and `StubURLProtocol` holds process-wide state. Handlers
+are therefore keyed by **host**, and each suite that stubs the network must own a host no other
+suite uses — pick a different `PurseEnvironment` tier if you need one
+(`SubmitPaymentTests` uses sandbox, `RedirectHandoffTests` uses test, `CardPluginTests` uses an
+explicit `api.example` root).
+
+Getting this wrong does not fail loudly: the other suite's response arrives instead of yours, and
+the test fails with a confusing assertion about the wrong body. It has already cost three debugging
+rounds. `@Suite(.serialized)` only serializes *within* a suite — it does nothing across them.
+
+## Redirects
+
+Only **redirect-based** flows are in scope, redirect-based 3-D Secure included — it is an ordinary
+redirection and gets no special path. A PSP that requires its own **embedded** 3-D Secure SDK (a
+challenge rendered in-process) needs a partner plugin of its own; do not try to bend the redirect
+presenter into one.
+
+`RedirectPolicy` is a security boundary, not a convenience:
+
+- **`https` only.** A challenge chain never legitimately needs `http`, `file`, `javascript` or
+  another app's scheme, and allowing them turns a redirect into an exfiltration path.
+- **Reaching the return is `returned`, never success.** The final redirect is built server-side and
+  can land on a URL the client cannot read. The real outcome lives on the session. `RedirectOutcome`
+  deliberately has no `success` case — keep it that way.
+- A `WKNavigationDelegate` method whose signature is a near-miss **compiles, is never called, and
+  silently disables the allowlist**. `decisionHandler` is `@escaping @MainActor @Sendable`.
+
 ## What NOT to do
 
 - **Do not add a second observation mechanism.** One `ObservableObject` with `@Published`. Not
