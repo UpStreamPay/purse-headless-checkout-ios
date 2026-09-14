@@ -15,7 +15,11 @@ let package = Package(
         // So no app could take this product *and* a partner one, which is what splitting them was
         // for. Static costs nothing here — no framework to embed, and the Secure Fields binary
         // target is embedded on its own — and is SPM's default.
-        .library(name: "PurseHeadlessCheckout", targets: ["PurseHeadlessCheckout"])
+        .library(name: "PurseHeadlessCheckout", targets: ["PurseHeadlessCheckout"]),
+        // A separate product so a card-only merchant links no PassKit and declares no Apple Pay
+        // entitlement — SDK-12264's "un marchand carte-seule n'embarque pas …". Static, for the
+        // reason above: an app takes this *and* the core product.
+        .library(name: "PurseCheckoutApplePay", targets: ["PurseCheckoutApplePay"])
     ],
     dependencies: [
         // **https, not ssh.** `git@github.com:` authenticates regardless of repository
@@ -42,9 +46,14 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        .target(
+            name: "PurseCheckoutApplePay",
+            dependencies: ["PurseHeadlessCheckout"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         .testTarget(
             name: "PurseHeadlessCheckoutTests",
-            dependencies: ["PurseHeadlessCheckout"],
+            dependencies: ["PurseHeadlessCheckout", "PurseCheckoutApplePay"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         )
     ]
