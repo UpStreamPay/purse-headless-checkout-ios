@@ -111,6 +111,12 @@ public final class PurseHeadlessCheckout: ObservableObject {
     private var registrationByMethod: [String: RegistrationState] = [:]
     /// Save-token decisions for a temporary secondary instrument, keyed by item id.
     private var registrationBySecondaryToken: [String: RegistrationState] = [:]
+    /// Items already given their plugin's `onSessionSet` — `host(for:)` fires it exactly once per
+    /// item, Android's `activePlugins` gate.
+    private var trackedPluginItemIds: Set<String> = []
+    /// Test seam: the fire-and-forget `onSessionSet` `Task` started by `host(for:)`, keyed by item
+    /// id, so a test can `await` it instead of racing the checkout's own background work.
+    var pendingSessionSet: [String: Task<Void, Never>] = [:]
 
     // MARK: Creation
 
@@ -623,6 +629,100 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// The id of an item in the split that still reports its form incomplete, if any.
     public var unfulfilledItemId: String? {
         splitter.splits.map(\.source.id).first { fulfilledByItem[$0] == false }
+    }
+
+    // MARK: Plugin host
+
+    /// The ``PluginHost`` a coordinator drives `item` through — everything `PartnerUI` needs from
+    /// this checkout without depending on `Checkout`.
+    public func host(for item: any PrimarySource) throws -> PluginHost {
+        try requireOpen()
+        let client = try api
+        trackPlugin(item, api: client)
+        return ItemHost(checkout: self, item: item, apiClient: client)
+    }
+
+    /// The context a plugin sees for `item` right now, against `apiClient` — Android's
+    /// `pluginContext`.
+    private func pluginContext(for item: any PrimarySource, api apiClient: PaymentAPIClient) -> PartnerUIContext {
+        let registration = (item as? PrimaryMethod).map { registrationOf($0).registered } ?? false
+        let token = (item as? PaymentToken).map {
+            PayToken(
+                value: $0.value,
+                expirationDate: $0.expirationDate,
+                holderName: $0.holderName.nonBlank,
+                selectedNetwork: CardBrand.fromWire($0.brand) == .unknown ? nil : $0.brand,
+                requiresCVV: $0.requiresCVV
+            )
+        }
+        return PartnerUIContext(
+            partner: item.partner,
+            method: item.method,
+            session: session.source,
+            amount: remainingAmountToPay,
+            api: apiClient,
+            register: registration,
+            token: token,
+            collected: collectedByItem[item.id] ?? [:]
+        )
+    }
+
+    /// Resolve `item`'s plugin and give it `onSessionSet` once — Android's `trackPlugin`. A no-op
+    /// when no plugin is registered yet, or `item` was already tracked.
+    private func trackPlugin(_ item: any PrimarySource, api apiClient: PaymentAPIClient) {
+        guard trackedPluginItemIds.insert(item.id).inserted else { return }
+        guard let plugin = registry.plugin(partner: item.partner, method: item.method, session: session.source) else {
+            return
+        }
+        let context = pluginContext(for: item, api: apiClient)
+        pendingSessionSet[item.id] = Task {
+            try? await plugin.onSessionSet(context)
+        }
+    }
+
+    /// The adapter behind every ``host(for:)`` call — one shape for every plugin, never exposed
+    /// beyond the `PluginHost` existential it returns as.
+    @MainActor
+    private final class ItemHost: PluginHost {
+        unowned let checkout: PurseHeadlessCheckout
+        let item: any PrimarySource
+        let apiClient: PaymentAPIClient
+
+        init(checkout: PurseHeadlessCheckout, item: any PrimarySource, apiClient: PaymentAPIClient) {
+            self.checkout = checkout
+            self.item = item
+            self.apiClient = apiClient
+        }
+
+        var environment: PurseEnvironment { checkout.environment }
+        var redirectionReturnURL: String? { checkout.session.source.redirection }
+
+        func buildContext() -> PartnerUIContext {
+            checkout.pluginContext(for: item, api: apiClient)
+        }
+
+        func setCollected(_ data: [String: JSONValue]) {
+            checkout.setCollected(item.id, data)
+        }
+
+        func setAsPrimary() throws {
+            switch item {
+            case let method as PrimaryMethod:
+                try checkout.setPrimary(method)
+            case let token as PaymentToken:
+                try checkout.setPrimaryToken(token)
+            default:
+                break
+            }
+        }
+
+        func setFulfilled(_ fulfilled: Bool) {
+            checkout.setFulfilled(item.id, fulfilled)
+        }
+
+        func submitPayment() async throws -> ValidationResult {
+            try await checkout.submitPayment()
+        }
     }
 
     // MARK: Session refresh

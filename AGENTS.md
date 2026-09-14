@@ -280,15 +280,35 @@ assumed either way, and documented on the type itself rather than silently wired
    Android, recorded in the module layout docs.
 4. Mirror the Android plugin's `/init` timing and failure modes — `docs/plugins/` there is per-PSP.
 
-## No concrete `PluginHost` exists yet
+## `PurseHeadlessCheckout.host(for:)` — the concrete `PluginHost`
 
-Every coordinator (`CardCoordinator`, `ApplePayCoordinator`, `PayPalCoordinator`, `KlarnaCoordinator`)
-takes `host: any PluginHost` as an init parameter, but nothing in this repo implements that protocol
-— `PurseHeadlessCheckout` does not conform to it, and there is no `host(item:)`-style factory either.
-Every plugin test constructs a bare `PartnerUIContext` directly instead. This is fine for what has
-been tested so far (the protocol half of each plugin), but a real merchant integration — and the
-eventual Demo app — needs this seam built before a coordinator can actually reach a live checkout.
-Don't assume it exists when writing anything that touches a coordinator; check first.
+`host(for item: any PrimarySource) throws -> PluginHost` is the seam a coordinator actually runs
+through in a real app. `item` must be a fresh `PrimaryMethod` or one of its saved `PaymentToken`s
+(anything else is a type error, not a runtime one — `PrimarySource` is the constraint). Asking for a
+host gives the plugin its `onSessionSet` exactly once per item id (`trackedPluginItemIds`), mirroring
+Android's `trackPlugin`. Throws `checkoutTornDown` after `teardown()`, same as every other network
+path.
+
+The adapter (`PurseHeadlessCheckout.ItemHost`, private, nested) is deliberately thin: every member
+forwards to an existing public method (`setCollected`, `setFulfilled`, `setPrimary`/`setPrimaryToken`,
+`submitPayment`) or an existing public property (`session`, `remainingAmountToPay`). The one thing it
+does itself is `pluginContext(for:api:)` — the same context shape `PaymentValidator` builds at actual
+`/validate` time, except `amount` here is the *live* `remainingAmountToPay` (updates as the splitter
+moves), not a frozen split amount. Don't confuse the two: a plugin's `buildContext()` during form entry
+and its `preValidation` context at submit are built by different code for a reason.
+
+**Real bug this uncovered, fixed in the same change**: `CardCoordinator` held its host as `private
+weak var host`, the only one of the four coordinators to do so (the other three use `let`, matching
+Android's own strong reference). Nothing else keeps a `host(for:)`-produced `ItemHost` alive, so the
+weak reference went nil as soon as the caller's local variable went out of scope — `setCollected`/
+`setFulfilled` silently became no-ops right after `init`. Existing tests never caught it because they
+always kept a local `let` reference to their fake host alive for the coordinator's lifetime. Now `let`,
+matching the other three.
+
+Test coverage: `PluginHostTests.swift`. It claims no `PurseEnvironment` tier — `buildContext`/
+`setCollected`/`setFulfilled`/`setAsPrimary`/`onSessionSet` are all synchronous or in-process, no
+network involved, so it can safely share a host with another suite (see `WalletTests`' header comment
+for the same reasoning).
 
 ## Error codes with no dedicated case still need a real carrier
 
@@ -365,3 +385,14 @@ committing to it as a CI gate. Adding an unvalidated lint config directly to a *
 risks blocking every future PR on an unknown volume of pre-existing violations. Do this properly
 when the tools are available: install both, run against the full tree, fix or explicitly baseline
 what they flag, *then* wire the CI step — not the other way around.
+
+**CI has been red on every PR from `feat/card-payment` (#4) onward, and it is not a code bug.**
+`Package.swift` pins `purse-securefields-ios` over `ssh` (`git@github.com:...`), the CI runner has
+no SSH key loaded for it, and the repo has no deploy key. Every run fails identically:
+`git@github.com: Permission denied (publickey)` while resolving that one dependency — confirmed by
+reading the actual failed-job log, not guessed. PRs #1–#3 pass only because they predate the
+dependency being added to the graph. **Not fixed here, deliberately**: the repo owner is making
+`purse-securefields-ios` public, expected within a day of this note (2026-09-14) — once that lands,
+CI goes green with no workflow change needed, since the same `git@github.com:...` URL resolves
+without auth against a public repo. Do not add a deploy key or PAT secret as a workaround; check
+whether the repo is public yet before investigating this again.
