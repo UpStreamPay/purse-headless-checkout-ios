@@ -1,6 +1,15 @@
 {
-  "originHash" : "f8b59faa3b50a37999d25c5bae65a8b00451ef6fe156726871f1f5b9b890528d",
+  "originHash" : "bd681e854a542eaa8598554a4d980d43af3693b445e39f7921bb767cd0e5dd7b",
   "pins" : [
+    {
+      "identity" : "paypal-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/paypal/paypal-ios.git",
+      "state" : {
+        "revision" : "13865f9ddd1403a1c156df3bd3d27508ecb1931d",
+        "version" : "1.5.0"
+      }
+    },
     {
       "identity" : "purse-securefields-ios",
       "kind" : "remoteSourceControl",

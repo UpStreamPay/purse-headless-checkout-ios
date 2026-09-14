@@ -19,7 +19,9 @@ let package = Package(
         // A separate product so a card-only merchant links no PassKit and declares no Apple Pay
         // entitlement — SDK-12264's "un marchand carte-seule n'embarque pas …". Static, for the
         // reason above: an app takes this *and* the core product.
-        .library(name: "PurseCheckoutApplePay", targets: ["PurseCheckoutApplePay"])
+        .library(name: "PurseCheckoutApplePay", targets: ["PurseCheckoutApplePay"]),
+        // Same reasoning: a merchant who doesn't offer PayPal never links PayPal's SDK.
+        .library(name: "PurseCheckoutPayPal", targets: ["PurseCheckoutPayPal"])
     ],
     dependencies: [
         // **https, not ssh.** `git@github.com:` authenticates regardless of repository
@@ -36,7 +38,10 @@ let package = Package(
         // and the mismatch surfaces as `Undefined symbol:
         // PurseSecureFields.SecureFieldsStyle.default.unsafeMutableAddressor` — which reads exactly
         // like a broken release. Wipe DerivedData before concluding anything about an artifact.
-        .package(url: "https://github.com/UpStreamPay/purse-securefields-ios.git", from: "1.9.0")
+        .package(url: "https://github.com/UpStreamPay/purse-securefields-ios.git", from: "1.9.0"),
+        // Public repo, real tagged releases. Verified: `swift package resolve` against this URL
+        // succeeds and pulls in the PayPalCheckout binary target transitively.
+        .package(url: "https://github.com/paypal/paypal-ios.git", from: "1.5.0")
     ],
     targets: [
         .target(
@@ -51,9 +56,19 @@ let package = Package(
             dependencies: ["PurseHeadlessCheckout"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        .target(
+            name: "PurseCheckoutPayPal",
+            dependencies: [
+                "PurseHeadlessCheckout",
+                .product(name: "CorePayments", package: "paypal-ios"),
+                .product(name: "PayPalWebPayments", package: "paypal-ios"),
+                .product(name: "PaymentButtons", package: "paypal-ios")
+            ],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         .testTarget(
             name: "PurseHeadlessCheckoutTests",
-            dependencies: ["PurseHeadlessCheckout", "PurseCheckoutApplePay"],
+            dependencies: ["PurseHeadlessCheckout", "PurseCheckoutApplePay", "PurseCheckoutPayPal"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         )
     ]

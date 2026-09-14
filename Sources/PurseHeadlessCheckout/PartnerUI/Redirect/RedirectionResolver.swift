@@ -41,7 +41,8 @@ public enum RedirectionResolver {
 
         guard let action, let target = action.targetURL else { return action }
         let isOwnReturn = sessionReturnURL.map(target.hasPrefix) ?? false
-        return (isOwnReturn || target.isWidgetConfirmationRedirect) ? nil : action
+        let isEcho = target.isWidgetConfirmationRedirect || target.isPayPalApprovalEcho
+        return (isOwnReturn || isEcho) ? nil : action
     }
 
     /// Best-effort `payment_id` off the widget-confirmation redirect — present whether or not
