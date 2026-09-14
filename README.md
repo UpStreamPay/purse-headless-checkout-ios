@@ -34,7 +34,7 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | Gift cards, vouchers, loyalty (7 issuers + host-registrable) | ✅ |
 | Apple Pay | ✅ (separate `PurseCheckoutApplePay` product) |
 | PayPal | ✅ (separate `PurseCheckoutPayPal` product) |
-| Klarna | planned |
+| Klarna | ✅ (separate `PurseCheckoutKlarna` product) |
 | Saved methods, BNPL, theming, hooks | planned |
 | XCFramework distribution, monitoring, docs | planned |
 

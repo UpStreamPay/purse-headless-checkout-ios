@@ -21,7 +21,10 @@ let package = Package(
         // reason above: an app takes this *and* the core product.
         .library(name: "PurseCheckoutApplePay", targets: ["PurseCheckoutApplePay"]),
         // Same reasoning: a merchant who doesn't offer PayPal never links PayPal's SDK.
-        .library(name: "PurseCheckoutPayPal", targets: ["PurseCheckoutPayPal"])
+        // Same reasoning: a merchant who doesn't offer PayPal never links PayPal's SDK.
+        .library(name: "PurseCheckoutPayPal", targets: ["PurseCheckoutPayPal"]),
+        // Same reasoning: a merchant who doesn't offer Klarna never links Klarna's SDK.
+        .library(name: "PurseCheckoutKlarna", targets: ["PurseCheckoutKlarna"])
     ],
     dependencies: [
         // **https, not ssh.** `git@github.com:` authenticates regardless of repository
@@ -41,7 +44,12 @@ let package = Package(
         .package(url: "https://github.com/UpStreamPay/purse-securefields-ios.git", from: "1.9.0"),
         // Public repo, real tagged releases. Verified: `swift package resolve` against this URL
         // succeeds and pulls in the PayPalCheckout binary target transitively.
-        .package(url: "https://github.com/paypal/paypal-ios.git", from: "1.5.0")
+        .package(url: "https://github.com/paypal/paypal-ios.git", from: "1.5.0"),
+        // `klarna-mobile-sdk-spm` is the current mirror; the sibling `klarna-mobile-sdk-basic-spm`
+        // is archived and its GitHub description says so outright — verified via the repos' own
+        // metadata, not from a search result. Real tagged releases (binary xcframeworks hosted on
+        // Klarna's own CDN, not a private-repo release asset), so this resolves normally too.
+        .package(url: "https://github.com/klarna/klarna-mobile-sdk-spm.git", from: "2.9.0")
     ],
     targets: [
         .target(
@@ -66,9 +74,23 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        .target(
+            name: "PurseCheckoutKlarna",
+            dependencies: [
+                "PurseHeadlessCheckout",
+                // The only product this plugin needs. It bundles the `KlarnaCore`/`KlarnaCoreWebView`
+                // targets internally — there is no separate "KlarnaCore" product to depend on, unlike
+                // PayPal's split. Verified against the package's own manifest, not assumed from the
+                // naming pattern.
+                .product(name: "KlarnaPayments", package: "klarna-mobile-sdk-spm")
+            ],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         .testTarget(
             name: "PurseHeadlessCheckoutTests",
-            dependencies: ["PurseHeadlessCheckout", "PurseCheckoutApplePay", "PurseCheckoutPayPal"],
+            dependencies: [
+                "PurseHeadlessCheckout", "PurseCheckoutApplePay", "PurseCheckoutPayPal", "PurseCheckoutKlarna"
+            ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         )
     ]
