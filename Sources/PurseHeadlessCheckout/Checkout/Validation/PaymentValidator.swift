@@ -99,7 +99,14 @@ struct PaymentValidator {
         }
 
         for item in prepared {
-            try await item.plugin.postValidation(result, context: item.context)
+            do {
+                try await item.plugin.postValidation(result, context: item.context)
+            } catch {
+                // `/validate` has already answered at this point, so the payment exists whatever a
+                // plugin does next (Klarna's `postValidation` throws on a declined authorization,
+                // for one).
+                throw PurseCheckoutError.postValidationFailed(result: result, underlying: error)
+            }
         }
         return result
     }

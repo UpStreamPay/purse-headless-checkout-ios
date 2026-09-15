@@ -81,6 +81,12 @@ public final class PurseHeadlessCheckout: ObservableObject {
     private let registry: PluginRegistry
     private let hooks: PurseCheckoutHooks?
     private let serverClock: ServerDatetimeChecker
+    /// Web's `WATCHDOG_DURATION`, and Android's `WATCHDOG_INTERVAL_MS`.
+    static let watchdogIntervalNanoseconds: UInt64 = 5_000_000_000
+    /// Test seams: the background work started at creation, so a test can await the clock sync
+    /// instead of racing it, and cancel the watchdog rather than leaving a timer running.
+    var pendingClockSync: Task<Void, Never>?
+    var expiryWatchdog: Task<Void, Never>?
     /// Injectable so tests can stub the transport — the seam `purse-ios-securefields` calls
     /// `testURLSession`. Production callers never pass it.
     private let urlSession: URLSession
@@ -124,6 +130,27 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
         registry.install(RedirectionModule())
         refresh()
+
+        // Nothing else ever called `sync()`, so the offset stayed 0 and every "server-corrected"
+        // check was really the device clock. One sync at creation is what makes the correction real.
+        pendingClockSync = Task { [serverClock] in await serverClock.sync() }
+        startExpiryWatchdog()
+    }
+
+    /// Move the session to ``SessionState/expired`` when its expiry passes *while the shopper is
+    /// looking at the screen* — web's `ServerDatetimeChecker.WATCHDOG_DURATION`, Android's
+    /// `startExpiryWatchdog`.
+    private func startExpiryWatchdog() {
+        expiryWatchdog = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: Self.watchdogIntervalNanoseconds)
+                guard let self else { return }
+                guard sessionState == .ready else { continue }
+                if await serverClock.isExpiredForServer(session.expirationDate) {
+                    sessionState = .expired
+                }
+            }
+        }
     }
 
     /// Where this session's Payment API calls go. A build-**locked** (release) environment trusts
@@ -155,7 +182,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// `postValidation`.
     @discardableResult
     public func submitPayment(skipOnBeforeValidate: Bool = false) async throws -> ValidationResult {
-        try acquireSubmitLock()
+        try await acquireSubmitLock()
 
         guard splitter.fulfilled else {
             sessionState = .ready
@@ -184,15 +211,29 @@ public final class PurseHeadlessCheckout: ObservableObject {
                 skipOnBeforeValidate: skipOnBeforeValidate
             )
         } catch {
-            // The session is only spent once /validate actually answered. A hook that aborted, or a
-            // transport failure, leaves it submittable — except when the outcome is unknown, where
-            // the payment may exist and a retry could double-charge.
-            if let checkoutError = error as? PurseCheckoutError,
-               case let .validateFailed(_, underlying) = checkoutError,
-               (underlying as? PaymentAPIError)?.outcomeUnknown == true {
+            // The session is only spent once /validate actually answered — but there are three
+            // distinct ways that can be true, and only one of them used to be handled.
+            switch error {
+            case let PurseCheckoutError.postValidationFailed(result, _):
+                // The API answered about the payment; a plugin choked afterwards. The payment is
+                // real, so the session is spent exactly as it would be on the success path.
+                validationConsumed = true
+                sessionState = result.isSuccess ? .submitted : .error
+
+            case let PurseCheckoutError.validateFailed(_, underlying)
+                where (underlying as? PaymentAPIError)?.outcomeUnknown == true:
+                // No answer came back, so the payment may exist: a retry could double-charge.
                 validationConsumed = true
                 sessionState = .submitted
-            } else {
+
+            case _ where Self.isSessionTerminal(error):
+                // Already submitted / expired / gone: every further call against this session is
+                // pointless, so say so rather than leaving it looking submittable.
+                sessionState = .terminated
+
+            default:
+                // A hook that aborted before anything was sent, or a transport failure: the
+                // checkout is exactly as submittable as it was.
                 sessionState = .ready
             }
             throw error
@@ -216,16 +257,30 @@ public final class PurseHeadlessCheckout: ObservableObject {
         )?.withReturnURLPrefix(session.source.redirection)
     }
 
+    /// Whether `error`, **or anything in its `underlying` chain**, is a terminal Payment API answer
+    /// for the session (already submitted / expired / gone).
+    static func isSessionTerminal(_ error: any Error) -> Bool {
+        var current: (any Error)? = error
+        while let error = current {
+            if (error as? PaymentAPIError)?.isSessionTerminal == true { return true }
+            current = (error as? any PurseError)?.underlying
+        }
+        return false
+    }
+
     /// Re-checks expiry against the server-corrected clock, then moves `ready`/`error` →
     /// `submitting`.
-    private func acquireSubmitLock() throws {
+    private func acquireSubmitLock() async throws {
         if validationConsumed {
             throw PurseCheckoutError.submitBlocked(state: .submitted)
         }
         guard sessionState == .ready || sessionState == .error else {
             throw PurseCheckoutError.submitBlocked(state: sessionState)
         }
-        if session.expirationDate < Date() {
+        // Against the **server** clock, not the device's. A device running ten minutes slow would
+        // otherwise submit an expired session, and one running fast would refuse a valid one — and
+        // the shopper cannot fix either.
+        if await serverClock.isExpiredForServer(session.expirationDate) {
             sessionState = .expired
             throw PurseCheckoutError.sessionExpired(sessionId: session.id)
         }
@@ -323,9 +378,19 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// Hand the checkout a **new** Client Session without tearing the screen down — the cart
     /// changed, or the previous session expired and your backend minted a fresh one.
     public func setSession(_ widgetData: String) throws {
+        // Never while a submit is in flight. `submitPayment` suspends at `await validator.execute`,
+        // releasing the main actor, and a `setSession` landing in that window replaces the session,
+        // resets the splitter and clears `validationConsumed` — so when `/validate` answers, the
+        guard sessionState != .submitting else {
+            throw PurseCheckoutError.submitBlocked(state: .submitting)
+        }
+
         let newParams = try SessionCodec.decode(widgetData)
         let incoming = newParams.paymentSession
 
+        // The device clock, deliberately: this path is synchronous, and the check that actually
+        // gates a payment is the server-corrected one in `acquireSubmitLock`. A device clock wrong
+        // enough to slip an expired blob past here still cannot get it submitted.
         if incoming.expirationDate < Date() {
             throw PurseCheckoutError.sessionExpired(sessionId: incoming.id)
         }

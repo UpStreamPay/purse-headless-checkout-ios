@@ -28,6 +28,9 @@ public enum PurseCheckoutError: PurseError {
     case validateFailed(String, (any Error)?)
     /// A merchant hook threw.
     case hookFailed(hook: String, underlying: any Error, code: PurseErrorCode)
+    /// `/validate` **answered** — the payment exists, approved or declined — and a plugin's
+    /// `postValidation` then threw.
+    case postValidationFailed(result: ValidationResult, underlying: any Error)
 
     public var code: PurseErrorCode {
         switch self {
@@ -40,6 +43,7 @@ public enum PurseCheckoutError: PurseError {
         case .itemNotFulfilled: .elementNotFulfilled
         case .validateFailed: .validateFailed
         case let .hookFailed(_, _, code): code
+        case .postValidationFailed: .postValidateFailed
         }
     }
 
@@ -47,6 +51,7 @@ public enum PurseCheckoutError: PurseError {
         switch self {
         case let .validateFailed(_, underlying): underlying
         case let .hookFailed(_, underlying, _): underlying
+        case let .postValidationFailed(_, underlying): underlying
         default: nil
         }
     }
@@ -73,6 +78,8 @@ public enum PurseCheckoutError: PurseError {
             detail
         case let .hookFailed(hook, underlying, _):
             "the \(hook) hook failed: \(underlying)"
+        case let .postValidationFailed(result, underlying):
+            "validate answered \(result.globalStatus) but postValidation failed: \(underlying)"
         }
     }
 }

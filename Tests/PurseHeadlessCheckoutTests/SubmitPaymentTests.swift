@@ -56,6 +56,38 @@ struct SubmitPaymentTests {
 
     private static let successBody = #"{"global_status":"SUCCESS","results":[]}"#
 
+    /// A plugin whose `postValidation` throws — Klarna's does exactly this on a declined
+    /// authorization, *after* `/validate` has already charged the payment.
+    private struct ThrowingPostValidationPlugin: PartnerUIPlugin {
+        let partner: Partner
+        let method: PaymentMethod
+        func preValidation(_ context: PartnerUIContext) async throws -> ValidateItemPayload {
+            ItemPayload(partner: partner, method: method, amount: context.amount)
+        }
+        func postValidation(_ result: ValidationResult, context: PartnerUIContext) async throws {
+            throw PartnerUIError("authorization declined")
+        }
+    }
+
+    private func checkoutWhosePluginFailsAfterValidate() throws -> PurseHeadlessCheckout {
+        let registry = PluginRegistry()
+        registry.registerVault(vendor: .purse) {
+            ThrowingPostValidationPlugin(partner: $0.partner, method: $0.method)
+        }
+        return try PurseHeadlessCheckout(
+            widgetData: TestSessions.widgetData(paymentSession: TestSessions.paymentSession(amount: 100)),
+            registry: registry,
+            urlSession: StubURLProtocol.session()
+        )
+    }
+
+    /// Holds the checkout for a `@Sendable` hook to reach back into, and records what it saw.
+    @MainActor private final class Interleave {
+        var checkout: PurseHeadlessCheckout?
+        var thrown: (any Error)?
+        var didSucceed = false
+    }
+
     // MARK: Happy path
 
     @Test func submitsOneValidateItemPerSplit() async throws {
@@ -263,5 +295,117 @@ struct SubmitPaymentTests {
             #expect(error.code == .methodNotImplemented)
             #expect(error.message.contains("purse-creditcard"))
         }
+    }
+
+    // MARK: Session-spending correctness
+
+    /// `/validate` answered — the payment exists — and a plugin then threw. The session is spent
+    /// either way; treating this as "the submit failed" would let the next submit send a second
+    /// `/validate` for an already-charged session.
+    @Test func aPostValidationFailureStillSpendsTheSession() async throws {
+        StubURLProtocol.reset()
+        StubURLProtocol.set("/validate", .ok(Self.successBody))
+
+        let checkout = try checkoutWhosePluginFailsAfterValidate()
+        try selectCard(checkout)
+
+        do {
+            _ = try await checkout.submitPayment()
+            Issue.record("expected the postValidation failure to surface")
+        } catch let error as PurseCheckoutError {
+            #expect(error.code == .postValidateFailed)
+            // The result rides along precisely because the payment is real.
+            guard case let .postValidationFailed(result, _) = error else {
+                Issue.record("expected postValidationFailed, got \(error)")
+                return
+            }
+            #expect(result.isSuccess)
+        }
+
+        #expect(checkout.sessionState == .submitted)
+
+        // The second submit must never reach the PSP.
+        StubURLProtocol.reset()
+        do {
+            _ = try await checkout.submitPayment()
+            Issue.record("expected the spent session to refuse a second submit")
+        } catch let error as PurseCheckoutError {
+            #expect(error.code == .submitBlocked)
+        }
+        #expect(!StubURLProtocol.paths.contains { $0.hasSuffix("/validate") })
+    }
+
+    /// A terminal API answer (already submitted / expired / gone) ends the session rather than
+    /// leaving it looking submittable. The error arrives wrapped in `validateFailed`, so matching it
+    /// means walking the chain, not casting the top-level error.
+    @Test func aTerminalValidateAnswerTerminatesTheSession() async throws {
+        StubURLProtocol.reset()
+        StubURLProtocol.set("/validate", .failure(409, #"{"error":"SESSION_ALREADY_SUBMITTED_ERROR"}"#))
+
+        let checkout = try makeCheckout()
+        try selectCard(checkout)
+
+        await #expect(throws: PurseCheckoutError.self) {
+            _ = try await checkout.submitPayment()
+        }
+        #expect(checkout.sessionState == .terminated)
+    }
+
+    /// `submitPayment` suspends at the `/validate` round trip, releasing the main actor.
+    @Test func setSessionIsRefusedWhileASubmitIsInFlight() async throws {
+        StubURLProtocol.reset()
+        StubURLProtocol.set("/validate", .ok(Self.successBody))
+
+        let interleave = Interleave()
+        let hooks = PurseCheckoutHooks(onBeforeValidate: { _ in
+            await MainActor.run {
+                do {
+                    try interleave.checkout?.setSession(
+                        TestSessions.widgetData(paymentSession: TestSessions.paymentSession(id: "session-2"))
+                    )
+                    interleave.didSucceed = true
+                } catch {
+                    interleave.thrown = error
+                }
+            }
+        })
+
+        let checkout = try makeCheckout(hooks: hooks)
+        interleave.checkout = checkout
+        try selectCard(checkout)
+        _ = try await checkout.submitPayment()
+
+        #expect(!interleave.didSucceed)
+        #expect((interleave.thrown as? PurseCheckoutError)?.code == .submitBlocked)
+        // The session that was actually submitted is still the one in force.
+        #expect(checkout.currentSessionId == "session-1")
+    }
+
+    /// Expiry is checked against the **server** clock. `ServerDatetimeChecker` existed and was
+    /// never consulted: nothing called `sync()` and nothing called `isExpiredForServer`, so a device
+    /// clock running slow would submit an expired session.
+    @Test func expiryIsCheckedAgainstTheServerClockNotTheDevices() async throws {
+        StubURLProtocol.reset()
+        StubURLProtocol.set("/validate", .ok(Self.successBody))
+        // The server is a year ahead of this device: a session that still has an hour left *by the
+        // device clock* expired long ago as far as the server is concerned.
+        let formatter = ISO8601DateFormatter()
+        let serverNow = Date().addingTimeInterval(365 * 24 * 3600)
+        StubURLProtocol.set("/datetime", .ok(#"{"iso":"\#(formatter.string(from: serverNow))"}"#))
+
+        let checkout = try makeCheckout(
+            expirationDate: formatter.string(from: Date().addingTimeInterval(3600))
+        )
+        await checkout.pendingClockSync?.value
+        try selectCard(checkout)
+
+        do {
+            _ = try await checkout.submitPayment()
+            Issue.record("expected the server clock to refuse an expired session")
+        } catch let error as PurseCheckoutError {
+            #expect(error.code == .expiredSession)
+        }
+        #expect(checkout.sessionState == .expired)
+        checkout.expiryWatchdog?.cancel()
     }
 }
