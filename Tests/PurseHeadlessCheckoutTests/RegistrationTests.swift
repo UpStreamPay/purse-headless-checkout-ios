@@ -187,4 +187,53 @@ struct RegistrationTests {
             #expect(error.code == .invalidTokenName)
         }
     }
+
+    // MARK: setSession
+
+    /// A save-token decision belongs to the item that was on screen when the shopper made it.
+    @Test func aRegistrationDecisionDoesNotSurviveAMethodItWasNotMadeFor() throws {
+        let checkout = try PurseHeadlessCheckout(
+            widgetData: TestSessions.widgetData(
+                paymentSession: TestSessions.paymentSession(
+                    protocols: TestSessions.cardProtocol(settings: ["save_token_mode": "PREFER"])
+                )
+            ),
+            urlSession: StubURLProtocol.session()
+        )
+        let method = try #require(checkout.paymentMethods.compactMap { item -> PrimaryMethod? in
+            if case let .primaryMethod(method) = item { return method }
+            return nil
+        }.first)
+
+        // Registered *against* the mode's default (PREFER defaults to on), so "the decision
+        // survived" and "the default came back" cannot be confused.
+        try checkout.register(method, registered: false, name: "Perso")
+        #expect(!checkout.registrationOf(method).registered)
+        #expect(checkout.registrationOf(method).name == "Perso")
+
+        // A different `labels` set is a different configuration under the same id, so the item does
+        // not survive.
+        try checkout.setSession(
+            TestSessions.widgetData(
+                paymentSession: TestSessions.paymentSession(
+                    id: "session-2",
+                    protocols: TestSessions.cardProtocol(
+                        settings: ["save_token_mode": "PREFER"],
+                        labels: ["different"]
+                    )
+                )
+            )
+        )
+
+        let rebuilt = try #require(checkout.paymentMethods.compactMap { item -> PrimaryMethod? in
+            if case let .primaryMethod(method) = item { return method }
+            return nil
+        }.first)
+        #expect(rebuilt.id == method.id)
+        // Back to the new method's own default, carrying none of the old decision.
+        #expect(checkout.registrationOf(rebuilt).registered)
+        #expect(checkout.registrationOf(rebuilt).name == nil)
+
+        checkout.expiryWatchdog?.cancel()
+    }
 }

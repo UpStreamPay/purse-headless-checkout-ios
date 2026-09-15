@@ -100,10 +100,14 @@ public struct WalletAPIClient: Sendable {
 
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         if status >= 400 {
-            let responseBody = String(data: data, encoding: .utf8) ?? ""
+            // The body stays **out** of the message, exactly as `PaymentAPIClient` keeps it out:
+            // `errorPayload` puts a `PurseError`'s message straight into the monitoring event, and
+            // a wallet 4xx body can carry a masked PAN or a holder name.
+            let errorCode = (try? JSONDecoder().decode(JSONValue.self, from: data))?["error"]?.stringValue
             throw PaymentAPIError(
-                "Wallet API \(method) \(path) failed: HTTP \(status) \(responseBody)",
+                "Wallet API \(method) \(path) failed: HTTP \(status)" + (errorCode.map { " (\($0))" } ?? ""),
                 status: status,
+                errorCode: errorCode,
                 path: path
             )
         }

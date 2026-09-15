@@ -543,6 +543,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
         session = built
         meansOfPayment = built.meansOfPayment
         fulfilledByItem = fulfilledByItem.filter { survivingIds.contains($0.key) }
+        // Save-token decisions belong to the item that was on screen when the shopper made them.
+        registrationByMethod = registrationByMethod.filter { survivingIds.contains($0.key) }
+        registrationBySecondaryToken.removeAll()
 
         // Gift cards were tokenized against the old session and cannot carry over.
         splitter.reset(orderAmount: built.amount)
