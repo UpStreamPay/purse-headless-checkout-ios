@@ -23,13 +23,17 @@ public final class PurseHeadlessCheckout: ObservableObject {
     public let disabledMethods: Set<MethodKey>
 
     /// Resolved Payment API root; calls go to `{root}/{entityId}/sessions/{sessionId}/…`.
-    public var paymentAPIRoot: String { environment.paymentAPIRoot }
+    ///
+    /// Re-resolved by ``setSession(_:)``, since the new blob may name a different host.
+    public private(set) var paymentAPIRoot: String
 
     public var currency: String { session.currency }
     public var isInformationRequest: Bool { session.isInformationRequest }
     public var currentSessionId: String { session.id }
 
     private let environment: PurseEnvironment
+    /// Kept so ``setSession(_:)`` can re-apply the same trust decision to the incoming blob.
+    private let lockedEnvironment: PurseEnvironment?
 
     // MARK: Published state
 
@@ -82,7 +86,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
     ) throws {
         let params = try SessionCodec.decode(widgetData)
         self.params = params
-        self.environment = lockedEnvironment ?? params.environment
+        let environment = lockedEnvironment ?? params.environment
+        self.environment = environment
+        self.lockedEnvironment = lockedEnvironment
+        self.paymentAPIRoot = Self.resolveAPIRoot(params, locked: lockedEnvironment, environment: environment)
         self.disabledMethods = disabledMethods
         self.instanceId = instanceId
 
@@ -92,6 +99,18 @@ public final class PurseHeadlessCheckout: ObservableObject {
         self.splitter = PursePaymentSplitter(orderAmount: built.amount)
 
         refresh()
+    }
+
+    /// Where this session's Payment API calls go. A build-**locked** (release) environment trusts
+    /// its own known root and ignores whatever `api_url` the session declares — that is the whole
+    /// point of locking, and ``PurseEnvironment``'s own header says so.
+    private static func resolveAPIRoot(
+        _ params: PurseSessionParams,
+        locked: PurseEnvironment?,
+        environment: PurseEnvironment
+    ) -> String {
+        guard locked == nil, let declared = params.apiURL.nonBlank else { return environment.paymentAPIRoot }
+        return declared
     }
 
     // MARK: Selecting the primary
@@ -190,6 +209,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
         let previousPrimaryId = splitter.primaryMethod?.id
 
         let built = PaymentSessionBuilder.build(incoming, disabledMethods: disabledMethods)
+        // The new blob may name a different host; the locked-environment decision is re-applied to
+        // it unchanged.
+        paymentAPIRoot = Self.resolveAPIRoot(newParams, locked: lockedEnvironment, environment: environment)
 
         // An item survives only when its configuration is deep-equal; anything else is a different
         // method wearing the same id.

@@ -56,6 +56,42 @@ struct PurseHeadlessCheckoutTests {
         #expect(checkout.paymentAPIRoot == PurseEnvironment.production.paymentAPIRoot)
     }
 
+    /// An unlocked build honours the session's own `api_url`, so a tenant- or region-specific
+    /// Payment API host is actually reached. A locked one ignores it — that is what locking buys.
+    @Test func anUnlockedBuildRoutesToTheSessionsApiURLAndALockedOneIgnoresIt() throws {
+        let tenantHost = "https://api.tenant-42.purse-sandbox.com/payment/v1"
+
+        let unlocked = try PurseHeadlessCheckout(
+            widgetData: TestSessions.widgetData(apiURL: tenantHost)
+        )
+        #expect(unlocked.paymentAPIRoot == tenantHost)
+
+        let locked = try PurseHeadlessCheckout(
+            widgetData: TestSessions.widgetData(apiURL: tenantHost),
+            lockedEnvironment: .production
+        )
+        #expect(locked.paymentAPIRoot == PurseEnvironment.production.paymentAPIRoot)
+
+        // A blob that omits it falls back to the declared tier's root.
+        let noURL = try PurseHeadlessCheckout(widgetData: TestSessions.widgetData(apiURL: ""))
+        #expect(noURL.paymentAPIRoot == PurseEnvironment.sandbox.paymentAPIRoot)
+    }
+
+    /// A new blob can name a different host, so the root cannot be resolved once at init.
+    @Test func setSessionReResolvesTheApiRoot() throws {
+        let checkout = try PurseHeadlessCheckout(widgetData: TestSessions.widgetData())
+        #expect(checkout.paymentAPIRoot == PurseEnvironment.sandbox.paymentAPIRoot)
+
+        let moved = "https://api.moved.purse-sandbox.com/payment/v1"
+        try checkout.setSession(
+            TestSessions.widgetData(
+                apiURL: moved,
+                paymentSession: TestSessions.paymentSession(id: "session-2")
+            )
+        )
+        #expect(checkout.paymentAPIRoot == moved)
+    }
+
     /// Filtered states mean "never show this" — the item must not reach the published list.
     @Test func filteredMethodsAreNotPublished() throws {
         let checkout = try checkout(

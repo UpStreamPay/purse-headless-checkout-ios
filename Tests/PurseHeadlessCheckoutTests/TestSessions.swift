@@ -6,16 +6,20 @@ import Foundation
 /// types directly, or the parser is never exercised.
 enum TestSessions {
 
+    /// `apiURL` defaults to the declared environment's own root rather than a hardcoded sandbox
+    /// host: an unlocked checkout honours `api_url`, so a fixture that always said "sandbox" while
+    /// declaring `environment: "development"` would route somewhere the session never meant.
     static func widgetData(
         environment: String = "sandbox",
         apiKey: String = "test-key",
         entityId: String = "entity-1",
+        apiURL: String? = nil,
         paymentSession: [String: Any] = Self.paymentSession(),
         walletSession: [String: Any]? = nil
     ) -> String {
         var blob: [String: Any] = [
             "api_key": apiKey,
-            "api_url": "https://api.purse-sandbox.com",
+            "api_url": apiURL ?? PurseEnvironment.fromWire(environment)?.paymentAPIRoot ?? "",
             "environment": environment,
             "entity_id": entityId,
             "payment_session": paymentSession,
