@@ -58,9 +58,22 @@ public final class KlarnaCoordinator: NSObject {
             return try await self.authorizeWidget()
         }
 
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
-            pendingReady = continuation
-            paymentView.initialize(clientToken: config.clientToken)
+        // One widget load at a time; a second `prepare()` would overwrite this continuation and
+        // strand the first caller.
+        guard pendingReady == nil else {
+            throw PartnerUIError("a Klarna widget is already being prepared")
+        }
+
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                pendingReady = continuation
+                paymentView.initialize(clientToken: config.clientToken)
+            }
+        } catch {
+            // The registration above happens before the widget is known to work; drop it rather
+            // than leave a closure keyed by a token nothing will ever present.
+            await KlarnaAuthorizationRegistry.shared.remove(token)
+            throw error
         }
 
         host.setCollected([
@@ -73,6 +86,9 @@ public final class KlarnaCoordinator: NSObject {
     private func authorizeWidget() async throws -> Bool {
         guard let view else {
             throw PartnerUIError("call prepare() before authorizing — the widget has no client token yet")
+        }
+        guard pendingAuthorize == nil else {
+            throw PartnerUIError("a Klarna authorization is already in progress")
         }
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, any Error>) in
             pendingAuthorize = continuation

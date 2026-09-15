@@ -16,9 +16,16 @@ actor KlarnaAuthorizationRegistry {
         callbacks[token] = callback
     }
 
-    /// Removes and returns the callback — single use, same as Android's collected entry is
-    /// overwritten by the next `prepare()`.
-    func take(_ token: String) -> (@Sendable () async throws -> Bool)? {
+    /// Reads the callback **without consuming it**. Single-use `take` semantics made a declined
+    /// authorization unrecoverable: `postValidation` took the callback, called it, and threw
+    /// `KlarnaAuthorizationDeclined` when the shopper declined — with the callback already gone.
+    func callback(for token: String) -> (@Sendable () async throws -> Bool)? {
+        callbacks[token]
+    }
+
+    /// Drops a registration whose widget never became usable, so a failed load does not leave its
+    /// closure behind for the life of the process.
+    func remove(_ token: String) {
         callbacks.removeValue(forKey: token)
     }
 }

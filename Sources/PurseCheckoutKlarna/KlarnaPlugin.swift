@@ -48,7 +48,7 @@ public struct KlarnaPlugin: PartnerUIPlugin {
     public func postValidation(_ result: ValidationResult, context: PartnerUIContext) async throws {
         guard result.isSuccess else { return }
         guard let token = context.collected[Collected.authorizeToken]?.stringValue,
-              let authorize = await KlarnaAuthorizationRegistry.shared.take(token)
+              let authorize = await KlarnaAuthorizationRegistry.shared.callback(for: token)
         else {
             throw PartnerUIError("Klarna authorize callback missing — was the widget ever prepared?")
         }

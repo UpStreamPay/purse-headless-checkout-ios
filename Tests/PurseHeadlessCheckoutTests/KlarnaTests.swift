@@ -121,14 +121,35 @@ struct KlarnaTests {
         }
     }
 
-    /// The registry is single-use, same as Android's `collected` entry being overwritten by the
-    /// next `prepare()` — a second lookup must not find a stale callback.
-    @Test func theRegistryHandsOutACallbackOnlyOnce() async throws {
+    /// A lookup must **not** consume the callback.
+    @Test func aDeclinedAuthorizationCanBeRetried() async throws {
         let token = UUID().uuidString
-        await KlarnaAuthorizationRegistry.shared.register(token: token) { true }
+        let attempts = Attempts()
+        await KlarnaAuthorizationRegistry.shared.register(token: token) {
+            await attempts.record() > 1
+        }
 
-        #expect(await KlarnaAuthorizationRegistry.shared.take(token) != nil)
-        #expect(await KlarnaAuthorizationRegistry.shared.take(token) == nil)
+        let plugin = KlarnaPlugin(partner: .klarna)
+        let context = try context(collected: [KlarnaPlugin.Collected.authorizeToken: .string(token)])
+
+        // First attempt: the shopper declines.
+        await #expect(throws: KlarnaAuthorizationDeclined.self) {
+            try await plugin.postValidation(.success(), context: context)
+        }
+        // Second attempt reaches the widget again rather than a missing callback.
+        try await plugin.postValidation(.success(), context: context)
+        #expect(await attempts.count == 2)
+
+        await KlarnaAuthorizationRegistry.shared.remove(token)
+        #expect(await KlarnaAuthorizationRegistry.shared.callback(for: token) == nil)
+    }
+
+    private actor Attempts {
+        private(set) var count = 0
+        func record() -> Int {
+            count += 1
+            return count
+        }
     }
 
     // MARK: Registration
