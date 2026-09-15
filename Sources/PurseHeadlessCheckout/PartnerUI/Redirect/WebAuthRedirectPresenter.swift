@@ -32,10 +32,25 @@ public final class WebAuthRedirectPresenter: NSObject, RedirectPresenter {
             guard policy.allowsLoading(url) else {
                 throw PartnerUIError("refused redirect url: \(url.absoluteString)")
             }
+            // Only when the browser can actually observe the end of the flow — otherwise the web
+            // view, which watches every navigation itself and works on every supported iOS.
+            guard browserCanObserveReturn else { return try await presentWebView(action) }
             return try await presentWebAuthentication(url)
 
         case .postForm, .postHTML:
             return try await presentWebView(action)
+        }
+    }
+
+    /// Whether `ASWebAuthenticationSession` can see this policy's return destination. A custom
+    /// scheme it can always match.
+    private var browserCanObserveReturn: Bool {
+        switch policy.returnDestination {
+        case .customScheme:
+            return true
+        case .universalLink:
+            if #available(iOS 17.4, *) { return true }
+            return false
         }
     }
 
@@ -71,9 +86,8 @@ public final class WebAuthRedirectPresenter: NSObject, RedirectPresenter {
                     completionHandler: completion
                 )
             } else {
-                // Below 17.4 the system can only match a custom scheme. A Universal Link policy still
-                // works — the link opens the app and the flow resumes there — but the session itself
-                // cannot observe it, so it is dismissed rather than completed.
+                // A custom scheme — the only destination this initialiser can match, and the only
+                // policy routed here at all (see `browserCanObserveReturn`).
                 session = ASWebAuthenticationSession(
                     url: url,
                     callbackURLScheme: policy.callbackScheme,
@@ -108,6 +122,13 @@ public final class WebAuthRedirectPresenter: NSObject, RedirectPresenter {
             }
             let navigation = UINavigationController(rootViewController: controller)
             navigation.modalPresentationStyle = .formSheet
+            // A `.formSheet` is interactively dismissible: dragging it down tears the navigation
+            // controller off screen without `cancelTapped` and without any delegate callback, so
+            // the continuation below would never resume — the caller awaits forever on a payment
+            navigation.isModalInPresentation = true
+            // Belt and braces: if the gesture is ever re-enabled, or the system dismisses the sheet
+            // for its own reasons, this reports it as a cancel rather than leaving a suspended task.
+            navigation.presentationController?.delegate = controller
             presenter.present(navigation, animated: true)
         }
     }
@@ -128,7 +149,8 @@ extension WebAuthRedirectPresenter: ASWebAuthenticationPresentationContextProvid
 
 /// Hosts the POST cases. Navigation is gated by the same ``RedirectPolicy`` as the GET case.
 @MainActor
-final class RedirectWebViewController: UIViewController, WKNavigationDelegate {
+final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
+    UIAdaptivePresentationControllerDelegate {
 
     private let action: RedirectAction
     private let policy: RedirectPolicy
@@ -184,11 +206,12 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate {
                 finish(.failure(PartnerUIError("refused redirect url: \(action.targetURL ?? "")")))
                 return
             }
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-            request.httpBody = Data(formData.utf8)
-            webView.load(request)
+            // Not `URLRequest.httpBody` + `load(_:)`: WebKit drops the body of a `load(_:)` request,
+            // so the ACS would get an empty POST and answer 400 — see `FormRedirectHTML`.
+            webView.loadHTMLString(
+                FormRedirectHTML.autoSubmitting(actionURL: url.absoluteString, dataString: formData),
+                baseURL: url
+            )
 
         case let .postHTML(html, _):
             // The server sent literal markup to inject and auto-submit. There is no base URL to
@@ -200,8 +223,22 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate {
         }
     }
 
+    /// Whether `url` is the return URL the session configured, carried on the action itself.
+    private func isConfiguredReturn(_ url: URL) -> Bool {
+        guard let prefix = action.returnURLPrefix, !prefix.isEmpty else { return false }
+        return url.absoluteString.hasPrefix(prefix)
+    }
+
     @objc private func cancelTapped() {
         finish(.success(.canceled))
+    }
+
+    /// The sheet went away without Cancel being tapped. Report a cancel rather than leaving the
+    /// caller suspended: the view is already gone, so there is nothing left to dismiss.
+    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        guard let completion else { return }
+        self.completion = nil
+        completion(.success(.canceled))
     }
 
     // The signature must match WKNavigationDelegate's exactly, `@MainActor @Sendable` included.
@@ -216,7 +253,9 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate {
             return
         }
 
-        if policy.isReturn(url) {
+        // The policy's own destination, **or** the return URL the session configured and this
+        // action carries.
+        if policy.isReturn(url) || isConfiguredReturn(url) {
             decisionHandler(.cancel)
             finish(.success(.returned))
             return

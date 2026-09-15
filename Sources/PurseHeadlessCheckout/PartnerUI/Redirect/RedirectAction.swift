@@ -46,11 +46,26 @@ public extension String {
         contains("purse-redirection-data")
     }
 
-    /// Best-effort `payment_id` off a widget-confirmation redirect.
+    /// Best-effort `payment_id` out of the widget-confirmation redirect's `purse-redirection-data`
+    /// **JWT** — not a sibling query parameter, which the server does not send.
     var widgetConfirmationPaymentId: String? {
-        guard isWidgetConfirmationRedirect,
-              let components = URLComponents(string: self)
+        let marker = "purse-redirection-data="
+        guard let markerRange = range(of: marker) else { return nil }
+
+        let rawValue = self[markerRange.upperBound...].prefix { $0 != "&" }
+        let jwt = String(rawValue).removingPercentEncoding ?? String(rawValue)
+        let segments = jwt.split(separator: ".")
+        guard segments.count > 1 else { return nil }
+
+        // base64url, and the padding a JWT omits.
+        var payload = String(segments[1])
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
+
+        guard let data = Data(base64Encoded: payload),
+              let json = try? JSONDecoder().decode(JSONValue.self, from: data)
         else { return nil }
-        return components.queryItems?.first { $0.name == "payment_id" }?.value?.nonBlank
+        return json["payment_id"]?.stringValue?.nonBlank
     }
 }

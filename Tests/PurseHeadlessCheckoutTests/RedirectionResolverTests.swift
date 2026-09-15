@@ -132,19 +132,40 @@ struct RedirectionResolverTests {
 
     // MARK: Payment id
 
-    @Test func readsThePaymentIdOffTheConfirmationRedirect() {
-        let url = "https://shop.example/confirmation?purse-redirection-data=abc&payment_id=pay_123"
+    /// The id lives **inside** the `purse-redirection-data` JWT, not in a sibling query parameter.
+    private static let confirmationJWT =
+        "header.eyJjbGllbnRfc2Vzc2lvbl9zdGF0dXMiOiJTVUJNSVRURUQiLCJwYXltZW50X2lkIjoicGF5XzEyMyIsImF1dGhvcml6YXRpb25fc3RhdHVzIjoiQVVUSE9SSVpFRCJ9.signature"
+
+    private static var confirmationURL: String {
+        "https://shop.example/confirmation?purse-redirection-data=\(confirmationJWT)"
+    }
+
+    @Test func readsThePaymentIdOutOfTheConfirmationJWT() {
         let id = RedirectionResolver.widgetConfirmationPaymentId(
-            validateResponse: response(redirection: ["url": .string(url)])
+            validateResponse: response(redirection: ["url": .string(Self.confirmationURL)])
         )
         #expect(id == "pay_123")
+    }
+
+    /// A percent-encoded JWT is the same JWT.
+    @Test func readsThePaymentIdWhenTheJWTIsPercentEncoded() {
+        let encoded = Self.confirmationJWT.replacingOccurrences(of: ".", with: "%2E")
+        let url = "https://shop.example/confirmation?purse-redirection-data=\(encoded)"
+        #expect(url.widgetConfirmationPaymentId == "pay_123")
+    }
+
+    /// A JWT with no `payment_id` in its payload yields nothing rather than guessing.
+    @Test func noPaymentIdWhenTheJWTPayloadHasNone() {
+        // {"client_session_status":"SUBMITTED"}
+        let jwt = "header.eyJjbGllbnRfc2Vzc2lvbl9zdGF0dXMiOiJTVUJNSVRURUQifQ.signature"
+        let url = "https://shop.example/confirmation?purse-redirection-data=\(jwt)"
+        #expect(url.widgetConfirmationPaymentId == nil)
     }
 
     /// Available even when the same redirect is suppressed — it is read off the response, not by
     /// following anything.
     @Test func thePaymentIdSurvivesSuppression() {
-        let url = "https://shop.example/confirmation?purse-redirection-data=abc&payment_id=pay_123"
-        let body = response(redirection: ["url": .string(url)])
+        let body = response(redirection: ["url": .string(Self.confirmationURL)])
 
         #expect(resolve(body) == nil)
         #expect(RedirectionResolver.widgetConfirmationPaymentId(validateResponse: body) == "pay_123")
