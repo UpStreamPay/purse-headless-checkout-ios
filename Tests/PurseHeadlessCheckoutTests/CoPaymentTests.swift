@@ -37,13 +37,18 @@ struct CoPaymentTests {
         ]]],
     ]
 
+    /// Its own **session id** as well as its own host.
     private func makeCheckout() throws -> PurseHeadlessCheckout {
         let registry = PluginRegistry()
         registry.install(StubModule())
         return try PurseHeadlessCheckout(
             widgetData: TestSessions.widgetData(
                 environment: "development",
-                paymentSession: TestSessions.paymentSession(amount: 100, protocols: Self.protocols)
+                paymentSession: TestSessions.paymentSession(
+                    id: "co-payment-session",
+                    amount: 100,
+                    protocols: Self.protocols
+                )
             ),
             registry: registry,
             urlSession: StubURLProtocol.session()
@@ -170,5 +175,35 @@ struct CoPaymentTests {
 
         #expect(checkout.remainingAmountToPay == 100)
         #expect(checkout.appliedSecondaries.isEmpty)
+    }
+
+    // MARK: What /init is actually asked for
+
+    /// The `/init` must ask for the amount the instrument is being asked to cover, not 0.
+    @Test func initRequestsTheAmountStillToCoverNotZero() async throws {
+        stub(initBody: Self.giftCardInit)
+        let checkout = try makeCheckout()
+        let giftMethod = try #require(checkout.secondaryMethods.first)
+
+        _ = try await checkout.getSecondaryToken(method: giftMethod, pan: pan, cvv: "123")
+
+        let body = try #require(StubURLProtocol.body(for: "/init", host: Self.host)?.object)
+        #expect(body["amount"]?.decimalValue == 100)
+    }
+
+    /// A terminal `/init` answer ends the whole session, not just this tokenization. The error is
+    /// wrapped on the way out, so recognising it means walking the cause chain rather than casting
+    /// the error the caller sees.
+    @Test func aTerminalInitAnswerTerminatesTheSession() async throws {
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/init", .failure(409, #"{"error":"SESSION_ALREADY_SUBMITTED_ERROR"}"#), host: Self.host)
+
+        let checkout = try makeCheckout()
+        let giftMethod = try #require(checkout.secondaryMethods.first)
+
+        await #expect(throws: PurseCheckoutError.self) {
+            _ = try await checkout.getSecondaryToken(method: giftMethod, pan: pan, cvv: "123")
+        }
+        #expect(checkout.sessionState == .terminated)
     }
 }

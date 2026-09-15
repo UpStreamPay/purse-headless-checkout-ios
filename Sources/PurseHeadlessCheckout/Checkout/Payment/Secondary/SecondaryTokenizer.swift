@@ -13,10 +13,14 @@ struct SecondaryTokenizer {
     let api: PaymentAPIClient
     let configs: SecondaryConfigs
 
+    /// - Parameter amount: what this instrument is being asked to cover. Some issuers compute the
+    ///   eligible balance **against the requested amount** (Maxxing answers `logs.eligible_euros`),
+    ///   so sending 0 makes them answer 0 — and `parseToken` then rejects the card as empty.
     func tokenize(
         method: SecondaryMethod,
         pan: String,
-        cvv: String?
+        cvv: String?,
+        amount: Decimal
     ) async throws -> SecondaryToken {
         guard let config = configs.config(for: method) else {
             throw PurseCheckoutError.noSecondaryConfig(itemId: method.id)
@@ -47,7 +51,7 @@ struct SecondaryTokenizer {
         let payload: [String: JSONValue] = [
             "partner": .string(method.partner.wireValue),
             "method": .string(method.method.wireValue),
-            "amount": .number(0.description),
+            "amount": .number(amount.description),
             "payment_data": .object(config.buildInitPaymentData(pan: pan, cvv: cvv)),
         ]
 
@@ -55,9 +59,13 @@ struct SecondaryTokenizer {
         do {
             response = try await api.initPayment(payload)
         } catch {
+            // The cause is kept, not just its text: a terminal API answer (already submitted /
+            // expired / gone) has to stay recognisable through the wrapper, or the checkout cannot
+            // tell a dead session from a refused card. `isSessionTerminal` walks this chain.
             throw PurseCheckoutError.secondaryTokenizationFailed(
-                "could not initialise \(method.id): \(error)",
-                .failedToInitSecondaryToken
+                "could not initialise \(method.id)",
+                .failedToInitSecondaryToken,
+                underlying: error
             )
         }
 

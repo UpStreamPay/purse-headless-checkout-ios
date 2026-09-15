@@ -388,8 +388,18 @@ public final class PurseHeadlessCheckout: ObservableObject {
         pan: String,
         cvv: String? = nil
     ) async throws -> SecondaryToken {
-        try await SecondaryTokenizer(api: api, configs: configs)
-            .tokenize(method: method, pan: pan, cvv: cvv)
+        do {
+            return try await SecondaryTokenizer(api: api, configs: configs)
+                // What the instrument is being asked to cover, not 0: an issuer that computes the
+                // eligible balance against the requested amount answers 0 to a 0, and the card then
+                // looks empty.
+                .tokenize(method: method, pan: pan, cvv: cvv, amount: splitter.remaining)
+        } catch {
+            // A terminal API answer ends the whole session, not just this tokenization — web's
+            // `onSessionTerminated` path, and Android's `if (e.sessionTerminal())` here.
+            if Self.isSessionTerminal(error) { sessionState = .terminated }
+            throw error
+        }
     }
 
     /// Draw a tokenized secondary instrument into the split. See
