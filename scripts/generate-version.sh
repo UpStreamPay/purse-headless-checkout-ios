@@ -15,7 +15,10 @@ TARGET="$ROOT/Sources/PurseHeadlessCheckout/Core/SDKVersion.swift"
 
 VERSION="${1:-}"
 if [ -z "$VERSION" ]; then
-  VERSION="$(git -C "$ROOT" describe --tags --exact-match 2>/dev/null || echo "0.0.0-SNAPSHOT")"
+  # `--dirty` matters: without it a build from a modified tree sitting on v1.2.0 stamps
+  # SDKVersion.value = "1.2.0" and mis-attributes every monitoring event to a release that was
+  # never cut. The suffix makes such a build self-identify instead.
+  VERSION="$(git -C "$ROOT" describe --tags --exact-match --dirty=-dirty 2>/dev/null || echo "0.0.0-SNAPSHOT")"
 fi
 VERSION="${VERSION#v}"
 

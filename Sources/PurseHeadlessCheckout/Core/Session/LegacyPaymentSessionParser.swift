@@ -45,7 +45,10 @@ enum LegacyPaymentSessionParser {
 
             var methods: [Method: MethodEntry] = [:]
             for (methodKey, entryNode) in methodsObject {
-                guard let configNode = entryNode["configurations"] else { continue }
+                // Must be an *object*, not merely present. A string or number here would subscript
+                // to `nil` for every field and register the method with a fully-defaulted
+                // configuration — no min/max amount, no usage limit, i.e.
+                guard let configNode = entryNode["configurations"], configNode.objectValue != nil else { continue }
                 methods[.fromWire(methodKey)] = MethodEntry(
                     configurations: parseMethodConfiguration(configNode),
                     integratedTokens: parseIntegratedTokens(entryNode["integrated_tokens"])
@@ -57,8 +60,12 @@ enum LegacyPaymentSessionParser {
     }
 
     private static func parseMethodConfiguration(_ json: JSONValue) -> MethodConfiguration {
-        let vault = json["vault"].map { node in
-            VaultInfo(
+        // `.map` on the optional would fire for *any* non-null value, so `"vault": "purse"` would
+        // build a `VaultInfo(vendor: .unknown)` instead of `nil` — and two call sites branch on
+        // exactly that: `PaymentItem.isVaultedCard` would report a card-on-file needing a CVV form
+        let vault = json["vault"].flatMap { node -> VaultInfo? in
+            guard node.objectValue != nil else { return nil }
+            return VaultInfo(
                 supportedBrands: (node["supported_brands"]?.arrayValue ?? [])
                     .compactMap(\.stringValue)
                     .map(CardBrand.fromWire),

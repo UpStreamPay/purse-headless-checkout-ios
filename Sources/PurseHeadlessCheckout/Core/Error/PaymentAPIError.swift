@@ -15,6 +15,9 @@ public struct PaymentAPIError: PurseError {
     public let errorCode: String?
     /// The request path that failed, e.g. `/init`.
     public let path: String?
+    /// Whether the request was actually put on the wire. `false` only for a failure raised *before*
+    /// any byte was sent — an unusable URL, a body that could not be encoded.
+    public let requestSent: Bool
 
     public var code: PurseErrorCode { .apiError }
 
@@ -23,18 +26,20 @@ public struct PaymentAPIError: PurseError {
         underlying: (any Error)? = nil,
         status: Int? = nil,
         errorCode: String? = nil,
-        path: String? = nil
+        path: String? = nil,
+        requestSent: Bool = true
     ) {
         self.message = message
         self.underlying = underlying
         self.status = status
         self.errorCode = errorCode
         self.path = path
+        self.requestSent = requestSent
     }
 
     /// Whether the request may have reached the server even though no answer came back — a
     /// transport failure with no ``status``.
-    public var outcomeUnknown: Bool { status == nil }
+    public var outcomeUnknown: Bool { status == nil && requestSent }
 
     /// The session itself is spent — already submitted, expired, or gone — so every further call is
     /// pointless: web's `SESSION_TERMINAL_ERRORS`. Callers should surface a terminated session state.
@@ -47,6 +52,9 @@ public struct PaymentAPIError: PurseError {
     /// (submitted, expired, not found, malformed, 429 step budget spent) — only a 5xx (outage) or a
     /// transport failure with no status at all is worth retrying.
     public var isRetryable: Bool {
+        // A malformed URL or an unencodable body is deterministic: the same call fails the same way
+        // every time, so retrying it only delays the error the caller already has.
+        guard requestSent else { return false }
         guard let status else { return true }
         return status >= 500
     }

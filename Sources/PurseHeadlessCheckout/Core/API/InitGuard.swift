@@ -77,7 +77,13 @@ public actor InitGuard {
             remove(key)
             return result
         } catch {
-            store(.spent(error), for: key)
+            // Fast-rejection is for a **terminal** failure only — that is what this type's own doc
+            // promises, and what a 4xx means.
+            if (error as? PaymentAPIError)?.isRetryable == false {
+                store(.spent(error), for: key)
+            } else {
+                remove(key)
+            }
             throw error
         }
     }

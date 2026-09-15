@@ -148,6 +148,31 @@ struct SessionParsingTests {
         #expect(params.paymentSession.protocols[.purse]?[.creditCard]?.integratedTokens.isEmpty == true)
     }
 
+    /// Presence is not enough — a non-object `vault` must read as *no vault*, not as one with an
+    /// unknown vendor. `PaymentItem.isVaultedCard` and `PluginRegistry`'s vault lookup both branch
+    /// on this, so getting it wrong demands a CVV form no plugin can render.
+    @Test(arguments: ["purse", "", "7"])
+    func aNonObjectVaultParsesAsNoVaultAtAll(_ raw: String) throws {
+        let configurations: [String: Any] = ["stable": true, "vault": raw]
+        let session = TestSessions.paymentSession(
+            protocols: ["purse": ["creditcard": ["configurations": configurations]]]
+        )
+        let params = try SessionCodec.decode(TestSessions.widgetData(paymentSession: session))
+
+        #expect(params.paymentSession.protocols[.purse]?[.creditCard]?.configurations.vault == nil)
+    }
+
+    /// A non-object `configurations` would otherwise register the method with every field
+    /// defaulted — no min amount, no max amount, no usage limit — i.e. limits silently unenforced.
+    @Test func aNonObjectConfigurationsDropsTheMethodEntirely() throws {
+        let session = TestSessions.paymentSession(
+            protocols: ["purse": ["creditcard": ["configurations": "yes"]]]
+        )
+        let params = try SessionCodec.decode(TestSessions.widgetData(paymentSession: session))
+
+        #expect(params.paymentSession.protocols[.purse]?[.creditCard] == nil)
+    }
+
     @Test func defaultsTokenSourceToMerchant() {
         #expect(TokenSource.fromWire(nil) == .merchant)
         #expect(TokenSource.fromWire("NONSENSE") == .merchant)

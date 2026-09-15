@@ -69,7 +69,11 @@ public struct PaymentAPIClient: Sendable {
     private func execute(_ method: String, path: String, body: JSONValue?, url: String? = nil) async throws -> JSONValue {
         let urlString = url ?? sessionURL(path)
         guard let requestURL = URL(string: urlString) else {
-            throw PaymentAPIError("Payment API \(method) \(path) has an unusable URL: \(urlString)", path: path)
+            throw PaymentAPIError(
+                "Payment API \(method) \(path) has an unusable URL: \(urlString)",
+                path: path,
+                requestSent: false
+            )
         }
 
         var request = URLRequest(url: requestURL)
@@ -84,7 +88,8 @@ public struct PaymentAPIClient: Sendable {
                 throw PaymentAPIError(
                     "Payment API \(method) \(path) payload could not be encoded: \(error)",
                     underlying: error,
-                    path: path
+                    path: path,
+                    requestSent: false
                 )
             }
         }

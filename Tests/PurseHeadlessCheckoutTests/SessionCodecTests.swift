@@ -110,6 +110,23 @@ struct SessionCodecTests {
         #expect(params.paymentSession.expirationDate > Date())
     }
 
+    /// Android's JDK basic decoder accepts a missing `=` pad; `Data(base64Encoded:)` rejects it
+    /// outright. A backend that strips padding would otherwise work on Android and fail on every
+    /// iOS device — one blob, two verdicts.
+    @Test func decodesBase64WhosePaddingWasStripped() throws {
+        // Whether a blob needs padding depends on its byte length, so pick an id that produces one
+        // that does rather than assuming the default fixture happens to.
+        let padded = try #require(
+            ["session-1", "session-12", "session-123", "session-1234"]
+                .map { TestSessions.widgetData(paymentSession: TestSessions.paymentSession(id: $0)) }
+                .first { $0.hasSuffix("=") }
+        )
+        let unpadded = padded.replacingOccurrences(of: "=", with: "")
+
+        let params = try SessionCodec.decode(unpadded)
+        #expect(params.apiKey == "test-key")
+    }
+
     /// An unknown partner or method must survive the decode, or a backend rollout breaks every
     /// shipped app.
     @Test func keepsUnknownPartnersAndMethods() throws {

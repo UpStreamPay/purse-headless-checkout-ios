@@ -10,7 +10,7 @@ public enum SessionCodec {
     /// - Throws: ``PurseSessionError/sessionMalformed(_:)`` if `widgetData` is not valid
     ///   base64/JSON, or the decoded session fails the checks in ``LegacyPaymentSessionParser``.
     public static func decode(_ widgetData: String) throws -> PurseSessionParams {
-        guard let data = Data(base64Encoded: widgetData) else {
+        guard let data = Data(base64Encoded: paddedBase64(widgetData)) else {
             throw PurseSessionError.sessionMalformed("could not base64-decode widget data")
         }
 
@@ -39,6 +39,15 @@ public enum SessionCodec {
             paymentSession: try LegacyPaymentSessionParser.parse(paymentSessionNode),
             walletSession: parseWalletSession(json["wallet_session"])
         )
+    }
+
+    /// Restores the `=` padding `Data(base64Encoded:)` insists on. Android decodes with the JDK
+    /// **basic** decoder, whose documented contract is that `'='` "is accepted and interpreted as
+    /// the end of the encoded byte data, but is not required".
+    private static func paddedBase64(_ base64: String) -> String {
+        let remainder = base64.count % 4
+        guard remainder != 0 else { return base64 }
+        return base64 + String(repeating: "=", count: 4 - remainder)
     }
 
     /// A `wallet_session` missing its id or owner reference grants nothing, so it is dropped rather

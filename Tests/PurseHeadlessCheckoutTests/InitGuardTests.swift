@@ -90,6 +90,26 @@ struct InitGuardTests {
         #expect(await calls.value == InitGuard.maxAttempts)
     }
 
+    /// Exhausting the retries on a *transient* failure must not fast-reject the next attempt.
+    /// `shared` is process-wide and nothing evicts a spent entry, so treating "lost signal for two
+    /// seconds" as terminal would kill that method for the life of the app process.
+    @Test func aRetryableFailureThatExhaustedItsAttemptsDoesNotPoisonTheKey() async throws {
+        let guardActor = await makeGuard()
+        let calls = Counter()
+
+        for _ in 0 ..< 2 {
+            await #expect(throws: PaymentAPIError.self) {
+                try await guardActor.run(key: "k") {
+                    _ = await calls.increment()
+                    throw PaymentAPIError("offline", underlying: URLError(.notConnectedToInternet))
+                }
+            }
+        }
+
+        // Both rounds reached the network; the key was never spent.
+        #expect(await calls.value == InitGuard.maxAttempts * 2)
+    }
+
     /// A 4xx is a definitive backend decision, so it must not be retried even once.
     @Test func doesNotRetryTerminalFailures() async throws {
         let guardActor = await makeGuard()

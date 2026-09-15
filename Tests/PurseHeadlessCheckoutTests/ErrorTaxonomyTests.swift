@@ -75,6 +75,18 @@ struct ErrorTaxonomyTests {
         #expect(Set(PurseErrorCode.allCases.map(\.rawValue)) == android)
     }
 
+    /// A request that never left the device cannot have created a payment, so it must not claim
+    /// `outcomeUnknown` — the caller acts on that by spending the session. It is deterministic, so
+    /// it is not worth retrying either.
+    @Test func anErrorRaisedBeforeTheRequestWasSentIsNeitherUnknownNorRetryable() {
+        let neverSent = PaymentAPIError("unusable URL", path: "/validate", requestSent: false)
+        #expect(!neverSent.outcomeUnknown)
+        #expect(!neverSent.isRetryable)
+
+        // The default still describes a real transport failure mid-flight.
+        #expect(PaymentAPIError("connection lost", path: "/validate").outcomeUnknown)
+    }
+
     @Test func errorDescriptionLeadsWithTheCode() {
         #expect(PaymentAPIError("could not reach host").description == "[API_ERROR] could not reach host")
     }
