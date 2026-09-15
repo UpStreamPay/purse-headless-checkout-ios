@@ -184,4 +184,54 @@ struct CardPluginTests {
         // Development has no vault of its own.
         #expect(PurseEnvironment.development.vaultEnvironment == .sandbox)
     }
+
+    // MARK: Fulfilment across a tokenization
+
+    /// Records what the coordinator does to the checkout. A real `PurseHeadlessCheckout` would do
+    /// just as well, but this keeps the assertion on the two calls that matter.
+    private final class RecordingHost: PluginHost {
+        var fulfilled: Bool?
+        var collected: [String: JSONValue] = [:]
+        let context: PartnerUIContext
+
+        init(context: PartnerUIContext) { self.context = context }
+
+        var environment: PurseEnvironment { .sandbox }
+        var redirectionReturnURL: String? { nil }
+        func buildContext() -> PartnerUIContext { context }
+        func setCollected(_ data: [String: JSONValue]) { collected = data }
+        func setAsPrimary() throws {}
+        func setFulfilled(_ value: Bool) { fulfilled = value }
+        func submitPayment() async throws -> ValidationResult {
+            ValidationResult(globalStatus: "SUCCESS", redirection: nil, raw: .object([:]))
+        }
+    }
+
+    /// The regression this pins: Secure Fields zeroes its fields and reports the form invalid
+    /// *before* the network round trip, so a tokenization that then succeeds used to leave the item
+    /// unfulfilled — and `submitPayment()` refuses an unfulfilled item outright.
+    @Test func aSuccessfulTokenizationLeavesTheItemFulfilled() throws {
+        let host = RecordingHost(context: try context())
+        // No form, so no live vault is needed to construct it; the fulfilment logic under test is
+        // the same for every mode.
+        let coordinator = CardCoordinator(
+            host: host,
+            tenantId: "tenant-1",
+            supportedBrands: [.visa],
+            token: PayToken(value: "tok", requiresCVV: false)
+        )
+
+        // What Secure Fields does as it wipes the buffers at submit.
+        coordinator.secureFieldsFormValidityChanged(false)
+        #expect(host.fulfilled == false)
+
+        coordinator.apply(
+            CardTokenization(vaultFormToken: "vault-1", bin: "411111", lastFourDigits: "1111", selectedNetwork: .visa)
+        )
+
+        #expect(host.fulfilled == true)
+        #expect(coordinator.isFormValid)
+        #expect(host.collected[CardPlugin.Collected.token] == .string("vault-1"))
+        #expect(host.collected[CardPlugin.Collected.network] == .string(CardBrand.visa.wireValue))
+    }
 }

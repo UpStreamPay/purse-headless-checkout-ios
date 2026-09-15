@@ -311,8 +311,8 @@ struct SubmitPaymentTests {
     /// either way; treating this as "the submit failed" would let the next submit send a second
     /// `/validate` for an already-charged session.
     @Test func aPostValidationFailureStillSpendsTheSession() async throws {
-        StubURLProtocol.reset()
-        StubURLProtocol.set("/validate", .ok(Self.successBody))
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/validate", .ok(Self.successBody), host: Self.host)
 
         let checkout = try checkoutWhosePluginFailsAfterValidate()
         try selectCard(checkout)
@@ -333,22 +333,22 @@ struct SubmitPaymentTests {
         #expect(checkout.sessionState == .submitted)
 
         // The second submit must never reach the PSP.
-        StubURLProtocol.reset()
+        StubURLProtocol.reset(host: Self.host)
         do {
             _ = try await checkout.submitPayment()
             Issue.record("expected the spent session to refuse a second submit")
         } catch let error as PurseCheckoutError {
             #expect(error.code == .submitBlocked)
         }
-        #expect(!StubURLProtocol.paths.contains { $0.hasSuffix("/validate") })
+        #expect(!StubURLProtocol.paths(host: Self.host).contains { $0.hasSuffix("/validate") })
     }
 
     /// A terminal API answer (already submitted / expired / gone) ends the session rather than
     /// leaving it looking submittable. The error arrives wrapped in `validateFailed`, so matching it
     /// means walking the chain, not casting the top-level error.
     @Test func aTerminalValidateAnswerTerminatesTheSession() async throws {
-        StubURLProtocol.reset()
-        StubURLProtocol.set("/validate", .failure(409, #"{"error":"SESSION_ALREADY_SUBMITTED_ERROR"}"#))
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/validate", .failure(409, #"{"error":"SESSION_ALREADY_SUBMITTED_ERROR"}"#), host: Self.host)
 
         let checkout = try makeCheckout()
         try selectCard(checkout)
@@ -361,8 +361,8 @@ struct SubmitPaymentTests {
 
     /// `submitPayment` suspends at the `/validate` round trip, releasing the main actor.
     @Test func setSessionIsRefusedWhileASubmitIsInFlight() async throws {
-        StubURLProtocol.reset()
-        StubURLProtocol.set("/validate", .ok(Self.successBody))
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/validate", .ok(Self.successBody), host: Self.host)
 
         let interleave = Interleave()
         let hooks = PurseCheckoutHooks(onBeforeValidate: { _ in
@@ -393,13 +393,13 @@ struct SubmitPaymentTests {
     /// never consulted: nothing called `sync()` and nothing called `isExpiredForServer`, so a device
     /// clock running slow would submit an expired session.
     @Test func expiryIsCheckedAgainstTheServerClockNotTheDevices() async throws {
-        StubURLProtocol.reset()
-        StubURLProtocol.set("/validate", .ok(Self.successBody))
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/validate", .ok(Self.successBody), host: Self.host)
         // The server is a year ahead of this device: a session that still has an hour left *by the
         // device clock* expired long ago as far as the server is concerned.
         let formatter = ISO8601DateFormatter()
         let serverNow = Date().addingTimeInterval(365 * 24 * 3600)
-        StubURLProtocol.set("/datetime", .ok(#"{"iso":"\#(formatter.string(from: serverNow))"}"#))
+        StubURLProtocol.set("/datetime", .ok(#"{"iso":"\#(formatter.string(from: serverNow))"}"#), host: Self.host)
 
         let checkout = try makeCheckout(
             expirationDate: formatter.string(from: Date().addingTimeInterval(3600))

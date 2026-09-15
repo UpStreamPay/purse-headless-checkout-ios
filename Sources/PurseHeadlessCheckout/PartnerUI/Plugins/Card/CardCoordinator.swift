@@ -50,7 +50,10 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
     @Published public private(set) var detectedBrands: [CardBrand] = []
 
     private let manager: SecureFieldsManager?
-    private weak var host: (any PluginHost)?
+    /// Strong, like every other coordinator's: nothing else retains a `host(for:)`-produced
+    /// adapter, so a weak reference would go nil the moment the caller's local went out of
+    /// scope — silently turning `setCollected`/`setFulfilled` into no-ops right after `init`.
+    private let host: any PluginHost
     private var pending: CheckedContinuation<CardTokenization, any Error>?
 
     /// - Parameters: - host: the seam back to the checkout — where the vault token is stashed and
@@ -116,12 +119,25 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
     @discardableResult
     public func submit(saveToken: Bool = false) async throws -> CardTokenization? {
         guard let manager, mode.rendersForm else { return nil }
+        // Secure Fields' own `submit()` opens with `guard !isSubmitting else { return }` and comes
+        // back with **no delegate callback at all**, so a second call that overwrote `pending`
+        // would strand the first continuation for the life of the process (`SWIFT TASK CONTINUATION
+        guard pending == nil else {
+            throw PartnerUIError("a card tokenization is already in flight")
+        }
 
         let tokenization: CardTokenization = try await withCheckedThrowingContinuation { continuation in
             pending = continuation
             manager.submit(saveToken: saveToken)
         }
 
+        apply(tokenization)
+        return tokenization
+    }
+
+    /// What a successful tokenization does to the checkout: stash the vault token for `/validate`,
+    /// and **re-arm the fulfilment gate**.
+    func apply(_ tokenization: CardTokenization) {
         var collected: [String: JSONValue] = [
             CardPlugin.Collected.token: .string(tokenization.vaultFormToken),
         ]
@@ -129,8 +145,9 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
         if let network = tokenization.selectedNetwork {
             collected[CardPlugin.Collected.network] = .string(network.wireValue)
         }
-        host?.setCollected(collected)
-        return tokenization
+        host.setCollected(collected)
+        isFormValid = true
+        host.setFulfilled(true)
     }
 
     // MARK: SecureFieldsDelegate
@@ -160,7 +177,7 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
     public nonisolated func secureFieldsFormValidityChanged(_ isValid: Bool) {
         MainActor.assumeIsolated {
             isFormValid = isValid
-            host?.setFulfilled(isValid)
+            host.setFulfilled(isValid)
         }
     }
 
