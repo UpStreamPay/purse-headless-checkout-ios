@@ -412,9 +412,32 @@ public final class PurseHeadlessCheckout: ObservableObject {
         refresh()
     }
 
-    /// Draw a saved gift card into the split.
+    /// Draw a saved gift card into the split. Re-reads the checkout's **current** copy rather than
+    /// trusting the caller's: a saved card starts at `balance = 0, balanceResolved = false` until
+    /// the background `/init` answers, and a merchant holding a value type captured before that
     public func applySecondary(_ token: SavedSecondaryToken, amount: Decimal? = nil) throws {
-        try applySecondary(token.asSecondaryToken(), amount: amount)
+        let current = savedSecondaryTokens.first { $0.id == token.id } ?? token
+
+        if let disabled = current.disabled {
+            throw PurseCheckoutError.secondaryTokenizationFailed(
+                "saved token \(current.id) is disabled (\(disabled.code.rawValue))",
+                .failedToInitSecondaryToken
+            )
+        }
+        guard current.balanceResolved else {
+            throw PurseCheckoutError.secondaryTokenizationFailed(
+                "saved token \(current.id) has no resolved balance yet",
+                .secondaryTokenEmptyBalance
+            )
+        }
+        guard current.balance > 0 else {
+            throw PurseCheckoutError.secondaryTokenizationFailed(
+                "saved token \(current.id) has no balance",
+                .secondaryTokenEmptyBalance
+            )
+        }
+
+        try applySecondary(current.asSecondaryToken(), amount: amount)
     }
 
     public func removeSecondary(_ token: SecondaryToken) {

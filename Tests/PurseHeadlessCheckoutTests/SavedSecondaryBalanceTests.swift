@@ -160,4 +160,46 @@ struct SavedSecondaryBalanceTests {
         await checkout.pendingSecondaryBalanceResolution?.value
         #expect(checkout.savedSecondaryTokens.first?.balance == 30)
     }
+
+    // MARK: Applying one
+
+    /// A saved card starts at `balance = 0, balanceResolved = false` until the background `/init`
+    /// answers.
+    @Test func applyingASavedCardBeforeItsBalanceResolvedIsRefused() async throws {
+        StubURLProtocol.reset(host: Self.host)
+        // No /init handler: resolution cannot complete, so the balance stays unresolved.
+        let checkout = try makeCheckout(widgetData: widgetData(protocols: illicadoProtocols()))
+        let token = try #require(checkout.savedSecondaryTokens.first)
+
+        do {
+            try checkout.applySecondary(token)
+            Issue.record("expected an unresolved balance to be refused")
+        } catch let error as PurseCheckoutError {
+            #expect(error.code == .secondaryTokenEmptyBalance)
+        }
+        #expect(checkout.appliedSecondaries.isEmpty)
+        #expect(checkout.remainingAmountToPay == 100)
+    }
+
+    /// The checkout's own copy wins over the caller's. A merchant holding the value type from
+    /// before resolution would otherwise apply a stale zero balance.
+    @Test func applyingUsesTheCheckoutsCurrentCopyNotTheCallers() async throws {
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set(
+            "/init",
+            .ok(#"{"status":{"state":"SUCCESS"},"plugin_result":{"payment_data":{"cards":[{"balance":30}]},"logs":{}}}"#),
+            host: Self.host
+        )
+
+        let checkout = try makeCheckout(widgetData: widgetData(protocols: illicadoProtocols()))
+        let stale = try #require(checkout.savedSecondaryTokens.first)
+        #expect(!stale.balanceResolved)
+
+        await checkout.pendingSecondaryBalanceResolution?.value
+
+        // Same value the merchant captured before resolution — it must still work.
+        try checkout.applySecondary(stale)
+        #expect(checkout.appliedSecondaries.count == 1)
+        #expect(checkout.remainingAmountToPay < 100)
+    }
 }
