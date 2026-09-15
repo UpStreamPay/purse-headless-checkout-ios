@@ -54,6 +54,12 @@ public final class PayPalCoordinator: NSObject {
         client.delegate = self
         self.client = client
 
+        // One approval at a time: a second call would overwrite the continuation and strand the
+        // first caller for the life of the process.
+        guard pending == nil else {
+            throw PartnerUIError("a PayPal approval is already in progress")
+        }
+
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
             pending = continuation
             client.start(request: PayPalWebCheckoutRequest(orderID: orderId, fundingSource: .paypal))
@@ -84,6 +90,15 @@ extension PayPalCoordinator: PayPalWebCheckoutDelegate {
                 PayPalPlugin.Collected.payerId: .string(payerId),
             ])
             self.host.setFulfilled(true)
+            // The approval *is* the shopper choosing PayPal — `PluginHost.setAsPrimary`'s contract
+            // for a self-submitting flow, and what Android's `selectAndCapture` does here. Without
+            // it an approved order can leave the split's primary unset and the submit is refused.
+            do {
+                try self.host.setAsPrimary()
+            } catch {
+                self.resume(.failure(error))
+                return
+            }
             self.resume(.success(()))
         }
     }
