@@ -1,9 +1,6 @@
-#if DEBUG
 import Foundation
 
-/// This Demo runs entirely against a canned session (see `DemoViewController`) and stubs the
-/// Payment API's `/validate` — there is no real sandbox merchant behind it yet. See README.md
-/// "Demo app" for what a real sandbox integration needs on top of this.
+/// Stubs the Payment API's `/validate` when the Demo runs against its canned session.
 final class MockURLProtocol: URLProtocol {
     struct MockResponse {
         let data: Data
@@ -42,4 +39,3 @@ final class MockURLProtocol: URLProtocol {
 
     override func stopLoading() {}
 }
-#endif

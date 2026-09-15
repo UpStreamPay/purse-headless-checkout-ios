@@ -18,14 +18,15 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<!-- Not yet wired to a real sandbox: this Demo runs entirely against a canned session and a
-	     stubbed Payment API (see MockURLProtocol.swift), so it needs no real API key or entity id
-	     today. Left here, empty by default, for when a real PSP merchant id / sandbox credentials
-	     arrive — see README.md "Demo app" for what still needs a real merchant sandbox to exercise. -->
-	<key>API_KEY</key>
-	<string>$(API_KEY)</string>
-	<key>ENTITY_ID</key>
-	<string>$(ENTITY_ID)</string>
+	<!-- Set these via `source scripts/load-env.sh` (see .env.example); both resolve to an empty
+	     string when unset. With no WIDGET_DATA the Demo runs against its own canned session and a
+	     stubbed /validate; with one, it decodes that blob and talks to the real backend.
+	     The names must match .env.example exactly — they did not before, so the documented
+	     workflow set variables nothing ever read. -->
+	<key>WIDGET_DATA</key>
+	<string>$(WIDGET_DATA)</string>
+	<key>MONITORING_API_KEY</key>
+	<string>$(MONITORING_API_KEY)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

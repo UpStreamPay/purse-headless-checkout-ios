@@ -25,3 +25,29 @@ jobs:
             -destination "platform=iOS Simulator,id=$SIM_ID" \
             CODE_SIGNING_ALLOWED=NO \
             | grep --line-buffered -E "(Test Suite|Test Case|✔|✘|error:|FAILED|PASSED|run with)"
+
+  demo-app:
+    name: Demo App
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/ios-simulator
+
+      # Both configurations. Release is the one that matters: the Demo once referred to a
+      # `#if DEBUG` type unconditionally, so it did not compile in Release at all — and nothing
+      # built that configuration, so nobody found out. SDK-12264 asks for a release build taking a
+      # sandbox payment, which starts with the release build existing.
+      - name: Build (Debug and Release)
+        run: |
+          set -o pipefail
+          for configuration in Debug Release; do
+            xcodebuild build \
+              -project Demo/Demo.xcodeproj \
+              -scheme Demo \
+              -configuration "$configuration" \
+              -destination "platform=iOS Simulator,id=$SIM_ID" \
+              CODE_SIGNING_ALLOWED=NO \
+              | grep --line-buffered -E "(error:|warning:|BUILD)"
+          done

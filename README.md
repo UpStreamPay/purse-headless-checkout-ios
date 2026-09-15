@@ -78,15 +78,19 @@ Builds and launches today (`xcodebuild build -project Demo/Demo.xcodeproj -schem
 (`PurseHeadlessCheckout.framework`, and `PurseSecureFields.framework` transitively) install and load
 without a crash, confirmed on-device in the simulator, not just compiled.
 
-**What it can't do yet, honestly**: it runs against a hand-built canned session and a stubbed
-`/validate` (`MockURLProtocol.swift`) — there is no real merchant sandbox behind it. The one payment
-method it can exercise fully without real credentials is a **saved card that pays without a CVV**
-(`merchant_specifics.pay_token_no_cvv`), because that's the only card flow that mounts no Secure
-Fields form and makes no call to a real Vault. A fresh card, or a saved card that still needs its
-CVV, would open a real Secure Fields form talking to a real Vault tenant over its own network
-session — that needs a real sandbox tenant id, which isn't in this environment yet (same for Apple
-Pay's merchant id, PayPal's client id, and Klarna's client token). Wiring those in, and the release
-build actually authorizing a sandbox payment, is SDK-12264/12266's remaining AC once those arrive.
+**Running it against a real backend.** Copy `.env.example` to `.env`, put a real base64
+`widget.data` in `WIDGET_DATA`, and `source scripts/load-env.sh` before building or launching Xcode.
+With that set the Demo decodes your blob and talks to the real backend; with it empty it falls back
+to a canned session and a stubbed `/validate` (`MockURLProtocol.swift`) so it still runs out of the
+box. CI builds it in **Debug and Release** — it previously did not compile in Release at all, and
+nothing built that configuration.
+
+**What it still can't do.** The one card flow it exercises end to end without credentials is a saved
+card that pays **without a CVV** (`merchant_specifics.pay_token_no_cvv`), because that is the only
+path that mounts no Secure Fields form and calls no real Vault. Fresh-card entry, Apple Pay, PayPal
+and Klarna each need real sandbox credentials (a Vault tenant id, an Apple Pay merchant id, a PayPal
+client id, a Klarna client token). Wiring those in, and a release build actually authorizing a
+sandbox payment, is what remains of SDK-12264/12266's acceptance criteria.
 
 ## License
 

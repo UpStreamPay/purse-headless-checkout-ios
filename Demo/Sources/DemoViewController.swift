@@ -51,15 +51,27 @@ final class DemoViewController: UIViewController {
     }
 
     private func start() throws {
-        MockURLProtocol.handlers["/validate"] = MockURLProtocol.MockResponse(
-            data: Data(#"{"global_status":"SUCCESS","results":[{"status":{"state":"SUCCESS"}}]}"#.utf8),
-            statusCode: 200
-        )
+        // A real `widget.data` from `.env` if there is one, otherwise the canned session below.
+        // `.env.example` and `scripts/load-env.sh` documented this workflow from the start, but the
+        // names did not match `Info.plist` and nothing here read it — so the whole thing was dead.
+        let configured = Bundle.main.object(forInfoDictionaryKey: "WIDGET_DATA") as? String
+        let widgetData = configured?.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        let checkout = try PurseHeadlessCheckout(
-            widgetData: Self.demoWidgetData(),
-            urlSession: MockURLProtocol.makeSession()
-        )
+        let checkout: PurseHeadlessCheckout
+        if let widgetData, !widgetData.isEmpty {
+            // A real backend: no stub, real network.
+            checkout = try PurseHeadlessCheckout(widgetData: widgetData)
+            statusLabel.text = "Using WIDGET_DATA from the environment"
+        } else {
+            MockURLProtocol.handlers["/validate"] = MockURLProtocol.MockResponse(
+                data: Data(#"{"global_status":"SUCCESS","results":[{"status":{"state":"SUCCESS"}}]}"#.utf8),
+                statusCode: 200
+            )
+            checkout = try PurseHeadlessCheckout(
+                widgetData: Self.demoWidgetData(),
+                urlSession: MockURLProtocol.makeSession()
+            )
+        }
         self.checkout = checkout
         amountLabel.text = "\(checkout.session.amount) \(checkout.session.currency)"
 
