@@ -214,4 +214,51 @@ struct ApplePayTests {
         registry.install(ApplePayModule())
         #expect(registry.modules.filter { $0 == "purse.applepay" }.count == 1)
     }
+
+    // MARK: What the sheet must refuse to build
+
+    /// A `PKPaymentRequest` with an empty country or currency cannot be presented, and PassKit does
+    /// not say why — the sheet simply refuses, and `present()`'s diagnosis blames the entitlement.
+    /// Defaulting those to `""` turned a server misconfiguration into a wild goose chase.
+    @Test(arguments: ["country_code", "currency_code"])
+    func refusesToBuildASheetWithoutACountryOrCurrency(_ missing: String) {
+        var logs: [String: JSONValue] = ["country_code": "FR", "currency_code": "EUR"]
+        logs.removeValue(forKey: missing)
+
+        #expect(throws: PartnerUIError.self) {
+            try ApplePayRequestConfiguration.from(
+                initResponse: initResponse(logs),
+                variant: .adyen,
+                fallbackMerchantName: "Shop"
+            )
+        }
+    }
+
+    /// The fallback is the merchant's configured trading name. It used to be the payment session
+    /// id, and with a single summary item PassKit renders that label as the grand-total line — so
+    /// every Adyen sheet read `TOTAL <session-uuid>`.
+    @Test func fallsBackToTheConfiguredMerchantNameNeverTheSessionId() throws {
+        let config = try ApplePayRequestConfiguration.from(
+            initResponse: initResponse(["country_code": "FR", "currency_code": "EUR"]),
+            variant: .adyen,
+            fallbackMerchantName: ApplePayConfiguration(
+                merchantIdentifier: "merchant.com.example",
+                merchantName: "Example Shop"
+            ).merchantName
+        )
+        #expect(config.merchantName == "Example Shop")
+    }
+
+    /// A blank `merchantName` from `/init` is not a name — fall back rather than show the shopper
+    /// an empty total line.
+    @Test func treatsABlankMerchantNameFromInitAsAbsent() throws {
+        let config = try ApplePayRequestConfiguration.from(
+            initResponse: initResponse([
+                "merchantName": "", "countryCode": "FR", "currencyCode": "EUR",
+            ]),
+            variant: .ingenico,
+            fallbackMerchantName: "Example Shop"
+        )
+        #expect(config.merchantName == "Example Shop")
+    }
 }

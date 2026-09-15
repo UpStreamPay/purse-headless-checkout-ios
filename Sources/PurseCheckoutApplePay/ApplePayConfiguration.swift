@@ -11,9 +11,12 @@ import PurseHeadlessCheckout
 /// app's provisioning profile — so it must exist in the merchant's own Apple Developer account.
 public struct ApplePayConfiguration: Sendable {
     public let merchantIdentifier: String
+    /// What the shopper reads on the sheet's total line when `/init` names nobody.
+    public let merchantName: String
 
-    public init(merchantIdentifier: String) {
+    public init(merchantIdentifier: String, merchantName: String) {
         self.merchantIdentifier = merchantIdentifier
+        self.merchantName = merchantName
     }
 }
 
@@ -55,12 +58,22 @@ struct ApplePayRequestConfiguration: Sendable {
             throw PartnerUIError("Apple Pay /init returned no plugin_result.logs to configure the sheet")
         }
 
+        /// A `PKPaymentRequest` with an empty country or currency cannot be presented, and PassKit
+        /// does not say why — the sheet just refuses, and `present()`'s diagnosis blames the
+        /// entitlement. Failing here names the real cause instead.
+        func require(_ value: String?, _ field: String) throws -> String {
+            guard let value, !value.isEmpty else {
+                throw PartnerUIError("Apple Pay /init did not return \(field); the sheet cannot be presented")
+            }
+            return value
+        }
+
         switch variant {
         case .ingenico:
             return ApplePayRequestConfiguration(
-                countryCode: logs["countryCode"]?.stringValue ?? "",
-                currencyCode: logs["currencyCode"]?.stringValue ?? "",
-                merchantName: logs["merchantName"]?.stringValue ?? fallbackMerchantName,
+                countryCode: try require(logs["countryCode"]?.stringValue, "a country code"),
+                currencyCode: try require(logs["currencyCode"]?.stringValue, "a currency code"),
+                merchantName: logs["merchantName"]?.stringValue?.nonEmpty ?? fallbackMerchantName,
                 merchantCapabilities: capabilities(from: logs["merchantCapabilities"]?.stringValue),
                 supportedNetworks: Self.defaultNetworks,
                 productId: logs["productId"].flatMap { $0.intValue.map(String.init) ?? $0.stringValue }
@@ -68,8 +81,8 @@ struct ApplePayRequestConfiguration: Sendable {
 
         case .adyen:
             return ApplePayRequestConfiguration(
-                countryCode: logs["country_code"]?.stringValue ?? "",
-                currencyCode: logs["currency_code"]?.stringValue ?? "",
+                countryCode: try require(logs["country_code"]?.stringValue, "a country code"),
+                currencyCode: try require(logs["currency_code"]?.stringValue, "a currency code"),
                 merchantName: fallbackMerchantName,
                 merchantCapabilities: .threeDSecure,
                 supportedNetworks: Self.defaultNetworks,
@@ -86,9 +99,9 @@ struct ApplePayRequestConfiguration: Sendable {
                 .compactMap { $0.stringValue.flatMap(ApplePayJSNetworkMapper.network(forJSName:)) }
 
             return ApplePayRequestConfiguration(
-                countryCode: logs["country_code"]?.stringValue ?? "",
-                currencyCode: logs["currency_code"]?.stringValue ?? "",
-                merchantName: nested?["configuration"]?["merchantName"]?.stringValue ?? fallbackMerchantName,
+                countryCode: try require(logs["country_code"]?.stringValue, "a country code"),
+                currencyCode: try require(logs["currency_code"]?.stringValue, "a currency code"),
+                merchantName: nested?["configuration"]?["merchantName"]?.stringValue?.nonEmpty ?? fallbackMerchantName,
                 merchantCapabilities: .threeDSecure,
                 supportedNetworks: networks?.isEmpty == false ? networks! : Self.defaultNetworks,
                 productId: nil
@@ -123,9 +136,10 @@ struct ApplePayRequestConfiguration: Sendable {
 ///
 /// The encrypted payload is identical in every case — only the envelope differs.
 enum ApplePayTokenEnvelope {
-    static func session(for variant: ApplePayVariant, token: PKPaymentToken, productId: String?) -> String? {
-        let paymentData = token.paymentData
-
+    /// Takes the token's `paymentData` rather than the `PKPaymentToken` itself: `PKPaymentToken` is
+    /// not `Sendable`, and the delegate that produces it reads this one value out before hopping to
+    /// the main actor. It was the only thing this ever used.
+    static func session(for variant: ApplePayVariant, paymentData: Data, productId: String?) -> String? {
         switch variant {
         case .adyen:
             // Adyen wants the payment data base64-encoded.

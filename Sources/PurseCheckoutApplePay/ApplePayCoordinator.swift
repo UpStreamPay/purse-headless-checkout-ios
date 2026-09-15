@@ -14,6 +14,8 @@ public final class ApplePayCoordinator: NSObject {
     private let configuration: ApplePayConfiguration
     private let variant: ApplePayVariant
     private var request: ApplePayRequestConfiguration?
+    /// The amount `/init` created the order for, captured at `prepare()`.
+    private var preparedAmount: Decimal?
     private var controller: PKPaymentAuthorizationController?
     private var pending: CheckedContinuation<Void, any Error>?
     /// Set on authorization; distinguishes "the shopper cancelled" from "the sheet closed after
@@ -55,15 +57,21 @@ public final class ApplePayCoordinator: NSObject {
         request = try ApplePayRequestConfiguration.from(
             initResponse: response,
             variant: variant,
-            fallbackMerchantName: context.session.id
+            fallbackMerchantName: configuration.merchantName
         )
+        preparedAmount = context.amount
     }
 
     /// Present the sheet and wait for the shopper. On success the authorized token is stashed on
     /// the checkout, ready for the next submit.
     public func present() async throws {
-        guard let request else {
+        guard let request, let preparedAmount else {
             throw PartnerUIError("call prepare() before present() — the sheet has no configuration yet")
+        }
+        // PassKit presents one sheet at a time; a second call would overwrite the continuation and
+        // strand the first caller for the life of the process.
+        guard pending == nil else {
+            throw PartnerUIError("an Apple Pay sheet is already open")
         }
 
         let paymentRequest = PKPaymentRequest()
@@ -75,7 +83,7 @@ public final class ApplePayCoordinator: NSObject {
         paymentRequest.paymentSummaryItems = [
             PKPaymentSummaryItem(
                 label: request.merchantName,
-                amount: NSDecimalNumber(decimal: host.buildContext().amount)
+                amount: NSDecimalNumber(decimal: preparedAmount)
             ),
         ]
 
@@ -114,56 +122,104 @@ public final class ApplePayCoordinator: NSObject {
     }
 }
 
+// PassKit does not document which queue it calls its delegate on, and the whole conformance
+// inherits `@MainActor` from the class while mutating `pending`, `authorized` and `controller`.
 extension ApplePayCoordinator: PKPaymentAuthorizationControllerDelegate {
 
-    public func paymentAuthorizationController(
+    public nonisolated func paymentAuthorizationController(
         _ controller: PKPaymentAuthorizationController,
         didAuthorizePayment payment: PKPayment,
         handler completion: @escaping (PKPaymentAuthorizationResult) -> Void
     ) {
+        // `PKPayment` is not `Sendable`; these are. Read them here, before crossing.
+        let paymentData = payment.token.paymentData
+        let transactionIdentifier = payment.token.transactionIdentifier
+        let network = payment.token.paymentMethod.network
+        let handler = PassKitHandler(completion)
+
+        Task { @MainActor in
+            self.finishAuthorization(
+                paymentData: paymentData,
+                transactionIdentifier: transactionIdentifier,
+                network: network,
+                handler: handler
+            )
+        }
+    }
+
+    private func finishAuthorization(
+        paymentData: Data,
+        transactionIdentifier: String,
+        network: PKPaymentNetwork?,
+        handler: PassKitHandler
+    ) {
         guard let session = ApplePayTokenEnvelope.session(
             for: variant,
-            token: payment.token,
+            paymentData: paymentData,
             productId: request?.productId
         ) else {
-            completion(PKPaymentAuthorizationResult(status: .failure, errors: nil))
+            handler.callAsFunction(PKPaymentAuthorizationResult(status: .failure, errors: nil))
             resume(.failure(PartnerUIError("the Apple Pay token could not be read")))
             return
         }
 
         var collected: [String: JSONValue] = [ApplePayPlugin.Collected.session: .string(session)]
-        if let fingerprint = payment.token.transactionIdentifier.nonEmpty {
+        if let fingerprint = transactionIdentifier.nonEmpty {
             collected[ApplePayPlugin.Collected.fingerprint] = .string(fingerprint)
         }
-        if let network = ApplePayNetworkMapper.selectedNetwork(for: payment.token.paymentMethod.network) {
-            collected[ApplePayPlugin.Collected.network] = .string(network)
+        if let mapped = ApplePayNetworkMapper.selectedNetwork(for: network) {
+            collected[ApplePayPlugin.Collected.network] = .string(mapped)
         }
 
         host.setCollected(collected)
         host.setFulfilled(true)
+        // The tap *is* the shopper choosing this method — `PluginHost.setAsPrimary`'s own contract
+        // for a self-submitting flow, and what Android's `selectAndCapture` does.
+        do {
+            try host.setAsPrimary()
+        } catch {
+            handler.callAsFunction(PKPaymentAuthorizationResult(status: .failure, errors: nil))
+            resume(.failure(error))
+            return
+        }
         authorized = true
 
         // The sheet is told the authorization succeeded — that is about Apple's UI, not the
         // payment. The payment happens at /validate, which the merchant submits next.
-        completion(PKPaymentAuthorizationResult(status: .success, errors: nil))
+        handler.callAsFunction(PKPaymentAuthorizationResult(status: .success, errors: nil))
     }
 
-    public func paymentAuthorizationControllerDidFinish(_ controller: PKPaymentAuthorizationController) {
-        controller.dismiss { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                self.controller = nil
-                if self.authorized {
-                    self.resume(.success(()))
-                } else {
-                    self.host.setFulfilled(false)
-                    self.resume(.failure(PartnerUIError("the shopper dismissed the Apple Pay sheet")))
-                }
-            }
+    public nonisolated func paymentAuthorizationControllerDidFinish(_ controller: PKPaymentAuthorizationController) {
+        Task { @MainActor in
+            await self.dismissAndResume()
+        }
+    }
+
+    private func dismissAndResume() async {
+        await controller?.dismiss()
+        controller = nil
+        if authorized {
+            resume(.success(()))
+        } else {
+            host.setFulfilled(false)
+            resume(.failure(PartnerUIError("the shopper dismissed the Apple Pay sheet")))
         }
     }
 }
 
-private extension String {
+/// PassKit's authorization handler, carried across the hop to the main actor.
+private struct PassKitHandler: @unchecked Sendable {
+    private let completion: (PKPaymentAuthorizationResult) -> Void
+
+    init(_ completion: @escaping (PKPaymentAuthorizationResult) -> Void) {
+        self.completion = completion
+    }
+
+    func callAsFunction(_ result: PKPaymentAuthorizationResult) {
+        completion(result)
+    }
+}
+
+extension String {
     var nonEmpty: String? { isEmpty ? nil : self }
 }
