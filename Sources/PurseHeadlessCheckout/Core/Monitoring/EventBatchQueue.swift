@@ -76,8 +76,9 @@ actor EventBatchQueue<Item: Sendable> {
         while !items.isEmpty {
             let batch = Array(items.prefix(batchSize))
             items.removeFirst(batch.count)
+            // Subtract what this batch accounted for, rather than zeroing after the loop.
+            queuedBytes = max(0, queuedBytes - batch.reduce(0) { $0 + byteSizer($1) })
             await processor(batch)
         }
-        queuedBytes = 0
     }
 }

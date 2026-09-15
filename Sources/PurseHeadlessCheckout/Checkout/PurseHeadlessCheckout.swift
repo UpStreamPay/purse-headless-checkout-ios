@@ -4,6 +4,7 @@
 
 import Combine
 import Foundation
+import UIKit
 
 /// The checkout for one Purse payment session. Create it from the base64 `widget.data` blob your
 /// backend returns, observe its published state, and drive the split by selecting a primary method
@@ -96,6 +97,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// Test seams: the background work started at creation, so a test can await the clock sync
     /// instead of racing it, and cancel the watchdog rather than leaving a timer running.
     var pendingClockSync: Task<Void, Never>?
+    /// The app-background flush observer, removed at `teardown()`.
+    private var backgroundObserver: (any NSObjectProtocol)?
     var expiryWatchdog: Task<Void, Never>?
     /// Injectable so tests can stub the transport — the seam `purse-ios-securefields` calls
     /// `testURLSession`. Production callers never pass it.
@@ -185,7 +188,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
         let monitoringClient = MonitoringAPIClient(
             apiKey: params.apiKey,
             monitoringAPIRoot: monitoringAPIRootOverride ?? environment.monitoringAPIRoot,
-            envWireValue: environment.wireValue
+            envWireValue: environment.wireValue,
+            // The injected transport, like every other client here. Without it the collector used
+            // `URLSession.shared`, so the whole test suite and the Demo app POSTed real telemetry
+            // to the live host — and no stub could see what was sent.
+            session: urlSession
         )
         let createPayload = monitoringPayload([
             "sessionType": .string("v2"),
@@ -212,11 +219,24 @@ public final class PurseHeadlessCheckout: ObservableObject {
             await self.eventBus.post(.setSession, .info, setSessionPayload)
             await self.eventBus.post(.ready)
         }
+        observeAppBackgrounding()
 
         // Nothing else ever called `sync()`, so the offset stayed 0 and every "server-corrected"
         // check was really the device clock. One sync at creation is what makes the correction real.
         pendingClockSync = Task { [serverClock] in await serverClock.sync() }
         startExpiryWatchdog()
+    }
+
+    /// Flush queued telemetry when the app goes to the background.
+    private func observeAppBackgrounding() {
+        backgroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { await self.eventBus.flush() }
+        }
     }
 
     /// Move the session to ``SessionState/expired`` when its expiry passes *while the shopper is
@@ -576,8 +596,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
     public func removeSecondary(_ token: SecondaryToken) {
         splitter.clearSplit(token)
+        // Deliberately **not** `token.id`: for a freshly typed instrument that is built as
+        // `"{method}-{pan.suffix(4)}"` (`SecondaryConfig`), so emitting it hands the collector the
+        // card's last four digits.
         postMonitoring(.secondaryTokenRemoveFromSplit, .info, monitoringPayload([
-            "partner": .string(token.partner.wireValue), "method": .string(token.method.wireValue), "id": .string(token.id)
+            "partner": .string(token.partner.wireValue), "method": .string(token.method.wireValue)
         ]))
         refresh()
     }
@@ -1234,6 +1257,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
         pendingSecondaryBalanceResolution?.cancel()
         pendingWalletSync?.cancel()
         pendingClockSync?.cancel()
+        if let backgroundObserver {
+            NotificationCenter.default.removeObserver(backgroundObserver)
+            self.backgroundObserver = nil
+        }
         // Otherwise it keeps waking every five seconds for the life of the process. It holds `self`
         // weakly so it would end on deallocation anyway, but a merchant who tears down and keeps
         // the object around is exactly who called this.

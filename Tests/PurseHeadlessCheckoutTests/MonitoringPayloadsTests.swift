@@ -107,10 +107,10 @@ struct MonitoringPayloadsTests {
 
     // MARK: The privacy invariant, structurally
 
-    /// `DisabledState.message` can quote amounts (see its own doc comment); this asserts the
-    /// monitoring helpers have no path that would ever emit it — only a state's stable `code`
-    /// belongs in a payload, exactly as every real call site in `PurseHeadlessCheckout` builds one.
-    @Test func aDisabledStatePayloadCarriesOnlyItsCodeNeverItsMessage() {
+    /// Helper-level only: it builds its own payload, so it pins nothing about what the checkout
+    /// actually emits — which is why a real leak (`removeSecondary` sending a PAN-derived id)
+    /// sailed past it.
+    @Test func theHelperCarriesADisabledStateCodeThrough() {
         let state = DisabledState.minAmountNotMet(minAmount: 10, restToPay: 4.80)
         // What every real call site actually sends — the code, not the message.
         let payload = monitoringPayload(["code": .string(state.code.rawValue)])
