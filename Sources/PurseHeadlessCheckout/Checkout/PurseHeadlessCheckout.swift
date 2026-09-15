@@ -38,7 +38,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
     private let lockedEnvironment: PurseEnvironment?
     /// The `widget.data` string decoded at creation — kept only so ``saveState()`` can round-trip
     /// the exact session ``restore(_:hooks:registry:secondaryConfigs:urlSession:)`` rebuilds from.
-    private let widgetData: String
+    private var widgetData: String
 
     // MARK: Published state
 
@@ -560,6 +560,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
         }
 
         params = newParams
+        // The blob too, not just the decoded params: `saveState()` serialises this, so leaving it
+        // pinned to the first session meant a restore rebuilt a **superseded** one — matched
+        // `primaryId` and `secondaries` against the wrong catalogue, on a session that is typically
+        self.widgetData = widgetData
         session = built
         meansOfPayment = built.meansOfPayment
         fulfilledByItem = fulfilledByItem.filter { survivingIds.contains($0.key) }
@@ -1040,5 +1044,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
         isTornDown = true
         pendingSecondaryBalanceResolution?.cancel()
         pendingWalletSync?.cancel()
+        pendingClockSync?.cancel()
+        // Otherwise it keeps waking every five seconds for the life of the process. It holds `self`
+        // weakly so it would end on deallocation anyway, but a merchant who tears down and keeps
+        // the object around is exactly who called this.
+        expiryWatchdog?.cancel()
     }
 }

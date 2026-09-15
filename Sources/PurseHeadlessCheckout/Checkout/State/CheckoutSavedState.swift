@@ -20,7 +20,9 @@ public struct CheckoutSavedState: Sendable, Equatable {
     let registrationBySecondaryToken: [String: RegistrationState]
     let collectedByItem: [String: [String: JSONValue]]
     let submitted: Bool
-    /// When the snapshot was taken.
+    /// When the snapshot was taken. Epoch **seconds**. Android's peer writes epoch *milliseconds*,
+    /// so two `version: 1` payloads are not interchangeable between the platforms — which is fine
+    /// today, since a state saved on one device is only ever restored on that same device.
     public let savedAt: Date
 
     /// Same-content snapshots compare equal — compared by their serialized form, since `secondaries`

@@ -126,4 +126,32 @@ struct StateRestorationTests {
         let restored = try PurseHeadlessCheckout.restore(saved, urlSession: StubURLProtocol.session())
         #expect(restored.amountSplit.isEmpty)
     }
+
+    /// `saveState()` must snapshot the session **in force**, not the one the checkout was created
+    /// with.
+    @Test func saveStateSnapshotsTheSessionInForceNotTheOriginal() throws {
+        let checkout = try PurseHeadlessCheckout(
+            widgetData: TestSessions.widgetData(
+                paymentSession: TestSessions.paymentSession(id: "session-1", amount: 100)
+            ),
+            urlSession: StubURLProtocol.session()
+        )
+
+        try checkout.setSession(
+            TestSessions.widgetData(
+                paymentSession: TestSessions.paymentSession(id: "session-2", amount: 250)
+            )
+        )
+
+        let restored = try PurseHeadlessCheckout.restore(
+            checkout.saveState(),
+            urlSession: StubURLProtocol.session()
+        )
+
+        #expect(restored.currentSessionId == "session-2")
+        #expect(restored.session.amount == 250)
+
+        checkout.expiryWatchdog?.cancel()
+        restored.expiryWatchdog?.cancel()
+    }
 }
