@@ -262,3 +262,37 @@ struct ApplePayTests {
         #expect(config.merchantName == "Example Shop")
     }
 }
+
+/// The envelope each PSP variant wraps the authorized token in.
+@Suite struct ApplePayTokenEnvelopeTests {
+
+    private let token = Data(#"{"data":"abc","version":"EC_v1"}"#.utf8)
+
+    /// Adyen takes the payment data base64-encoded, inside its own `paymentMethod` wrapper — the
+    /// same shape web builds in `getAdyenSessionFromResult`.
+    @Test func adyenWrapsTheTokenBase64() throws {
+        let session = try #require(ApplePayTokenEnvelope.session(for: .adyen, paymentData: token, productId: nil))
+        let json = try #require(try JSONSerialization.jsonObject(with: Data(session.utf8)) as? [String: Any])
+        let method = try #require(json["paymentMethod"] as? [String: Any])
+        #expect(method["type"] as? String == "applepay")
+        #expect(method["applePayToken"] as? String == token.base64EncodedString())
+    }
+
+    /// Ingenico takes the same bytes as text, not base64.
+    @Test func ingenicoWrapsTheTokenAsText() throws {
+        let session = try #require(ApplePayTokenEnvelope.session(for: .ingenico, paymentData: token, productId: "p1"))
+        let json = try #require(try JSONSerialization.jsonObject(with: Data(session.utf8)) as? [String: Any])
+        let method = try #require(json["paymentMethod"] as? [String: Any])
+        #expect(method["applePayToken"] as? String == String(decoding: token, as: UTF8.self))
+        #expect(method["productId"] as? String == "p1")
+    }
+
+    /// An empty token is not a payment. Adyen would base64 it to `""` and ingenico decode it to
+    /// `""`, and the PSP then answers `BAD_REQUEST / Missing payment method details` a round trip
+    /// later — naming neither the field nor the cause.
+    @Test func anEmptyTokenIsRefusedByEveryVariant() {
+        for variant in [ApplePayVariant.adyen, .ingenico, .default] {
+            #expect(ApplePayTokenEnvelope.session(for: variant, paymentData: Data(), productId: nil) == nil)
+        }
+    }
+}

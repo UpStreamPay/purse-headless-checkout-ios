@@ -140,6 +140,11 @@ enum ApplePayTokenEnvelope {
     /// not `Sendable`, and the delegate that produces it reads this one value out before hopping to
     /// the main actor. It was the only thing this ever used.
     static func session(for variant: ApplePayVariant, paymentData: Data, productId: String?) -> String? {
+        // An empty token is not a payment. Two of the three variants would happily wrap it — adyen
+        // base64s it to `""`, ingenico decodes it to `""` — and the PSP answers `BAD_REQUEST /
+        // Missing payment method details` a round trip later, naming nothing.
+        guard !paymentData.isEmpty else { return nil }
+
         switch variant {
         case .adyen:
             // Adyen wants the payment data base64-encoded.
