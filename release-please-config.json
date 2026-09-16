@@ -1,0 +1,17 @@
+{
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "changelog-sections": [
+        {"type": "feat",     "section": "Features"},
+        {"type": "fix",      "section": "Bug Fixes"},
+        {"type": "perf",     "section": "Performance"},
+        {"type": "revert",   "section": "Reverts"},
+        {"type": "docs",     "section": "Documentation"},
+        {"type": "refactor", "section": "Refactoring"},
+        {"type": "test",     "section": "Tests",  "hidden": true},
+        {"type": "ci",       "section": "CI",     "hidden": true}
+      ]
+    }
+  }
+}

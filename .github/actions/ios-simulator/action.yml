@@ -1,0 +1,38 @@
+name: Pick iOS Simulator
+description: >
+  Boots the newest available iPhone simulator and exports its udid as SIM_ID.
+  Extracted into an action because every job that runs xcodebuild needs it — the sibling
+  purse-ios-securefields repo copy-pastes this block between jobs instead.
+
+runs:
+  using: composite
+  steps:
+    - name: Pick iOS Simulator
+      shell: bash
+      run: |
+        SIM_ID=$(xcrun simctl list -j devices available | python3 -c "
+        import json, re, sys
+
+        # Sort by the runtime's *version*, not its identifier string: sorted() on the raw keys ranks
+        # 'SimRuntime.iOS-9-0' above 'iOS-18-4' and 'iOS-26-0', so a runner with more than one
+        # runtime silently tested the oldest one while this action claimed 'newest available'.
+        def version(runtime):
+            return [int(part) for part in re.findall(r'\d+', runtime.rsplit('iOS-', 1)[-1])]
+
+        d = json.load(sys.stdin)['devices']
+        runtimes = [rt for rt in d if 'iOS' in rt]
+        for rt in sorted(runtimes, key=version, reverse=True):
+            for dev in d[rt]:
+                if 'iPhone' in dev['name']:
+                    print(dev['udid'])
+                    raise SystemExit
+        ")
+        if [ -z "$SIM_ID" ]; then
+          echo "::error::No iPhone simulator available on this runner"
+          exit 1
+        fi
+        echo "SIM_ID=$SIM_ID" >> $GITHUB_ENV
+        xcrun simctl boot "$SIM_ID" || true
+        # Wait for the boot to finish. Without this, xcodebuild races a still-booting simulator —
+        # the standard CI flake, and one that looks like a test failure rather than an infra one.
+        xcrun simctl bootstatus "$SIM_ID" -b

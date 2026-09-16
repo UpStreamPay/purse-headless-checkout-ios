@@ -1,0 +1,21 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      # The PAT is load-bearing: the default GITHUB_TOKEN does not fire the downstream
+      # `release: published` event the packaging workflow will listen for (see SDK-12264).
+      - uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.USP_GITHUB_ADMIN_ACCES_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

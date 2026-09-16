@@ -1,0 +1,27 @@
+# Swift Package Manager
+.build/
+.swiftpm/*
+# ...but CI runs `xcodebuild -scheme`, which needs the shared scheme to be tracked.
+# The sibling securefields repo force-adds it; a negation keeps it from being a manual step.
+!.swiftpm/xcode/
+.swiftpm/xcode/*
+!.swiftpm/xcode/xcshareddata/
+
+# Xcode (keep shared schemes under xcshareddata/)
+xcuserdata/
+DerivedData/
+build/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# macOS
+.DS_Store
+
+# Local demo app secrets — see .env.example
+.env
+
+# IntelliJ Idea
+.idea
+.run
+*.iml

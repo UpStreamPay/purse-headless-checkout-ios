@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  library-tests:
+    name: Library Tests
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/ios-simulator
+
+      - name: Test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -scheme PurseHeadlessCheckout \
+            -destination "platform=iOS Simulator,id=$SIM_ID" \
+            CODE_SIGNING_ALLOWED=NO \
+            | grep --line-buffered -E "(Test Suite|Test Case|✔|✘|error:|FAILED|PASSED|run with)"
