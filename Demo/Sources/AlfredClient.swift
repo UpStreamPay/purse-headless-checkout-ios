@@ -26,12 +26,23 @@ struct AlfredClient {
 
     /// Two steps, as alfred's own demo site uses: 1. `GET /order` → alfred's demo legacy order,
     /// wrapped as `{ "order": … }`. 2.
+    static let returnURL = "https://cdn.purse-dev.com/return/done.html"
+
     func createSession() async throws -> Session {
         let wrapper = try await getJSON("\(baseURL)/order")
-        guard let order = wrapper["order"] else {
+        guard var order = wrapper["order"]?.raw as? [String: Any] else {
             throw DemoError("alfred's /order carried no order")
         }
-        let session = try await postJSON("\(baseURL)/orchestration_session", body: order)
+        // The URLs sit on the **nested** `order.order`, not the wrapper alfred posts. Patching the
+        // outer object adds keys nothing reads, and the session comes back pointing at localhost
+        // anyway — verified by minting one and reading `shopper_redirection_url` back.
+        if var inner = order["order"] as? [String: Any] {
+            for key in ["redirection", "success", "failure"] {
+                inner[key] = Self.returnURL
+            }
+            order["order"] = inner
+        }
+        let session = try await postJSON("\(baseURL)/orchestration_session", body: DemoJSON(raw: order))
         guard let data = session["widget"]?["data"]?.string else {
             throw DemoError("alfred's /orchestration_session carried no widget.data")
         }

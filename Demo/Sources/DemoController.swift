@@ -45,10 +45,14 @@ final class DemoController: ObservableObject {
     let alfred = AlfredClient(baseURL: AlfredClient.fromInfoPlist)
     var alfredBaseURL: String { alfred.baseURL }
 
-    /// One presenter for every redirect. A custom scheme, because
-    /// `ASWebAuthenticationSession` can only observe the return for one before iOS 17.4.
+    /// One presenter for every redirect, returning to the page `AlfredClient` puts on the order.
+    /// `prefersInAppWebView` because this demo claims no Associated Domain for `cdn.purse-dev.com`
+    /// — nobody's demo app could.
     private let presenter = WebAuthRedirectPresenter(
-        policy: RedirectPolicy(returnDestination: .customScheme("com.purse.headlesscheckout.demo.redirect"))
+        policy: RedirectPolicy(
+            returnDestination: .universalLink(host: "cdn.purse-dev.com", path: "/return/done.html")
+        ),
+        prefersInAppWebView: true
     )
 
     private var elements: [String: PaymentElement] = [:]
