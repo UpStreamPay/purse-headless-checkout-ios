@@ -515,6 +515,12 @@ final class ElementSpy: PaymentElementListener {
 
     func onOutcome(_ outcome: PaymentOutcome) {
         controller.log("\(item.id) → \(outcome)")
+        // A redirect return carries the payment id in its token, which the capture card wants and
+        // which `onPaymentId` only fires for when `/validate` itself named one.
+        if case let .returnedFromRedirect(url) = outcome,
+           let paymentId = url?.absoluteString.widgetRedirectionData?.paymentId {
+            controller.capturePaymentId = paymentId
+        }
         controller.finish(outcome, method: controller.label(item))
     }
 }

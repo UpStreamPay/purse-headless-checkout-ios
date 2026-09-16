@@ -34,12 +34,16 @@ struct DemoResult {
                 method: method,
                 detail: "global_status = \(result.globalStatus)"
             )
-        case .returnedFromRedirect:
+        case let .returnedFromRedirect(url):
+            // The return URL's `purse-redirection-data` JWT reports the outcome.
+            let reported = url?.absoluteString.widgetRedirectionData
+            let claim = reported?.authorizationStatus.map { "The redirect reported \($0). " } ?? ""
             return DemoResult(
                 kind: .unconfirmed,
                 method: method,
-                detail: "The shopper came back from the partner's redirect, which isn't proof of "
-                    + "payment. Fetch the transactions below to confirm."
+                detail: claim
+                    + "Coming back from a redirect isn't proof of payment, and the token saying so "
+                    + "is not signature-checked here. Fetch the transactions below to confirm."
             )
         case let .failed(error):
             // A `/validate` that left the device unanswered is not a failure: the payment may well
