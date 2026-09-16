@@ -49,6 +49,22 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | `headless-checkout.ts` | `checkout/PurseHeadlessCheckout.kt` | `Checkout/PurseHeadlessCheckout.swift` |
 | `utils/error/error.ts` (thrown) | `checkout/PurseCheckoutException.kt` | `Checkout/PurseCheckoutError.swift` |
 
+## PartnerUI — landed
+
+| Web | Android | iOS |
+|---|---|---|
+| `commons/Plugin/types.ts` (`Plugin<Context>`) | `partnerui/PartnerUiPlugin.kt` | `PartnerUI/PartnerUIPlugin.swift` |
+| `commons/PartnerUI/types.ts` | `partnerui/PartnerUiContext.kt` | `PartnerUI/PartnerUIPlugin.swift` (`PartnerUIContext`) |
+| `plugins/index.ts` (`getPlugin`) | `partnerui/PluginRegistry.kt` | `PartnerUI/PluginRegistry.swift` |
+| none | `partnerui/PluginHost.kt` | `PartnerUI/PluginHost.swift` |
+| `partner-ui/src/events.ts` | `partnerui/PluginEvent.kt` | `PartnerUI/PluginEvent.swift` |
+| payment-element events | `partnerui/PaymentOutcome.kt` | `PartnerUI/PluginEvent.swift` (`PaymentOutcome`) |
+| `manageRedirection` shapes | `partnerui/redirect/RedirectAction.kt` | `PartnerUI/Redirect/RedirectAction.swift` |
+| `manageRedirection` | `partnerui/redirect/RedirectionResolver.kt` | `PartnerUI/Redirect/RedirectionResolver.swift` |
+| `plugins/generics/redirection` | `plugins/generics/redirection/RedirectionPlugin.kt` | `PartnerUI/Plugins/RedirectionPlugin.swift` |
+| `headless-checkout-validation.ts` | `checkout/validation/PaymentValidator.kt` | `Checkout/Validation/PaymentValidator.swift` |
+| `PurseHeadlessCheckoutHooks` | `checkout/PurseCheckoutHooks.kt` | `Checkout/Validation/PaymentValidator.swift` (`PurseCheckoutHooks`) |
+
 ## Divergences and why
 
 | Topic | Android | iOS | Why |
@@ -64,12 +80,18 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | `PaymentItem` | `sealed class` + 4 data classes | `enum` + 4 structs | A `switch` over the four kinds is exhaustive, so a fifth kind cannot compile until every dispatch site handles it. |
 | Splitter | `class`, mutable, not thread-safe | `struct`, mutating methods | Value semantics; only ever touched on the main actor, so no `Sendable` question arises. |
 | Item ordering | inherits JSON object order | ties broken by id | Swift dictionaries have no stable iteration order, so items with no `position` would otherwise shuffle between builds. |
+| A plugin's `postValidation` throwing **after** a successful `/validate` | propagates raw; the catch never sets `validationConsumed`, so the session reads as still submittable | `postValidationFailed(result:underlying:)` carries the result, and the session is spent | `/validate` answered, so the payment exists — Klarna's `postValidation` throws on a declined authorization, which is the ordinary way to reach this. Leaving the session submittable invites a second `/validate` against an already-charged session, contradicting the invariant both ports state ("a declined payment spends the session"). **Android has the same defect; report it.** |
+| Expiry watchdog and server clock | `startExpiryWatchdog` every 5 s; `isExpiredForServer` checked in `acquireSubmitLock` and `setSession` | watchdog ported; server clock checked in `acquireSubmitLock`, device clock kept in `setSession` | `ServerDatetimeChecker` existed here with **zero call sites** — nothing ever called `sync()`, so the offset stayed 0 and "server-corrected" meant the device clock. `setSession` stays synchronous (making it `async` would break every caller for a check that only pre-screens: the gate that reaches the PSP is the submit-time one). |
+| `PluginEvent` / `pluginEvents` stream | coordinators dispatch events; the checkout clears recoverable states, deactivates methods, terminates the session, and re-exposes them; emits `PARTNER_UI_EVENT` | **not ported** — the orphaned public enum was removed | It had no producer and no consumer anywhere, so a merchant could never receive one. Shipping a public type that promises behaviour nothing implements is the scaffolding AGENTS.md forbids, and removing it later would be a breaking change. See `PartnerUIError.swift` for what building it would take. |
 | Error root | `abstract class PurseException` | `protocol PurseError` | Swift errors are values; a protocol lets session/API/checkout errors stay distinct types a caller can switch over. |
 | Suspension codes | 11 (3 web codes dropped as DOM-only) | 11 | iOS follows Android for consistency across native platforms. **SDK-12263's AC says 14 and must be amended.** |
 | BNPL total | `initial + (count−2)×recurring + final` — fixes a web double-count | same *(PR 5)* | Web's figure is wrong in a credit disclosure; iOS keeps web's field names and Android's arithmetic. **Raise a web bug.** |
 | Partner discovery | `ServiceLoader` over `META-INF/services` | explicit `install()` *(PR 4)* | No `ServiceLoader` and no lazy class loading on this platform (stated in SDK-12264). Android already supports explicit install; iOS makes it the only path. |
 | Google Pay / Apple Pay | `:partner-googlepay` | `PurseCheckoutApplePay` *(PR 4)* | Not a rename — a different partner integration entirely. Net-new work, not a port. |
 | `PATCH` requests | sent as `POST` + `X-HTTP-Method-Override` | real `PATCH` *(PR 5)* | `HttpURLConnection` refuses `PATCH`; `URLSession` does not. |
+| `Method` type name | `Method` | **`PaymentMethod`** | Foundation re-exports the Objective-C runtime's `Method` typedef. A merchant writing `-> Method` gets *"'Method' is ambiguous for type lookup"*, and cannot qualify it because the `PurseHeadlessCheckout` **class shadows the module of the same name**. Verified from a real consumer package, before and after. Web (TypeScript) and Android (Kotlin) have no such collision, so this is the one place naming parity had to give. |
+| Following a redirect | `postValidation` opens an Activity | resolved after submit via `pendingRedirect(for:)` | Same as Android's reason: "follow a redirect" is `window.location` on web and needs nothing but the URL; natively it needs a presenter the pure protocol half must not own. |
+| Partner module discovery | `ServiceLoader` | `PluginRegistry.install(_:)` | No `ServiceLoader`, no lazy class loading (stated in SDK-12264). Android already supports explicit install; iOS makes it the only path. |
 
 ## Vocabulary
 

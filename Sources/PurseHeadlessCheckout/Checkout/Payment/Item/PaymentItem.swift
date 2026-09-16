@@ -33,7 +33,7 @@ public enum PaymentItem: Sendable, Equatable {
         }
     }
 
-    public var method: Method {
+    public var method: PaymentMethod {
         switch self {
         case let .primaryMethod(item): item.method
         case let .secondaryMethod(item): item.method
@@ -94,7 +94,7 @@ public enum PaymentItem: Sendable, Equatable {
 public struct PrimaryMethod: PrimarySource, Sendable, Equatable {
     public let id: String
     public let partner: Partner
-    public let method: Method
+    public let method: PaymentMethod
     public let configuration: MethodConfiguration
     public internal(set) var disabled: DisabledState?
     /// `settings.merchant_specifics.integration_mode` — `redirection` / `popup`, or `nil`.
@@ -114,7 +114,7 @@ public struct PrimaryMethod: PrimarySource, Sendable, Equatable {
 public struct SecondaryMethod: Sendable, Equatable {
     public let id: String
     public let partner: Partner
-    public let method: Method
+    public let method: PaymentMethod
     public let configuration: MethodConfiguration
     public internal(set) var disabled: DisabledState?
 
@@ -129,7 +129,7 @@ public struct PaymentToken: PrimarySource, Sendable, Equatable {
     /// The token's own id (not `partner-method`) — matches the wallet API's token ids.
     public let id: String
     public let partner: Partner
-    public let method: Method
+    public let method: PaymentMethod
     public let configuration: MethodConfiguration
     public internal(set) var disabled: DisabledState?
     /// The opaque value `/validate` pays with.
@@ -178,7 +178,7 @@ public struct SavedSecondaryToken: Sendable, Equatable {
     /// The wallet token id — matches the wallet API's ids, and is the split source id.
     public let id: String
     public let partner: Partner
-    public let method: Method
+    public let method: PaymentMethod
     public let configuration: MethodConfiguration
     public internal(set) var disabled: DisabledState?
     /// `uniqueness_token` — the stored instrument number the partner re-initialises with.
@@ -225,7 +225,7 @@ extension PaymentToken {
     init(
         from token: IntegratedToken,
         partner: Partner,
-        method: Method,
+        method: PaymentMethod,
         configuration: MethodConfiguration,
         disabled: DisabledState?
     ) {
@@ -254,7 +254,7 @@ extension SavedSecondaryToken {
     init(
         from token: IntegratedToken,
         partner: Partner,
-        method: Method,
+        method: PaymentMethod,
         configuration: MethodConfiguration,
         disabled: DisabledState?,
         takePolicy: SecondaryTakePolicy

@@ -73,6 +73,23 @@ public final class PurseHeadlessCheckout: ObservableObject {
     private var splitter: PursePaymentSplitter
     /// Per-item form completeness, armed when an item needs one (a card form, a CVV re-entry).
     private var fulfilledByItem: [String: Bool] = [:]
+    /// What each item's native step produced, threaded into its `/validate` payload.
+    private var collectedByItem: [String: [String: JSONValue]] = [:]
+    /// Set once a `/validate` has answered — a declined payment spends the session just as a
+    /// successful one does, so a second submit must never reach the PSP.
+    private var validationConsumed = false
+    private let registry: PluginRegistry
+    private let hooks: PurseCheckoutHooks?
+    private let serverClock: ServerDatetimeChecker
+    /// Web's `WATCHDOG_DURATION`, and Android's `WATCHDOG_INTERVAL_MS`.
+    static let watchdogIntervalNanoseconds: UInt64 = 5_000_000_000
+    /// Test seams: the background work started at creation, so a test can await the clock sync
+    /// instead of racing it, and cancel the watchdog rather than leaving a timer running.
+    var pendingClockSync: Task<Void, Never>?
+    var expiryWatchdog: Task<Void, Never>?
+    /// Injectable so tests can stub the transport — the seam `purse-ios-securefields` calls
+    /// `testURLSession`. Production callers never pass it.
+    private let urlSession: URLSession
 
     // MARK: Creation
 
@@ -82,7 +99,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
         widgetData: String,
         lockedEnvironment: PurseEnvironment? = nil,
         disabledMethods: Set<MethodKey> = [],
-        instanceId: String = UUID().uuidString
+        hooks: PurseCheckoutHooks? = nil,
+        registry: PluginRegistry = .shared,
+        instanceId: String = UUID().uuidString,
+        urlSession: URLSession = .shared
     ) throws {
         let params = try SessionCodec.decode(widgetData)
         self.params = params
@@ -91,14 +111,46 @@ public final class PurseHeadlessCheckout: ObservableObject {
         self.lockedEnvironment = lockedEnvironment
         self.paymentAPIRoot = Self.resolveAPIRoot(params, locked: lockedEnvironment, environment: environment)
         self.disabledMethods = disabledMethods
+        self.hooks = hooks
+        self.registry = registry
         self.instanceId = instanceId
+        self.urlSession = urlSession
+
+        let datetimeAPI = DatetimeAPIClient(
+            apiKey: params.apiKey,
+            datetimeAPIRoot: environment.datetimeAPIRoot,
+            session: urlSession
+        )
+        self.serverClock = ServerDatetimeChecker(fetchServerTime: { try await datetimeAPI.datetime() })
 
         let built = PaymentSessionBuilder.build(params.paymentSession, disabledMethods: disabledMethods)
         self.session = built
         self.meansOfPayment = built.meansOfPayment
         self.splitter = PursePaymentSplitter(orderAmount: built.amount)
 
+        registry.install(RedirectionModule())
         refresh()
+
+        // Nothing else ever called `sync()`, so the offset stayed 0 and every "server-corrected"
+        // check was really the device clock. One sync at creation is what makes the correction real.
+        pendingClockSync = Task { [serverClock] in await serverClock.sync() }
+        startExpiryWatchdog()
+    }
+
+    /// Move the session to ``SessionState/expired`` when its expiry passes *while the shopper is
+    /// looking at the screen* — web's `ServerDatetimeChecker.WATCHDOG_DURATION`, Android's
+    /// `startExpiryWatchdog`.
+    private func startExpiryWatchdog() {
+        expiryWatchdog = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: Self.watchdogIntervalNanoseconds)
+                guard let self else { return }
+                guard sessionState == .ready else { continue }
+                if await serverClock.isExpiredForServer(session.expirationDate) {
+                    sessionState = .expired
+                }
+            }
+        }
     }
 
     /// Where this session's Payment API calls go. A build-**locked** (release) environment trusts
@@ -111,6 +163,139 @@ public final class PurseHeadlessCheckout: ObservableObject {
     ) -> String {
         guard locked == nil, let declared = params.apiURL.nonBlank else { return environment.paymentAPIRoot }
         return declared
+    }
+
+    /// The Payment API client for the session in force.
+    private var api: PaymentAPIClient {
+        PaymentAPIClient(
+            apiKey: params.apiKey,
+            apiRoot: paymentAPIRoot,
+            entityId: params.entityId,
+            sessionId: session.id,
+            session: urlSession
+        )
+    }
+
+    // MARK: Submitting
+
+    /// Build the payment: `preValidation` for every split, one `POST /validate`, then each plugin's
+    /// `postValidation`.
+    @discardableResult
+    public func submitPayment(skipOnBeforeValidate: Bool = false) async throws -> ValidationResult {
+        try await acquireSubmitLock()
+
+        guard splitter.fulfilled else {
+            sessionState = .ready
+            throw PurseCheckoutError.paymentNotFulfilled("the split does not cover the amount to pay")
+        }
+        if let itemId = unfulfilledItemId {
+            sessionState = .ready
+            throw PurseCheckoutError.itemNotFulfilled(itemId: itemId)
+        }
+
+        // Every selectable item is locked for the duration, then unlocked whatever happens.
+        refresh()
+        defer {
+            sessionState = sessionState == .submitting ? .error : sessionState
+            refresh()
+        }
+
+        let validator = PaymentValidator(api: api, registry: registry)
+        let result: ValidationResult
+        do {
+            result = try await validator.execute(
+                splits: splitter.splits,
+                session: session.source,
+                collectedByItem: collectedByItem,
+                hooks: hooks,
+                skipOnBeforeValidate: skipOnBeforeValidate
+            )
+        } catch {
+            // The session is only spent once /validate actually answered — but there are three
+            // distinct ways that can be true, and only one of them used to be handled.
+            switch error {
+            case let PurseCheckoutError.postValidationFailed(result, _):
+                // The API answered about the payment; a plugin choked afterwards. The payment is
+                // real, so the session is spent exactly as it would be on the success path.
+                validationConsumed = true
+                sessionState = result.isSuccess ? .submitted : .error
+
+            case let PurseCheckoutError.validateFailed(_, underlying)
+                where (underlying as? PaymentAPIError)?.outcomeUnknown == true:
+                // No answer came back, so the payment may exist: a retry could double-charge.
+                validationConsumed = true
+                sessionState = .submitted
+
+            case _ where Self.isSessionTerminal(error):
+                // Already submitted / expired / gone: every further call against this session is
+                // pointless, so say so rather than leaving it looking submittable.
+                sessionState = .terminated
+
+            default:
+                // A hook that aborted before anything was sent, or a transport failure: the
+                // checkout is exactly as submittable as it was.
+                sessionState = .ready
+            }
+            throw error
+        }
+
+        validationConsumed = true
+        sessionState = .submitted
+        return result
+    }
+
+    /// The redirect the last `/validate` asked for, if any — a 3-D Secure challenge or a PSP page.
+    /// Reaching the returned action's destination is **not** an outcome: the final redirect is
+    /// built server-side and can land on a URL this client cannot read.
+    public func pendingRedirect(for result: ValidationResult) -> RedirectAction? {
+        let primary = splitter.primaryMethod
+        return RedirectionResolver.resolve(
+            validateResponse: result.raw,
+            partner: primary?.partner.wireValue ?? "",
+            method: primary?.method.wireValue ?? "",
+            sessionReturnURL: session.source.redirection
+        )?.withReturnURLPrefix(session.source.redirection)
+    }
+
+    /// Whether `error`, **or anything in its `underlying` chain**, is a terminal Payment API answer
+    /// for the session (already submitted / expired / gone).
+    static func isSessionTerminal(_ error: any Error) -> Bool {
+        var current: (any Error)? = error
+        while let error = current {
+            if (error as? PaymentAPIError)?.isSessionTerminal == true { return true }
+            current = (error as? any PurseError)?.underlying
+        }
+        return false
+    }
+
+    /// Re-checks expiry against the server-corrected clock, then moves `ready`/`error` →
+    /// `submitting`.
+    private func acquireSubmitLock() async throws {
+        if validationConsumed {
+            throw PurseCheckoutError.submitBlocked(state: .submitted)
+        }
+        guard sessionState == .ready || sessionState == .error else {
+            throw PurseCheckoutError.submitBlocked(state: sessionState)
+        }
+        // Against the **server** clock, not the device's. A device running ten minutes slow would
+        // otherwise submit an expired session, and one running fast would refuse a valid one — and
+        // the shopper cannot fix either.
+        if await serverClock.isExpiredForServer(session.expirationDate) {
+            sessionState = .expired
+            throw PurseCheckoutError.sessionExpired(sessionId: session.id)
+        }
+        sessionState = .submitting
+    }
+
+    /// Stash what an item's native step produced, for its next `/validate` payload.
+    public func setCollected(_ itemId: String, _ data: [String: JSONValue]) {
+        collectedByItem[itemId] = data
+    }
+
+    /// Synchronise the expiry clock with the server. Failures are swallowed — a payment must never
+    /// be blocked because a clock-sync call timed out.
+    public func syncServerClock() async {
+        await serverClock.sync()
     }
 
     // MARK: Selecting the primary
@@ -193,9 +378,19 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// Hand the checkout a **new** Client Session without tearing the screen down — the cart
     /// changed, or the previous session expired and your backend minted a fresh one.
     public func setSession(_ widgetData: String) throws {
+        // Never while a submit is in flight. `submitPayment` suspends at `await validator.execute`,
+        // releasing the main actor, and a `setSession` landing in that window replaces the session,
+        // resets the splitter and clears `validationConsumed` — so when `/validate` answers, the
+        guard sessionState != .submitting else {
+            throw PurseCheckoutError.submitBlocked(state: .submitting)
+        }
+
         let newParams = try SessionCodec.decode(widgetData)
         let incoming = newParams.paymentSession
 
+        // The device clock, deliberately: this path is synchronous, and the check that actually
+        // gates a payment is the server-corrected one in `acquireSubmitLock`. A device clock wrong
+        // enough to slip an expired blob past here still cannot get it submitted.
         if incoming.expirationDate < Date() {
             throw PurseCheckoutError.sessionExpired(sessionId: incoming.id)
         }
@@ -238,6 +433,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
             restorePrimary(id: previousPrimaryId)
         }
 
+        collectedByItem.removeAll()
+        validationConsumed = false
         sessionState = .ready
         refresh()
     }
@@ -272,7 +469,13 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
         // Filtered states mean "never show this" — the item stays in the internal list so a later
         // recompute can still see it, but no merchant ever renders it.
-        let visible = meansOfPayment.filter { $0.disabled?.isFiltered != true }
+        var visible = meansOfPayment.filter { $0.disabled?.isFiltered != true }
+
+        // `submitting` is a published overlay only, never written into the internal list: it must
+        // lift cleanly when the submit ends, without erasing a real disabled state underneath.
+        if sessionState == .submitting {
+            visible = visible.map { $0.disabled == nil ? $0.withDisabled(.submitting) : $0 }
+        }
 
         paymentMethods = visible.filter {
             switch $0 {

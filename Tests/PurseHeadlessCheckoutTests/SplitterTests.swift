@@ -31,7 +31,7 @@ struct SplitterTests {
     private struct StubPrimary: PrimarySource {
         let id = "purse-creditcard"
         let partner = Partner.purse
-        let method = Method.creditCard
+        let method = PaymentMethod.creditCard
     }
 
     // MARK: Web vectors

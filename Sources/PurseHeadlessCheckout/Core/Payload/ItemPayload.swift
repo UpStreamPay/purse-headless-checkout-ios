@@ -9,7 +9,7 @@ import Foundation
 /// ``JSONValue`` since only a plugin knows their shape — JSON stays at the edges.
 public struct ItemPayload: Sendable, Equatable {
     public let partner: Partner
-    public let method: Method
+    public let method: PaymentMethod
     public let amount: Decimal
     public let stepId: Int?
     public let paymentData: [String: JSONValue]
@@ -19,7 +19,7 @@ public struct ItemPayload: Sendable, Equatable {
 
     public init(
         partner: Partner,
-        method: Method,
+        method: PaymentMethod,
         amount: Decimal,
         stepId: Int? = nil,
         paymentData: [String: JSONValue] = [:],

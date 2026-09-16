@@ -9,7 +9,7 @@ import Foundation
 public protocol SplitSource: Sendable {
     var id: String { get }
     var partner: Partner { get }
-    var method: Method { get }
+    var method: PaymentMethod { get }
 }
 
 /// A ``SplitSource`` that can occupy the split's single primary slot: a fresh ``PrimaryMethod`` or a

@@ -15,6 +15,22 @@ public enum PurseCheckoutError: PurseError {
     case invalidTake(String, PurseErrorCode)
     /// The new session handed to `setSession` is already expired.
     case sessionExpired(sessionId: String)
+    /// Submitting a session that is being submitted, already submitted, or terminated.
+    case submitBlocked(state: SessionState)
+    /// No plugin is registered for a method in the split — the partner product was never installed.
+    case noPluginRegistered(itemId: String)
+    /// No secondary configuration for an applied instrument.
+    case noSecondaryConfig(itemId: String)
+    /// An item in the split reports its own form incomplete.
+    case itemNotFulfilled(itemId: String)
+    /// The `/validate` call itself failed. Inspect ``underlying`` for a ``PaymentAPIError`` whose
+    /// ``PaymentAPIError/outcomeUnknown`` means the payment may nonetheless exist.
+    case validateFailed(String, (any Error)?)
+    /// A merchant hook threw.
+    case hookFailed(hook: String, underlying: any Error, code: PurseErrorCode)
+    /// `/validate` **answered** — the payment exists, approved or declined — and a plugin's
+    /// `postValidation` then threw.
+    case postValidationFailed(result: ValidationResult, underlying: any Error)
 
     public var code: PurseErrorCode {
         switch self {
@@ -22,6 +38,21 @@ public enum PurseCheckoutError: PurseError {
         case .methodDisabled: .methodDisabled
         case let .invalidTake(_, code): code
         case .sessionExpired: .expiredSession
+        case .submitBlocked: .submitBlocked
+        case .noPluginRegistered, .noSecondaryConfig: .methodNotImplemented
+        case .itemNotFulfilled: .elementNotFulfilled
+        case .validateFailed: .validateFailed
+        case let .hookFailed(_, _, code): code
+        case .postValidationFailed: .postValidateFailed
+        }
+    }
+
+    public var underlying: (any Error)? {
+        switch self {
+        case let .validateFailed(_, underlying): underlying
+        case let .hookFailed(_, underlying, _): underlying
+        case let .postValidationFailed(_, underlying): underlying
+        default: nil
         }
     }
 
@@ -35,6 +66,20 @@ public enum PurseCheckoutError: PurseError {
             detail
         case let .sessionExpired(sessionId):
             "session \(sessionId) is already expired"
+        case let .submitBlocked(state):
+            "a payment cannot be submitted while the session is \(state.rawValue)"
+        case let .noPluginRegistered(itemId):
+            "no plugin registered for \(itemId) — install the partner product that provides it"
+        case let .noSecondaryConfig(itemId):
+            "no secondary configuration for \(itemId)"
+        case let .itemNotFulfilled(itemId):
+            "\(itemId) has not reported its form complete"
+        case let .validateFailed(detail, _):
+            detail
+        case let .hookFailed(hook, underlying, _):
+            "the \(hook) hook failed: \(underlying)"
+        case let .postValidationFailed(result, underlying):
+            "validate answered \(result.globalStatus) but postValidation failed: \(underlying)"
         }
     }
 }
