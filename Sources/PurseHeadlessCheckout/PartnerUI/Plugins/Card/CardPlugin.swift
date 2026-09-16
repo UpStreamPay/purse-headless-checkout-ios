@@ -174,7 +174,10 @@ extension CardModule {
 
         view.translatesAutoresizingMaskIntoConstraints = false
         let box = UIView()
-        box.backgroundColor = theme.input.backgroundColor ?? .secondarySystemBackground
+        // `PurseTheme.default` sets `input.backgroundColor` to `.clear`, which is an instruction to
+        // the *field* to paint nothing — not a colour for the box around it.
+        let themed = theme.input.backgroundColor
+        box.backgroundColor = (themed?.cgColor.alpha ?? 0) > 0 ? themed : .secondarySystemBackground
         box.layer.cornerRadius = 10
         box.addSubview(view)
         NSLayoutConstraint.activate([
