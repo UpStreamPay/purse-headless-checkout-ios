@@ -42,7 +42,8 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | `teardown()`/`isTornDown`, process-death state restoration, error-code coverage meta-test | ✅ |
 | Observability — batched event bus, monitoring collector, privacy-audited payloads | ✅ |
 | CI (build + test on PR), semantic versioning, release-please | ✅ (see `.github/workflows/`) |
-| XCFramework signing/distribution, `PrivacyInfo.xcprivacy`, lint, docs | planned |
+| `PrivacyInfo.xcprivacy` (no required-reason APIs; data-type declaration pending a privacy sign-off) | ✅ |
+| XCFramework signing/distribution, SwiftLint/SwiftFormat, docs | planned |
 
 ## Development
 
