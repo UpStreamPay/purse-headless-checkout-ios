@@ -67,6 +67,17 @@ final class DemoViewController: UIViewController {
                 data: Data(#"{"global_status":"SUCCESS","results":[{"status":{"state":"SUCCESS"}}]}"#.utf8),
                 statusCode: 200
             )
+            // The two calls the engine makes on its own, which nothing in this screen asks for and
+            // so are easy to forget: `ServerDatetimeChecker` syncs against `/datetime`, and the
+            // monitoring event bus batches to `/widget/headless_checkout`.
+            MockURLProtocol.handlers["/datetime"] = MockURLProtocol.MockResponse(
+                data: Data(#"{"iso":"\#(ISO8601DateFormatter().string(from: Date()))"}"#.utf8),
+                statusCode: 200
+            )
+            MockURLProtocol.handlers["/widget/headless_checkout"] = MockURLProtocol.MockResponse(
+                data: Data("{}".utf8),
+                statusCode: 200
+            )
             checkout = try PurseHeadlessCheckout(
                 widgetData: Self.demoWidgetData(),
                 urlSession: MockURLProtocol.makeSession()

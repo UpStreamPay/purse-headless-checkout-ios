@@ -23,7 +23,12 @@ final class MockURLProtocol: URLProtocol {
         let path = request.url?.path ?? ""
         let key = Self.handlers.keys.first { path.hasSuffix($0) } ?? ""
         guard let mock = Self.handlers[key] else {
-            client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+            // Not `.notConnectedToInternet`: that is code -1009, which URLSession logs as if the
+            // device were offline, and reads that way to anyone looking at the console.
+            client?.urlProtocol(self, didFailWithError: URLError(
+                .unsupportedURL,
+                userInfo: [NSLocalizedDescriptionKey: "MockURLProtocol has no handler for \(path)"]
+            ))
             return
         }
         let response = HTTPURLResponse(
