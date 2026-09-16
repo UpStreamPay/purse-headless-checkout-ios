@@ -2,7 +2,10 @@
 // Same: token from the vault into /validate; saved token + CVV-only token side by side.
 // Differs: /init runs inside `preValidation`, not at `onSessionSet` (nothing about rendering depends on it — Secure Fields tokenizes independently).
 
+import Combine
 import Foundation
+import PurseSecureFields
+import UIKit
 
 /// The `purse`-vendor vault-backed card plugin — the protocol half, with no Secure Fields types in
 /// sight. The interactive half (the form, tokenization) lives in ``CardCoordinator``.
@@ -116,5 +119,98 @@ struct CardModule: PartnerModule {
 
     @MainActor func register(into registry: PluginRegistry) {
         registry.registerVault(vendor: .purse) { CardPlugin(partner: $0.partner) }
+    }
+
+    @MainActor func renders(_ plugin: any PartnerUIPlugin) -> Bool { plugin is CardPlugin }
+
+    @MainActor func surface(for plugin: any PartnerUIPlugin, request: SurfaceRequest) -> PaymentSurface? {
+        let context = request.host.buildContext()
+        let coordinator = CardCoordinator(
+            host: request.host,
+            tenantId: context.vaultTenantId ?? "",
+            supportedBrands: context.configuration?.vault?.supportedBrands ?? [],
+            token: context.token,
+            options: context.options
+        )
+        let listener = request.listener
+        // A form gates on its own validity; a no-CVV token has nothing to fill in, so it is ready
+        // as soon as it exists.
+        let observer = CardReadinessObserver(coordinator: coordinator, listener: listener)
+
+        return PaymentSurface(
+            hasUI: coordinator.mode.rendersForm,
+            selfSubmitting: false,
+            makeView: {
+                guard coordinator.mode.rendersForm else { return nil }
+                let theme = (context.options.theme ?? .default).resolve()
+                let stack = UIStackView(
+                    arrangedSubviews: coordinator.fieldViews.map { Self.matchingPAN($0, theme: theme) }
+                )
+                stack.axis = .vertical
+                stack.spacing = 12
+                return stack
+            },
+            prepare: { observer.start() },
+            submit: {
+                do {
+                    _ = try await coordinator.submit()
+                } catch {
+                    listener.onOutcome(.failed(error.asPurseError()))
+                    return
+                }
+                await request.captureNow()
+            }
+        )
+    }
+}
+
+extension CardModule {
+    /// The four field views do not arrive alike: `SecurePANContainer` ships its own chrome — a 48pt
+    /// rounded `.secondarySystemBackground` box holding the PAN field and the brand selector —
+    /// while the CVV, expiry and holder-name views are bare fields with no height and no background
+    @MainActor
+    static func matchingPAN(_ view: UIView, theme: PurseTheme.Resolved) -> UIView {
+        guard !(view is SecurePANContainer) else { return view }
+
+        view.translatesAutoresizingMaskIntoConstraints = false
+        let box = UIView()
+        // `PurseTheme.default` sets `input.backgroundColor` to `.clear`, which is an instruction to
+        // the *field* to paint nothing — not a colour for the box around it.
+        let themed = theme.input.backgroundColor
+        box.backgroundColor = (themed?.cgColor.alpha ?? 0) > 0 ? themed : .secondarySystemBackground
+        box.layer.cornerRadius = 10
+        box.addSubview(view)
+        NSLayoutConstraint.activate([
+            view.topAnchor.constraint(equalTo: box.topAnchor, constant: 12),
+            view.leadingAnchor.constraint(equalTo: box.leadingAnchor, constant: 14),
+            view.trailingAnchor.constraint(equalTo: box.trailingAnchor, constant: -14),
+            view.bottomAnchor.constraint(equalTo: box.bottomAnchor, constant: -12),
+            box.heightAnchor.constraint(equalToConstant: 48),
+        ])
+        return box
+    }
+}
+
+/// Bridges `CardCoordinator.$isFormValid` onto the element listener. A no-CVV token renders no form
+/// and never publishes, so its readiness is asserted once instead.
+@MainActor
+private final class CardReadinessObserver {
+    private let coordinator: CardCoordinator
+    private let listener: any PaymentElementListener
+    private var cancellable: AnyCancellable?
+
+    init(coordinator: CardCoordinator, listener: any PaymentElementListener) {
+        self.coordinator = coordinator
+        self.listener = listener
+    }
+
+    func start() {
+        guard coordinator.mode.rendersForm else {
+            listener.onReady(true)
+            return
+        }
+        cancellable = coordinator.$isFormValid.sink { [listener] valid in
+            listener.onReady(valid)
+        }
     }
 }

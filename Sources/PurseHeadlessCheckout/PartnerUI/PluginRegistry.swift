@@ -21,6 +21,19 @@ public protocol PartnerModule: Sendable {
     var id: String { get }
     /// Main-actor isolated because the registry is: registration mutates checkout-facing state.
     @MainActor func register(into registry: PluginRegistry)
+
+    /// Whether `plugin` is one of this module's own — a `plugin is MyPlugin` test.
+    @MainActor func renders(_ plugin: any PartnerUIPlugin) -> Bool
+
+    /// The rendered half of `plugin` for one item. Only called when ``renders(_:)`` said `true`.
+    @MainActor func surface(for plugin: any PartnerUIPlugin, request: SurfaceRequest) -> PaymentSurface?
+}
+
+public extension PartnerModule {
+    /// Defaulted so a module contributing only protocol plugins still compiles. Its items then get
+    /// an element with no UI whose submit reports `noPluginRegistered`.
+    @MainActor func renders(_ plugin: any PartnerUIPlugin) -> Bool { false }
+    @MainActor func surface(for plugin: any PartnerUIPlugin, request: SurfaceRequest) -> PaymentSurface? { nil }
 }
 
 /// Resolves the plugin for a `(partner, method)` of a session.
@@ -33,7 +46,7 @@ public final class PluginRegistry {
     private var genericPlugins: [String: PluginBuilder] = [:]
     private var partnerPlugins: [MethodKey: PluginBuilder] = [:]
     private var methodFallbacks: [PaymentMethod: PluginBuilder] = [:]
-    private var installed: [String] = []
+    private var installed: [any PartnerModule] = []
 
     /// The built-in plugins every merchant gets — the Purse-vault card and the generic redirection
     /// template — are installed here, mirroring Android's `PluginRegistry` init block. A caller that
@@ -44,13 +57,19 @@ public final class PluginRegistry {
     }
 
     /// The ids of the modules currently contributing plugins, in installation order.
-    public var modules: [String] { installed }
+    public var modules: [String] { installed.map(\.id) }
 
     /// Add a module's plugins. Installing the same module twice is a no-op.
     public func install(_ module: any PartnerModule) {
-        guard !installed.contains(module.id) else { return }
-        installed.append(module.id)
+        guard !installed.contains(where: { $0.id == module.id }) else { return }
+        installed.append(module)
         module.register(into: self)
+    }
+
+    /// The installed module that renders `plugin` — Android's `moduleFor`. `nil` when the partner
+    /// product is linked but not installed, which is what makes an element headless.
+    public func module(rendering plugin: any PartnerUIPlugin) -> (any PartnerModule)? {
+        installed.first { $0.renders(plugin) }
     }
 
     /// Exact `(partner, method)`; last registration wins.

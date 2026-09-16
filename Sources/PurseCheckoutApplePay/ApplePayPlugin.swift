@@ -3,6 +3,8 @@
 // Differs: no merchant-validation round trip (PassKit has no `onvalidatemerchant`).
 
 import Foundation
+import PassKit
+import UIKit
 import PurseHeadlessCheckout
 
 /// The Apple Pay plugin — the protocol half, with no PassKit types in sight.
@@ -66,11 +68,84 @@ public struct ApplePayPlugin: PartnerUIPlugin {
 public struct ApplePayModule: PartnerModule {
     public let id = "purse.applepay"
 
-    public init() {}
+    /// Needed to render a payment element. The merchant id is entitlement-bound, so it can only
+    /// come from the app — nothing in the session carries it. `nil` still registers the plugin, so
+    /// a host driving `ApplePayCoordinator` itself keeps working; only the element needs it.
+    private let configuration: ApplePayConfiguration?
+
+    public init(configuration: ApplePayConfiguration? = nil) {
+        self.configuration = configuration
+    }
 
     @MainActor public func register(into registry: PluginRegistry) {
         // Registered as a method fallback, whatever the partner: the session decides which PSP
         // handles Apple Pay, and the variant is derived from it.
         registry.registerFallback(method: .applePay) { ApplePayPlugin(partner: $0.partner) }
+    }
+
+    @MainActor public func renders(_ plugin: any PartnerUIPlugin) -> Bool { plugin is ApplePayPlugin }
+
+    @MainActor public func surface(
+        for plugin: any PartnerUIPlugin,
+        request: SurfaceRequest
+    ) -> PaymentSurface? {
+        let listener = request.listener
+        guard let configuration else {
+            return .headless(submit: {
+                listener.onOutcome(.failed(PartnerUIError(
+                    "Apple Pay needs a merchant id: install ApplePayModule(configuration:)"
+                )))
+            })
+        }
+        // Read once: `canPay` is a `static var` nothing can observe, so a surface cannot react to
+        // it changing. A device that cannot pay renders no button at all.
+        guard ApplePayCoordinator.canPay else { return .headless(submit: {}) }
+
+        let coordinator = ApplePayCoordinator(host: request.host, configuration: configuration)
+        let button = ApplePayButtonBox(coordinator: coordinator, request: request)
+
+        return PaymentSurface(
+            hasUI: true,
+            selfSubmitting: true,
+            makeView: { button.view },
+            prepare: {
+                do {
+                    try await coordinator.prepare()
+                    listener.onReady(true)
+                } catch {
+                    listener.onReady(false)
+                    listener.onOutcome(.failed(error.asPurseError()))
+                }
+            },
+            // Self-submitting: the button drives it. A host Pay button must not.
+            submit: {}
+        )
+    }
+}
+
+/// Owns the `PKPaymentButton` and its target, which `UIControl` holds unowned.
+@MainActor
+private final class ApplePayButtonBox {
+    let view: PKPaymentButton
+    private let coordinator: ApplePayCoordinator
+    private let request: SurfaceRequest
+
+    init(coordinator: ApplePayCoordinator, request: SurfaceRequest) {
+        self.coordinator = coordinator
+        self.request = request
+        self.view = PKPaymentButton(paymentButtonType: .plain, paymentButtonStyle: .automatic)
+        view.addTarget(self, action: #selector(tapped), for: .touchUpInside)
+    }
+
+    @objc private func tapped() {
+        Task { @MainActor in
+            do {
+                try await coordinator.present()
+            } catch {
+                request.listener.onOutcome(.failed(error.asPurseError()))
+                return
+            }
+            await request.selectAndCapture()
+        }
     }
 }

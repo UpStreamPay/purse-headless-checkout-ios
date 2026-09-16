@@ -56,4 +56,15 @@ struct RedirectionModule: PartnerModule {
             RedirectionPlugin(partner: data.partner, method: data.method)
         }
     }
+
+    @MainActor func renders(_ plugin: any PartnerUIPlugin) -> Bool { plugin is RedirectionPlugin }
+
+    /// Nothing to show: the PSP's own hosted page is the payment step. `/init` runs inside
+    /// `preValidation`, so there is nothing to prepare either — it is ready as soon as it exists.
+    @MainActor func surface(for plugin: any PartnerUIPlugin, request: SurfaceRequest) -> PaymentSurface? {
+        PaymentSurface.headless(
+            prepare: { request.listener.onReady(true) },
+            submit: { await request.captureNow() }
+        )
+    }
 }

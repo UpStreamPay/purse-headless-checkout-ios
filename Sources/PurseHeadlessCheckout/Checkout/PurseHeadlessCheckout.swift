@@ -642,6 +642,82 @@ public final class PurseHeadlessCheckout: ObservableObject {
         return ItemHost(checkout: self, item: item, apiClient: client)
     }
 
+    // MARK: Payment element
+
+    /// The ``PaymentElement`` for `item` — web's `getPaymentElement`, Android's
+    /// `rememberPaymentElement`.
+    public func paymentElement(
+        for item: PaymentItem,
+        listener: any PaymentElementListener,
+        redirect: (any RedirectPresenter)? = nil,
+        appReturnURL: URL? = nil
+    ) -> PaymentElement {
+        let wrapped = ElementListener(listener)
+        let key = "\(item.id):\(itemGenerations[item.id] ?? 0)"
+
+        func failing(_ error: any PurseError) -> PaymentElement {
+            PaymentElement(
+                item: item,
+                surface: .headless(submit: { wrapped.onOutcome(.failed(error)) }),
+                listener: wrapped
+            )
+        }
+
+        // Swift catches at compile time what Kotlin leaves to runtime: `host(for:)` takes a
+        // `PrimarySource`, and a secondary is not one. Android has no peer for this branch.
+        let source: any PrimarySource
+        let isToken: Bool
+        switch item {
+        case let .primaryMethod(method): source = method; isToken = false
+        case let .paymentToken(token): source = token; isToken = true
+        case .secondaryMethod, .savedSecondaryToken:
+            return failing(PartnerUIError(
+                "a secondary is applied with applySecondary(_:), never paid with a payment element"
+            ))
+        }
+
+        if let disabled = item.disabled, disabled.isTechnicallyDisabled {
+            return failing(PurseCheckoutError.methodDisabled(itemId: item.id, disabled: disabled))
+        }
+
+        let host: PluginHost
+        do {
+            host = try self.host(for: source)
+        } catch {
+            return failing(error.asPurseError())
+        }
+
+        guard let plugin = registry.plugin(partner: item.partner, method: item.method, session: session.source),
+              let module = registry.module(rendering: plugin)
+        else {
+            return failing(PurseCheckoutError.noPluginRegistered(itemId: item.id))
+        }
+
+        postMonitoring(
+            isToken ? .primaryTokenGetPaymentElement : .methodGetPaymentElement,
+            .info,
+            monitoringPayload(["itemId": .string(item.id)])
+        )
+
+        let request = SurfaceRequest(
+            host: host,
+            isToken: isToken,
+            key: key,
+            listener: wrapped,
+            appReturnURL: appReturnURL,
+            redirectPresenter: redirect,
+            capture: { [weak self] in
+                guard let self else { return }
+                await ElementFlow.capture(host: host, checkout: self, presenter: redirect, listener: wrapped)
+            }
+        )
+
+        guard let surface = module.surface(for: plugin, request: request) else {
+            return failing(PurseCheckoutError.noPluginRegistered(itemId: item.id))
+        }
+        return PaymentElement(item: item, surface: surface, listener: wrapped)
+    }
+
     /// The context a plugin sees for `item` right now, against `apiClient` — Android's
     /// `pluginContext`.
     private func pluginContext(for item: any PrimarySource, api apiClient: PaymentAPIClient) -> PartnerUIContext {

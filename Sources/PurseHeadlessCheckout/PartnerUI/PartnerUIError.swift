@@ -22,15 +22,10 @@ public struct PartnerUIError: PurseError {
 //
 // Android has `PluginEvent` (web's `UnifiedEvent`) plus a `pluginEvents` SharedFlow: a coordinator
 // reports `Ready` / `InitFailed` / `PartnerError` / `EndOfSession` back to the checkout, which
-// clears a recoverable disabled state, deactivates the method, or terminates the session, and
-// re-exposes every event to the merchant's UI. It also emits `PARTNER_UI_EVENT` to monitoring.
+// clears a recoverable disabled state, deactivates the method, or terminates the session.
 //
-// iOS has none of that wiring. A `PluginEvent` enum and a `PaymentOutcome` enum did exist here as
-// public types with **no producer and no consumer anywhere in the SDK** — a merchant could never
-// have received one. They are removed rather than left in the published API: shipping a public type
-// that promises behaviour nothing implements is exactly the scaffolding AGENTS.md forbids, and
-// removing it later would be a breaking change.
-//
-// Building it for real means: a `dispatchEvent` on `PartnerUIContext`, the checkout-side reactions
-// above, and an `AsyncStream` on the checkout (Android's SharedFlow). That is a feature, not a fix
-// — see docs/web-android-ios-map.md.
+// iOS still has none of that wiring. `PluginEvent` and `PaymentOutcome` were both removed from here
+// when they were public types with no producer and no consumer. `PaymentOutcome` is back, with a
+// real producer — see Element/. `PluginEvent` is not: it needs a `dispatchEvent` on
+// `PartnerUIContext`, the checkout-side reactions above, and an `AsyncStream` peer of Android's
+// SharedFlow. A feature, not a fix — see docs/web-android-ios-map.md.
