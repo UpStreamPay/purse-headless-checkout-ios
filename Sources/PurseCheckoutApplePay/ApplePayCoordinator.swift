@@ -49,7 +49,7 @@ public final class ApplePayCoordinator: NSObject {
             "partner": .string(context.partner.wireValue),
             "method": .string(PaymentMethod.applePay.wireValue),
             "amount": .number(context.amount.description),
-            "partner_data": .object(["browser": .object(ApplePayPlugin.browserData(locale: context.options.locale))]),
+            "partner_data": .object(["browser": .object(BrowserData.make(locale: context.options.locale))]),
             "payment_data": .object([:]),
             "payment_preferences": .object([:]),
         ])

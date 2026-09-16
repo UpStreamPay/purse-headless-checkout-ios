@@ -54,22 +54,11 @@ public struct ApplePayPlugin: PartnerUIPlugin {
             paymentData: ["card": .object(card)],
             partnerData: [
                 "session": .string(session),
-                "browser": .object(ApplePayPlugin.browserData(locale: context.options.locale)),
+                "browser": .object(await BrowserData.make(locale: context.options.locale)),
             ]
         )
     }
 
-    /// Native has no `window.navigator`; these are the honest equivalents, as the redirection
-    /// plugin sends.
-    static func browserData(locale: String?) -> [String: JSONValue] {
-        [
-            "accept_header": "application/json",
-            "java_enabled": .bool(false),
-            "language": .string(locale ?? Locale.preferredLanguages.first ?? "en"),
-            "color_depth": .number("32"),
-            "timezone_offset": .number(String(-TimeZone.current.secondsFromGMT() / 60)),
-        ]
-    }
 }
 
 /// Install this to offer Apple Pay: There is no `ServiceLoader` on this platform, so a partner
