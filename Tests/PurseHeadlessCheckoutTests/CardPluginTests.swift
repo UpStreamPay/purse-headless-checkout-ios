@@ -178,11 +178,18 @@ struct CardPluginTests {
         #expect(CardBrand.dinersClub.secureFieldsBrand == nil)
     }
 
-    @Test func environmentsMapToVaultTiers() {
+    /// Every tier, not a sample: this asserted three of the four and skipped `.test`, which was the
+    /// one pointing at the wrong vault. A tenant exists only in its own tier's vault, so the
+    /// mismatch surfaced as "no tenant with id was found" — a message that names nothing.
+    @Test func everyEnvironmentMapsToItsOwnVaultTier() {
         #expect(PurseEnvironment.production.vaultEnvironment == .production)
         #expect(PurseEnvironment.sandbox.vaultEnvironment == .sandbox)
+        #expect(PurseEnvironment.test.vaultEnvironment == .test)
         // Development has no vault of its own.
         #expect(PurseEnvironment.development.vaultEnvironment == .sandbox)
+        // And nothing silently lands on production.
+        let nonProduction: [PurseEnvironment] = [.sandbox, .development, .test]
+        #expect(nonProduction.allSatisfy { $0.vaultEnvironment != .production })
     }
 
     // MARK: Fulfilment across a tokenization

@@ -195,12 +195,14 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
 // MARK: - Vocabulary mapping
 
 extension PurseEnvironment {
-    /// The vault tier for this Payment API tier. Development has no vault of its own.
+    /// The vault tier for this Payment API tier. Development has no vault of its own. Each tier's
+    /// tenants exist only in its own vault, so a mismatch fails tokenization with "no tenant with
+    /// id was found" rather than anything that names the environment.
     var vaultEnvironment: VaultEnvironment {
         switch self {
         case .production: .production
         case .sandbox, .development: .sandbox
-        case .test: .sandbox
+        case .test: .test
         }
     }
 }
