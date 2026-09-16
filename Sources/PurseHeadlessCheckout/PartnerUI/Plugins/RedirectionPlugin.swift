@@ -42,21 +42,8 @@ public struct RedirectionPlugin: PartnerUIPlugin {
             amount: context.amount,
             stepId: stepId,
             paymentData: paymentData,
-            partnerData: ["browser": .object(Self.browserData)]
+            partnerData: ["browser": .object(await BrowserData.make(locale: context.options.locale))]
         )
-    }
-
-    /// The `partner_data.browser` block a 3-D Secure step needs. Native has no `window.navigator`,
-    /// so these are the honest native equivalents rather than a spoofed browser fingerprint: an ACS
-    /// uses them for challenge sizing and locale.
-    static var browserData: [String: JSONValue] {
-        [
-            "accept_header": "application/json",
-            "java_enabled": .bool(false),
-            "language": .string(Locale.preferredLanguages.first ?? "en"),
-            "color_depth": .number("32"),
-            "timezone_offset": .number(String(-TimeZone.current.secondsFromGMT() / 60)),
-        ]
     }
 }
 
