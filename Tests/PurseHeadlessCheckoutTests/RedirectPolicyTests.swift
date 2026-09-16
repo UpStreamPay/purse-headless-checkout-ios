@@ -159,3 +159,50 @@ struct RedirectFirstLoadTests {
         #expect(firstLoad(.get(url: "http://acs.bank.example/3ds")) == .refused("http://acs.bank.example/3ds"))
     }
 }
+
+/// What counts as coming back, for the in-app web view. Pure, so it covers the paths a presented
+/// `WKWebView` would otherwise hide — including the server-redirect one, where the last hop of a
+/// payment return actually arrives.
+@MainActor
+struct RedirectReturnDetectionTests {
+
+    private let policy = RedirectPolicy(
+        returnDestination: .universalLink(host: "return.example", path: "/done")
+    )
+
+    private func isReturn(_ raw: String, action: RedirectAction) -> Bool {
+        RedirectWebViewController.isReturn(URL(string: raw)!, action: action, policy: policy)
+    }
+
+    private let plain = RedirectAction.get(url: "https://acs.bank.example/3ds")
+
+    @Test func thePolicysOwnDestinationEndsTheFlow() {
+        #expect(isReturn("https://return.example/done?x=1", action: plain))
+    }
+
+    /// The common case: a PSP redirects to the merchant's configured page, not to the app.
+    @Test func theSessionsConfiguredReturnEndsTheFlow() {
+        let action = RedirectAction.get(
+            url: "https://acs.bank.example/3ds",
+            returnURLPrefix: "https://cdn.purse-dev.com/return/done.html"
+        )
+        #expect(isReturn("https://cdn.purse-dev.com/return/done.html?purse-redirection-data=a.b.c", action: action))
+    }
+
+    /// Caught even when the session configured no return URL at all.
+    @Test func theWidgetConfirmationHopEndsTheFlow() {
+        #expect(isReturn("https://anywhere.example/x?purse-redirection-data=a.b.c", action: plain))
+    }
+
+    @Test func anOrdinaryChallengeHopDoesNot() {
+        #expect(!isReturn("https://acs.bank.example/3ds/step2", action: plain))
+        // A prefix that merely shares a host is not the return.
+        #expect(!isReturn("https://return.example/elsewhere", action: plain))
+    }
+
+    /// The query string is what carries the reported status, so it must survive detection.
+    @Test func theQueryStringIsNotPartOfTheMatch() {
+        #expect(isReturn("https://return.example/done", action: plain))
+        #expect(isReturn("https://return.example/done?purse-redirection-data=a.b.c&foo=1", action: plain))
+    }
+}

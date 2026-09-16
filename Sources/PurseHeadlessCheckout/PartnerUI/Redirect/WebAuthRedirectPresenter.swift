@@ -257,10 +257,18 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
         }
     }
 
-    /// Whether `url` is the return URL the session configured, carried on the action itself.
-    private func isConfiguredReturn(_ url: URL) -> Bool {
-        guard let prefix = action.returnURLPrefix, !prefix.isEmpty else { return false }
-        return url.absoluteString.hasPrefix(prefix)
+    /// Whether reaching `url` ends the flow. Three ways, and the second is the common one: a PSP
+    /// usually redirects to the merchant's configured return page rather than straight to the app's
+    /// scheme.
+    static func isReturn(_ url: URL, action: RedirectAction, policy: RedirectPolicy) -> Bool {
+        if policy.isReturn(url) { return true }
+        if let prefix = action.returnURLPrefix, !prefix.isEmpty,
+           url.absoluteString.hasPrefix(prefix) {
+            return true
+        }
+        // The widget's own confirmation hop carries the result the caller already has, and is caught
+        // even when no return URL is configured.
+        return url.absoluteString.isWidgetConfirmationRedirect
     }
 
     @objc private func cancelTapped() {
@@ -287,23 +295,24 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
             return
         }
 
-        // The policy's own destination, **or** the return URL the session configured and this
-        // action carries.
-        if policy.isReturn(url) || isConfiguredReturn(url) {
-            decisionHandler(.cancel)
-            finish(.success(.returned(url: url)))
-            return
-        }
-
-        // The widget's own confirmation hop is not a destination worth rendering — it carries the
-        // result the caller already has, and is caught even when no return URL is configured.
-        if url.absoluteString.isWidgetConfirmationRedirect {
+        if Self.isReturn(url, action: action, policy: policy) {
             decisionHandler(.cancel)
             finish(.success(.returned(url: url)))
             return
         }
 
         decisionHandler(policy.allowsLoading(url) ? .allow : .cancel)
+    }
+
+    /// A server-side `302` chain does not reliably re-enter `decidePolicyFor`, and the last hop of
+    /// a payment return is exactly that: the API's `client-sessions/{id}/redirection` endpoint
+    /// redirects to the merchant's page.
+    func webView(
+        _ webView: WKWebView,
+        didReceiveServerRedirectForProvisionalNavigation navigation: WKNavigation!
+    ) {
+        guard let url = webView.url, Self.isReturn(url, action: action, policy: policy) else { return }
+        finish(.success(.returned(url: url)))
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {
