@@ -301,6 +301,26 @@ through `hookFailed(hook:underlying:code:)` instead. Adding a new `PurseErrorCod
 itself require a new `PurseCheckoutError` case: check whether an existing flexible carrier already
 covers it before adding one.
 
+## Monitoring: per-instance, not a process-wide singleton — and one honest correction to Android
+
+`CheckoutEventBus` deliberately diverges from Android's `CheckoutEventBus`/web's event bus: it is
+owned by one `PurseHeadlessCheckout`, not a process-wide singleton every checkout instance shares
+and re-points via `install()`. Every other piece of mutable state here is already per-instance
+(`splitter`, `wallet`, …); a global bus would be the one exception, and it has a real failure mode
+Android's design accepts — two checkouts alive at once would have the second one's `install()`
+silently redirect the first one's events. Don't reach for a singleton/shared-instance pattern for
+monitoring state without checking whether the multi-instance case actually matters here (it does).
+
+**Do not copy a payload field from Android without checking it against the privacy AC first.**
+Android's own `LoanSimulator.call` includes `"amount" to product.amount.toPlainString()` in
+`HEADLESS_CHECKOUT_METHOD_LOAN_SIM` — a real inconsistency with its own documented invariant ("no
+raw amount in any event", SDK-12220) that this port does not carry forward. Every monitoring call
+site here only ever sends `partner`/`method`/`currencyCode`/counts/booleans — the amount itself
+never appears. `monitoringPayload`/`errorPayload`/`summarizeValidationResults`
+(`Checkout/Monitoring/MonitoringPayloads.swift`) are the one place that decides what a payload can
+carry; route every new event through them rather than building a payload by hand, and check the
+privacy invariant yourself rather than trusting the Android source is already clean.
+
 ## Repo layout
 
 ```

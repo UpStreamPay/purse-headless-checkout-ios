@@ -4,6 +4,7 @@
 
 import Combine
 import Foundation
+import UIKit
 
 /// The checkout for one Purse payment session. Create it from the base64 `widget.data` blob your
 /// backend returns, observe its published state, and drive the split by selecting a primary method
@@ -96,11 +97,16 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// Test seams: the background work started at creation, so a test can await the clock sync
     /// instead of racing it, and cancel the watchdog rather than leaving a timer running.
     var pendingClockSync: Task<Void, Never>?
+    /// The app-background flush observer, removed at `teardown()`.
+    private var backgroundObserver: (any NSObjectProtocol)?
     var expiryWatchdog: Task<Void, Never>?
     /// Injectable so tests can stub the transport — the seam `purse-ios-securefields` calls
     /// `testURLSession`. Production callers never pass it.
     private let urlSession: URLSession
     private let wallet: WalletTokens
+    /// This checkout's own analytics bus — per-instance, not a process-wide singleton; see
+    /// `CheckoutEventBus`'s own header comment for why.
+    private let eventBus = CheckoutEventBus()
     /// Save-token decisions for a fresh primary method, keyed by item id.
     private var registrationByMethod: [String: RegistrationState] = [:]
     /// Save-token decisions for a temporary secondary instrument, keyed by item id.
@@ -119,7 +125,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
         secondaryConfigs: SecondaryConfigs = .shared,
         instanceId: String = UUID().uuidString,
         urlSession: URLSession = .shared,
-        walletAPIRootOverride: String? = nil
+        walletAPIRootOverride: String? = nil,
+        monitoringAPIRootOverride: String? = nil,
+        restored: Bool = false
     ) throws {
         let params = try SessionCodec.decode(widgetData)
         self.params = params
@@ -165,15 +173,70 @@ public final class PurseHeadlessCheckout: ObservableObject {
         // operations and syncs names/favorites, so it must never break the checkout.
         if wallet.client != nil {
             pendingWalletSync = Task {
-                _ = try? await self.wallet.fetch()
-                self.syncWalletTokens()
+                do {
+                    _ = try await self.wallet.fetch()
+                    self.syncWalletTokens()
+                    await self.eventBus.post(.setWalletSession, .info, monitoringPayload([
+                        "walletSessionId": (params.walletSession?.sessionId).map(JSONValue.string)
+                    ]))
+                } catch {
+                    await self.eventBus.post(.setWalletSessionFailed, .error, errorPayload(error))
+                }
             }
         }
+
+        let monitoringClient = MonitoringAPIClient(
+            apiKey: params.apiKey,
+            monitoringAPIRoot: monitoringAPIRootOverride ?? environment.monitoringAPIRoot,
+            envWireValue: environment.wireValue,
+            // The injected transport, like every other client here. Without it the collector used
+            // `URLSession.shared`, so the whole test suite and the Demo app POSTed real telemetry
+            // to the live host — and no stub could see what was sent.
+            session: urlSession
+        )
+        let createPayload = monitoringPayload([
+            "sessionType": .string("v2"),
+            "user_agent": .string(CheckoutMonitoringContext.userAgent()),
+            "device": CheckoutMonitoringContext.deviceContext(),
+            "screen": CheckoutMonitoringContext.screen(),
+            "restored": restored ? .bool(true) : nil
+        ])
+        let setSessionPayload = monitoringPayload([
+            "paymentSessionId": .string(built.id),
+            "sessionType": .string("v2"),
+            "nb_methods": .number(String(built.meansOfPayment.count))
+        ])
+        pendingMonitoringInstall = Task {
+            await self.eventBus.install(client: monitoringClient, instanceId: instanceId)
+            await self.eventBus.patchExtras(
+                entityId: params.entityId,
+                paymentSessionId: built.id,
+                walletSessionId: params.walletSession?.sessionId,
+                version: SDKVersion.value,
+                wrapper: "direct"
+            )
+            await self.eventBus.post(.create, .info, createPayload)
+            await self.eventBus.post(.setSession, .info, setSessionPayload)
+            await self.eventBus.post(.ready)
+        }
+        observeAppBackgrounding()
 
         // Nothing else ever called `sync()`, so the offset stayed 0 and every "server-corrected"
         // check was really the device clock. One sync at creation is what makes the correction real.
         pendingClockSync = Task { [serverClock] in await serverClock.sync() }
         startExpiryWatchdog()
+    }
+
+    /// Flush queued telemetry when the app goes to the background.
+    private func observeAppBackgrounding() {
+        backgroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { await self.eventBus.flush() }
+        }
     }
 
     /// Move the session to ``SessionState/expired`` when its expiry passes *while the shopper is
@@ -230,6 +293,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
     @discardableResult
     public func submitPayment(skipOnBeforeValidate: Bool = false) async throws -> ValidationResult {
         try requireOpen()
+        await eventBus.post(.submitPayment, .info, monitoringPayload([
+            "trigger": .string(skipOnBeforeValidate ? "xpay" : "api"),
+            "nb_splits": .number(String(splitter.splits.count))
+        ]))
         try await acquireSubmitLock()
 
         guard splitter.fulfilled else {
@@ -248,7 +315,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
             refresh()
         }
 
-        let validator = PaymentValidator(api: try api, registry: registry, configs: configs)
+        await eventBus.post(.validationStarted, .info, monitoringPayload([
+            "session_id": .string(session.id), "nb_items": .number(String(splitter.splits.count))
+        ]))
+
+        let validator = PaymentValidator(api: try api, registry: registry, configs: configs, eventBus: eventBus)
         let result: ValidationResult
         do {
             result = try await validator.execute(
@@ -285,11 +356,30 @@ public final class PurseHeadlessCheckout: ObservableObject {
                 // checkout is exactly as submittable as it was.
                 sessionState = .ready
             }
+            await eventBus.post(.paymentError, .error, errorPayload(error))
             throw error
         }
 
         validationConsumed = true
         sessionState = .submitted
+        // Web's levels: a refused payment is a WARNING on validationFailed and an ERROR on the
+        // paymentError that follows it, both saying why attempt by attempt.
+        let attempts = summarizeValidationResults(result.raw)
+        if result.isSuccess {
+            await eventBus.post(.validationSuccess, .success, monitoringPayload([
+                "global_status": .string(result.globalStatus), "results": attempts
+            ]))
+        } else {
+            await eventBus.post(.validationFailed, .warning, monitoringPayload([
+                "global_status": .string(result.globalStatus), "results": attempts
+            ]))
+            await eventBus.post(.paymentError, .error, monitoringPayload([
+                "message": .string("validate answered \(result.globalStatus)"),
+                "api_status": .string(result.globalStatus),
+                "has_redirection": .bool(result.redirection?.url != nil),
+                "results": summarizeValidationResults(result.raw, onlyFailures: true)
+            ]))
+        }
         return result
     }
 
@@ -307,6 +397,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
                 // `true` means the merchant took it over: the SDK opens nothing.
                 if try await onRedirection(action) { return nil }
             } catch {
+                await eventBus.post(.clientHookError, .error, monitoringPayload([
+                    "hook": .string("onRedirection"), "message": .string(error.localizedDescription)
+                ]))
                 throw PurseCheckoutError.hookFailed(
                     hook: "onRedirection",
                     underlying: error,
@@ -346,9 +439,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// `submitting`.
     private func acquireSubmitLock() async throws {
         if validationConsumed {
+            postMonitoring(.submitBlocked, .warning, monitoringPayload(["state": .string(SessionState.submitted.rawValue)]))
             throw PurseCheckoutError.submitBlocked(state: .submitted)
         }
         guard sessionState == .ready || sessionState == .error else {
+            postMonitoring(.submitBlocked, .warning, monitoringPayload(["state": .string(sessionState.rawValue)]))
             throw PurseCheckoutError.submitBlocked(state: sessionState)
         }
         // Against the **server** clock, not the device's. A device running ten minutes slow would
@@ -356,6 +451,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
         // the shopper cannot fix either.
         if await serverClock.isExpiredForServer(session.expirationDate) {
             sessionState = .expired
+            postMonitoring(.expiredSession, .warning, monitoringPayload(["paymentSessionId": .string(session.id)]))
             throw PurseCheckoutError.sessionExpired(sessionId: session.id)
         }
         sessionState = .submitting
@@ -378,16 +474,23 @@ public final class PurseHeadlessCheckout: ObservableObject {
     public func setPrimary(_ method: PrimaryMethod?) throws {
         guard let method else {
             splitter.setPrimary(nil)
+            postMonitoring(.clearPrimarySplit)
             refresh()
             return
         }
         try selectPrimary(method, itemId: method.id)
+        postMonitoring(.methodSetPrimary, .info, monitoringPayload([
+            "partner": .string(method.partner.wireValue), "method": .string(method.method.wireValue)
+        ]))
     }
 
     /// Pay with a saved card. When the token ``PaymentToken/requiresCVV``, the fulfilment gate is
     /// armed: the checkout is not fulfilled until the CVV form reports valid.
     public func setPrimaryToken(_ token: PaymentToken) throws {
         try selectPrimary(token, itemId: token.id)
+        postMonitoring(.primaryTokenSetAsPrimary, .info, monitoringPayload([
+            "partner": .string(token.partner.wireValue), "method": .string(token.method.wireValue)
+        ]))
         if token.requiresCVV, fulfilledByItem[token.id] == nil {
             fulfilledByItem[token.id] = false
             refresh()
@@ -405,6 +508,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// Drop the primary, leaving only whatever secondaries cover.
     public func clearPrimarySplit() {
         splitter.setPrimary(nil)
+        postMonitoring(.clearPrimarySplit)
         refresh()
     }
 
@@ -431,6 +535,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
         pan: String,
         cvv: String? = nil
     ) async throws -> SecondaryToken {
+        await eventBus.post(.methodGetSecondaryToken, .info, monitoringPayload([
+            "partner": .string(method.partner.wireValue), "method": .string(method.method.wireValue)
+        ]))
         do {
             return try await SecondaryTokenizer(api: api, configs: configs)
                 // What the instrument is being asked to cover, not 0: an issuer that computes the
@@ -439,7 +546,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
                 .tokenize(method: method, pan: pan, cvv: cvv, amount: splitter.remaining)
         } catch {
             // A terminal API answer ends the whole session, not just this tokenization — web's
-            // `onSessionTerminated` path, and Android's `if (e.sessionTerminal())` here.
+            // `onSessionTerminated` path, and Android's `if (e.sessionTerminal())` here. Walked
+            // through the wrapper, since the tokenizer never rethrows a bare `PaymentAPIError`.
             if Self.isSessionTerminal(error) { sessionState = .terminated }
             throw error
         }
@@ -449,6 +557,12 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// ``PursePaymentSplitter/takeSplit(_:requestedAmount:)`` for the refusal rules.
     public func applySecondary(_ token: SecondaryToken, amount: Decimal? = nil) throws {
         try splitter.takeSplit(token, requestedAmount: amount)
+        postMonitoring(.secondaryTokenTake, .info, monitoringPayload([
+            "partner": .string(token.partner.wireValue),
+            "method": .string(token.method.wireValue),
+            // Whether the shopper chose the slice, never how much it is.
+            "partial": .bool(amount != nil)
+        ]))
         refresh()
     }
 
@@ -482,6 +596,12 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
     public func removeSecondary(_ token: SecondaryToken) {
         splitter.clearSplit(token)
+        // Deliberately **not** `token.id`: for a freshly typed instrument that is built as
+        // `"{method}-{pan.suffix(4)}"` (`SecondaryConfig`), so emitting it hands the collector the
+        // card's last four digits.
+        postMonitoring(.secondaryTokenRemoveFromSplit, .info, monitoringPayload([
+            "partner": .string(token.partner.wireValue), "method": .string(token.method.wireValue)
+        ]))
         refresh()
     }
 
@@ -525,11 +645,13 @@ public final class PurseHeadlessCheckout: ObservableObject {
         // gates a payment is the server-corrected one in `acquireSubmitLock`. A device clock wrong
         // enough to slip an expired blob past here still cannot get it submitted.
         if incoming.expirationDate < Date() {
+            postMonitoring(.expiredSession, .warning, monitoringPayload(["paymentSessionId": .string(incoming.id)]))
             throw PurseCheckoutError.sessionExpired(sessionId: incoming.id)
         }
         // Same session id → ignored with no change, as on web.
         if incoming.id == session.id { return }
 
+        let previousSessionId = session.id
         let previousItems = Dictionary(
             meansOfPayment.map { ($0.id, $0) },
             uniquingKeysWith: { first, _ in first }
@@ -585,6 +707,28 @@ public final class PurseHeadlessCheckout: ObservableObject {
         // The wallet session outlives any one payment session — reapply what it already knows onto
         // the freshly rebuilt items rather than fetching again.
         if wallet.client != nil { syncWalletTokens() }
+
+        // Re-stamp the envelope so events after this refresh carry the session they belong to, not
+        // the first one — web's `patchExtrasData` on every `_setSession`.
+        let survivingMethodCount = survivingIds.count
+        let meansCount = built.meansOfPayment.count
+        Task {
+            await self.eventBus.patchExtras(paymentSessionId: built.id, walletSessionId: newParams.walletSession?.sessionId)
+            await self.eventBus.post(.setSession, .info, monitoringPayload([
+                "paymentSessionId": .string(built.id),
+                "previousPaymentSessionId": .string(previousSessionId),
+                "sessionType": .string("v2"),
+                "nb_methods": .number(String(meansCount)),
+                "nb_surviving_methods": .number(String(survivingMethodCount))
+            ]))
+        }
+    }
+
+    /// Fire-and-forget an event from a synchronous context — every mutating method here is
+    /// synchronous, but `CheckoutEventBus` is an actor. A failure inside `post` cannot happen (it
+    /// never throws), so this never needs to surface anything back to the caller.
+    private func postMonitoring(_ code: CheckoutEventCode, _ type: EventLevel = .info, _ payload: JSONValue? = nil) {
+        Task { await self.eventBus.post(code, type, payload) }
     }
 
     private func restorePrimary(id: String) {
@@ -608,12 +752,14 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// after every change to the split or to an item's state — the analogue of web re-running
     /// `updateMopDisabledState` whenever `primaryReach` changes.
     private func refresh() {
+        let before = meansOfPayment
         meansOfPayment = MethodAvailability.recompute(
             meansOfPayment,
             isInformationRequest: session.isInformationRequest,
             primaryReach: splitter.primaryReach,
             splitSources: splitter.splits.map(\.source)
         )
+        reportDisabledTransitions(before: before, after: meansOfPayment)
 
         // Filtered states mean "never show this" — the item stays in the internal list so a later
         // recompute can still see it, but no merchant ever renders it.
@@ -642,7 +788,31 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
         remainingAmountToPay = splitter.primaryReach
         amountSplit = splitter.splits
-        isPaymentFulfilled = splitter.fulfilled && unfulfilledItemId == nil
+        let fulfilled = splitter.fulfilled && unfulfilledItemId == nil
+        if fulfilled != isPaymentFulfilled {
+            postMonitoring(.paymentFulfilled, .info, monitoringPayload(["isFulfilled": .bool(fulfilled)]))
+        }
+        isPaymentFulfilled = fulfilled
+    }
+
+    /// Every transition of an item into a new ``DisabledState`` (or into none) as one
+    /// `HEADLESS_CHECKOUT_METHOD_DISABLED` event carrying only the state's **code** — never its
+    /// `message`, which can quote amounts.
+    private func reportDisabledTransitions(before: [PaymentItem], after: [PaymentItem]) {
+        let previousCodes = Dictionary(uniqueKeysWithValues: before.map { ($0.id, $0.disabled?.code) })
+        for item in after {
+            guard let state = item.disabled else { continue }
+            let previous = previousCodes[item.id] ?? nil
+            if previous == state.code { continue }
+            let technical = state.isTechnicallyDisabled || state.code == .fatalErrorBeforeRender
+            postMonitoring(.methodDisabled, technical ? .warning : .info, monitoringPayload([
+                "partner": .string(item.partner.wireValue),
+                "method": .string(item.method.wireValue),
+                "code": .string(state.code.rawValue),
+                "filtered": .bool(state.isFiltered),
+                "recoverable": .bool(state.isRecoverable)
+            ]))
+        }
     }
 
     // MARK: Saved secondary token balances
@@ -724,6 +894,12 @@ public final class PurseHeadlessCheckout: ObservableObject {
         refresh()
     }
 
+    // MARK: Monitoring
+
+    /// Exposed at `internal` access only so tests can `await` the monitoring install fired at
+    /// construction (`CREATE`/`SET_SESSION`/`READY`) — a merchant has no need to touch it.
+    private(set) var pendingMonitoringInstall: Task<Void, Never>?
+
     // MARK: Wallet session
 
     /// Exposed at `internal` access only so tests can `await` the initial wallet sync fired at
@@ -776,6 +952,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
         registrationByMethod[method.id] = RegistrationState(
             registered: registered, name: name ?? registrationByMethod[method.id]?.name
         )
+        postMonitoring(.methodRegister, .info, monitoringPayload([
+            "partner": .string(method.partner.wireValue),
+            "method": .string(method.method.wireValue),
+            "saveToken": .bool(registered)
+        ]))
     }
 
     /// The current save decision for a **temporary** gift card (one the shopper just typed and
@@ -803,6 +984,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
         registrationBySecondaryToken[token.id] = RegistrationState(
             registered: registered, name: name ?? registrationBySecondaryToken[token.id]?.name
         )
+        postMonitoring(.secondaryTokenRegister, .info, monitoringPayload([
+            "partner": .string(token.partner.wireValue),
+            "method": .string(token.method.wireValue),
+            "saveToken": .bool(registered)
+        ]))
     }
 
     /// One `RegistrationState` per currently-split item that carries a save decision — a
@@ -830,6 +1016,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
         try validateTokenLabel(name, excludingTokenId: token.id)
         try await client.editTokenName(token.id, name: name)
         updateTokenItem(token.id) { $0.name = name }
+        await eventBus.post(.tokenEdit, .info, monitoringPayload([
+            "partner": .string(token.partner.wireValue), "method": .string(token.method.wireValue), "tokenId": .string(token.id)
+        ]))
     }
 
     /// Rename a saved gift card (`PATCH …/tokens/{id}/name`) — same rules as the card overload.
@@ -839,6 +1028,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
         try validateTokenLabel(name, excludingTokenId: token.id)
         try await client.editTokenName(token.id, name: name)
         updateSavedSecondary(token.id) { $0.name = name }
+        await eventBus.post(.tokenEdit, .info, monitoringPayload([
+            "partner": .string(token.partner.wireValue), "method": .string(token.method.wireValue), "tokenId": .string(token.id)
+        ]))
     }
 
     /// Delete a saved card (`DELETE …/tokens/{id}`) — web's `token.delete()`: also clears it from
@@ -850,6 +1042,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
         if splitter.primaryMethod?.id == token.id { splitter.setPrimary(nil) }
         meansOfPayment.removeAll { $0.id == token.id }
         wallet.forget(token.id)
+        await eventBus.post(.tokenDelete, .info, monitoringPayload([
+            "partner": .string(token.partner.wireValue), "method": .string(token.method.wireValue), "tokenId": .string(token.id)
+        ]))
         refresh()
     }
 
@@ -860,6 +1055,12 @@ public final class PurseHeadlessCheckout: ObservableObject {
         try wallet.requireToken(token.id)
         let newFavorite = !token.favorite
         updateTokenItem(token.id) { $0.favorite = newFavorite }
+        await eventBus.post(.tokenSetFavorite, .info, monitoringPayload([
+            "partner": .string(token.partner.wireValue),
+            "method": .string(token.method.wireValue),
+            "tokenId": .string(token.id),
+            "favorite": .bool(newFavorite)
+        ]))
         do {
             try await client.setAsFavorite(token.id, favorite: newFavorite)
             _ = try await wallet.fetch()
@@ -889,6 +1090,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
             }
         }
         wallet.clear()
+        await eventBus.post(.deleteAllTokens)
         refresh()
     }
 
@@ -917,6 +1119,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// `simulable` label (`configuration.labels.contains("simulable")`).
     public func simulateLoan(_ method: PrimaryMethod, product: LoanProduct) async throws -> LoanSimulation {
         guard method.simulable else { throw PurseCheckoutError.methodNotSimulable(itemId: method.id) }
+        await eventBus.post(.methodLoanSim, .info, monitoringPayload([
+            "partner": .string(method.partner.wireValue),
+            "method": .string(method.method.wireValue),
+            "currencyCode": .string(product.currencyCode)
+        ]))
         do {
             return try await api.getSimulation(partner: method.partner, method: method.method, product: product)
         } catch {
@@ -928,6 +1135,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// ``simulateLoan(_:product:)``.
     public func simulateLoans(_ method: PrimaryMethod, product: LoanProduct) async throws -> [LoanSimulation] {
         guard method.simulable else { throw PurseCheckoutError.methodNotSimulable(itemId: method.id) }
+        await eventBus.post(.methodLoanSim, .info, monitoringPayload([
+            "partner": .string(method.partner.wireValue),
+            "method": .string(method.method.wireValue),
+            "currencyCode": .string(product.currencyCode)
+        ]))
         do {
             return try await api.getSimulationMulti(partner: method.partner, method: method.method, product: product)
         } catch {
@@ -1045,9 +1257,17 @@ public final class PurseHeadlessCheckout: ObservableObject {
         pendingSecondaryBalanceResolution?.cancel()
         pendingWalletSync?.cancel()
         pendingClockSync?.cancel()
+        if let backgroundObserver {
+            NotificationCenter.default.removeObserver(backgroundObserver)
+            self.backgroundObserver = nil
+        }
         // Otherwise it keeps waking every five seconds for the life of the process. It holds `self`
         // weakly so it would end on deallocation anyway, but a merchant who tears down and keeps
         // the object around is exactly who called this.
         expiryWatchdog?.cancel()
+        Task {
+            await eventBus.post(.pageUnload)
+            await eventBus.flush()
+        }
     }
 }

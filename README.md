@@ -40,7 +40,9 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | BNPL loan simulation | ✅ |
 | Theming (`PurseTheme`, mapped onto Secure Fields' own style) | ✅ |
 | `teardown()`/`isTornDown`, process-death state restoration, error-code coverage meta-test | ✅ |
-| XCFramework distribution, monitoring, docs | planned |
+| Observability — batched event bus, monitoring collector, privacy-audited payloads | ✅ |
+| CI (build + test on PR), semantic versioning, release-please | ✅ (see `.github/workflows/`) |
+| XCFramework signing/distribution, `PrivacyInfo.xcprivacy`, lint, docs | planned |
 
 ## Development
 
