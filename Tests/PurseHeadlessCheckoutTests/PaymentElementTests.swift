@@ -50,7 +50,7 @@ struct PaymentElementTests {
 
     private final class SpyPresenter: RedirectPresenter {
         var presented: [RedirectAction] = []
-        var answer: RedirectOutcome = .returned
+        var answer: RedirectOutcome = .returned(url: nil)
         func present(_ action: RedirectAction) async throws -> RedirectOutcome {
             presented.append(action)
             return answer
@@ -182,6 +182,36 @@ struct PaymentElementTests {
         #expect(result.isSuccess)
         #expect(spy.requiresAction == 0)
     }
+
+    /// The return URL reaches the listener, so a host can read what the redirect reported without
+    /// a round trip to its own backend.
+    @Test func theReturnURLReachesTheListener() async throws {
+        stubValidate(Self.withRedirect)
+        let checkout = try makeCheckout()
+        let spy = Spy()
+        let presenter = SpyPresenter()
+        let returned = "https://shop.example/return?purse-redirection-data=h.\(Self.claims).s"
+        presenter.answer = .returned(url: URL(string: returned))
+
+        let element = checkout.paymentElement(for: try selectCard(checkout), listener: spy, redirect: presenter)
+        await element.submit().value
+
+        guard case let .returnedFromRedirect(url) = try #require(spy.outcomes.first) else {
+            Issue.record("expected a redirect return, got \(spy.outcomes)")
+            return
+        }
+        let data = try #require(url?.absoluteString.widgetRedirectionData)
+        #expect(data.paymentId == "pay_777")
+        #expect(data.isAuthorized)
+    }
+
+    private static let claims: String = {
+        Data(#"{"payment_id":"pay_777","authorization_status":"AUTHORIZED"}"#.utf8)
+            .base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }()
 
     @Test func aRedirectingValidateAnnouncesTheActionThenReportsTheReturn() async throws {
         stubValidate(Self.withRedirect)

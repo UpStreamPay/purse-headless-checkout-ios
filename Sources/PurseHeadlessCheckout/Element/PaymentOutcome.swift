@@ -13,7 +13,7 @@ public enum PaymentOutcome {
 
     /// The shopper came back from a redirect. **Not** an outcome: the final redirect is built
     /// server-side and can land on a URL this client cannot read. Confirm against the session.
-    case returnedFromRedirect
+    case returnedFromRedirect(url: URL?)
 
     /// The shopper backed out — a dismissed sheet, an abandoned approval, a closed redirect.
     case canceled

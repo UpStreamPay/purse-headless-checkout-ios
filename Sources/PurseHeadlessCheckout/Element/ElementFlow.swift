@@ -37,7 +37,7 @@ enum ElementFlow {
         listener.onRequiresAction()
         do {
             switch try await checkout.presentRedirectIfNeeded(for: result, using: presenter) {
-            case .returned: listener.onOutcome(.returnedFromRedirect)
+            case let .returned(url): listener.onOutcome(.returnedFromRedirect(url: url))
             case .canceled: listener.onOutcome(.canceled)
             case nil: listener.onOutcome(.completed(result))  // the `onRedirection` hook took it over
             }
