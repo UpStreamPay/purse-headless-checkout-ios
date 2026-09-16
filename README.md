@@ -44,7 +44,8 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | CI (build + test on PR), semantic versioning, release-please | ✅ (see `.github/workflows/`) |
 | `PrivacyInfo.xcprivacy` (no required-reason APIs; data-type declaration pending a privacy sign-off) | ✅ |
 | `PurseHeadlessCheckout.host(for:)` — the concrete `PluginHost` every coordinator runs through | ✅ |
-| Demo app (`Demo/Demo.xcodeproj`) — builds, launches, exercises the engine end to end | ✅ (see below) |
+| Payment elements — one `hasUI`/`isReady`/`submit()` shape per method, with a sealed `PaymentOutcome` | ✅ |
+| Demo app (`Demo/Demo.xcodeproj`) — three screens over real sessions, every method | ✅ (see below) |
 | XCFramework signing/distribution, SwiftLint/SwiftFormat, docs | planned |
 
 ## Development
@@ -71,26 +72,31 @@ broken and why each one exists.
 
 ## Demo app
 
-`Demo/Demo.xcodeproj` — a real, minimal UIKit app: session decode → `PurseHeadlessCheckout` →
-`host(for:)` → `CardCoordinator` → `submitPayment()`, the same calls any merchant integration makes.
-Builds and launches today (`xcodebuild build -project Demo/Demo.xcodeproj -scheme Demo -destination
-"platform=iOS Simulator,id=$SIM_ID" CODE_SIGNING_ALLOWED=NO`); the embedded frameworks
-(`PurseHeadlessCheckout.framework`, and `PurseSecureFields.framework` transitively) install and load
-without a crash, confirmed on-device in the simulator, not just compiled.
+`Demo/Demo.xcodeproj` — session → pay → result, the same three screens as Android's `:app`, against
+sessions minted by **alfred** (the `usp-widget` dev server that holds the server-side Purse
+credentials a real merchant backend would).
 
-**Running it against a real backend.** Copy `.env.example` to `.env`, put a real base64
-`widget.data` in `WIDGET_DATA`, and `source scripts/load-env.sh` before building or launching Xcode.
-With that set the Demo decodes your blob and talks to the real backend; with it empty it falls back
-to a canned session and a stubbed `/validate` (`MockURLProtocol.swift`) so it still runs out of the
-box. CI builds it in **Debug and Release** — it previously did not compile in Release at all, and
-nothing built that configuration.
+```sh
+cd ../usp-widget && npm run dev:alfred          # port 9001
+cp .env.example .env                            # ALFRED_BASE_URL, blank ⇒ http://localhost:9001
+source scripts/load-env.sh                      # must be sourced; see the script for why
+xcodebuild build -project Demo/Demo.xcodeproj -scheme Demo \
+  -destination "platform=iOS Simulator,id=$SIM_ID" CODE_SIGNING_ALLOWED=NO
+```
 
-**What it still can't do.** The one card flow it exercises end to end without credentials is a saved
-card that pays **without a CVV** (`merchant_specifics.pay_token_no_cvv`), because that is the only
-path that mounts no Secure Fields form and calls no real Vault. Fresh-card entry, Apple Pay, PayPal
-and Klarna each need real sandbox credentials (a Vault tenant id, an Apple Pay merchant id, a PayPal
-client id, a Klarna client token). Wiring those in, and a release build actually authorizing a
-sandbox payment, is what remains of SDK-12264/12266's acceptance criteria.
+`localhost`, not Android's `10.0.2.2` — that is an emulator alias for the host loopback, and the
+Simulator shares the host's network stack. A physical device needs your machine's LAN IP.
+
+**There is no offline path.** Without alfred the demo mints nothing; paste a `widget.data` on screen
+1 instead. CI builds it in Debug and Release.
+
+**What still needs credentials this repo does not have.** Apple Pay's `/init` answers 400 without a
+real merchant id, and the sheet needs an entitlement — the button renders and the failure is
+reported, which is the honest result. Klarna needs a live client token. Everything else runs: the
+saved card, the redirection methods, gift-card split, loan simulation, `setSession`, teardown.
+
+**`-demo-autostart`** mints a session and opens the pay screen on launch, for smoke tests.
+
 
 ## License
 

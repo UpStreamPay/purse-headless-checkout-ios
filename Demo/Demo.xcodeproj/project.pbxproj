@@ -8,20 +8,38 @@
 
 /* Begin PBXBuildFile section */
 		3C2B00000000000000000001 /* PurseHeadlessCheckout in Frameworks */ = {isa = PBXBuildFile; productRef = 3C2B00000000000000000002 /* PurseHeadlessCheckout */; };
-		3C2B00000000000000000003 /* PurseHeadlessCheckout.framework in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 3C2B00000000000000000002 /* PurseHeadlessCheckout */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		BB00000000000000000061 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000060 /* Assets.xcassets */; };
-		BB00000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000002 /* AppDelegate.swift */; };
-		BB00000000000000000003 /* DemoViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000004 /* DemoViewController.swift */; };
-		BB00000000000000000005 /* MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000006 /* MockURLProtocol.swift */; };
+		BB00000000000000000100 /* AlfredClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000101 /* AlfredClient.swift */; };
+		BB00000000000000000102 /* DemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000103 /* DemoApp.swift */; };
+		BB00000000000000000104 /* DemoController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000105 /* DemoController.swift */; };
+		BB00000000000000000106 /* DemoJSON.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000107 /* DemoJSON.swift */; };
+		BB00000000000000000108 /* DemoResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000109 /* DemoResult.swift */; };
+		BB00000000000000000110 /* DemoTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000111 /* DemoTheme.swift */; };
+		BB00000000000000000112 /* DemoUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000113 /* DemoUI.swift */; };
+		BB00000000000000000114 /* PayScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000115 /* PayScreen.swift */; };
+		BB00000000000000000116 /* ResultScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000117 /* ResultScreen.swift */; };
+		BB00000000000000000118 /* SessionScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000119 /* SessionScreen.swift */; };
+		BB00000000000000000120 /* SimulationPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000121 /* SimulationPreview.swift */; };
+		3C2B0000000000000001000 /* PurseCheckoutApplePay in Frameworks */ = {isa = PBXBuildFile; productRef = 3C2B0000000000000001002 /* PurseCheckoutApplePay */; };
+		3C2B0000000000000001003 /* PurseCheckoutPayPal in Frameworks */ = {isa = PBXBuildFile; productRef = 3C2B0000000000000001005 /* PurseCheckoutPayPal */; };
+		3C2B0000000000000001006 /* PurseCheckoutKlarna in Frameworks */ = {isa = PBXBuildFile; productRef = 3C2B0000000000000001008 /* PurseCheckoutKlarna */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		BB00000000000000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		BB00000000000000000004 /* DemoViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoViewController.swift; sourceTree = "<group>"; };
-		BB00000000000000000006 /* MockURLProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockURLProtocol.swift; sourceTree = "<group>"; };
 		BB0000000000000000000A /* Demo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Demo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB0000000000000000000B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BB00000000000000000060 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BB00000000000000000101 /* AlfredClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlfredClient.swift; sourceTree = "<group>"; };
+		BB00000000000000000103 /* DemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoApp.swift; sourceTree = "<group>"; };
+		BB00000000000000000105 /* DemoController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoController.swift; sourceTree = "<group>"; };
+		BB00000000000000000107 /* DemoJSON.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoJSON.swift; sourceTree = "<group>"; };
+		BB00000000000000000109 /* DemoResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoResult.swift; sourceTree = "<group>"; };
+		BB00000000000000000111 /* DemoTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoTheme.swift; sourceTree = "<group>"; };
+		BB00000000000000000113 /* DemoUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoUI.swift; sourceTree = "<group>"; };
+		BB00000000000000000115 /* PayScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PayScreen.swift; sourceTree = "<group>"; };
+		BB00000000000000000117 /* ResultScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultScreen.swift; sourceTree = "<group>"; };
+		BB00000000000000000119 /* SessionScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionScreen.swift; sourceTree = "<group>"; };
+		BB00000000000000000121 /* SimulationPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimulationPreview.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -30,6 +48,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				3C2B00000000000000000001 /* PurseHeadlessCheckout in Frameworks */,
+				3C2B0000000000000001000 /* PurseCheckoutApplePay in Frameworks */,
+				3C2B0000000000000001003 /* PurseCheckoutPayPal in Frameworks */,
+				3C2B0000000000000001006 /* PurseCheckoutKlarna in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -42,7 +63,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				3C2B00000000000000000003 /* PurseHeadlessCheckout.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -70,9 +90,17 @@
 		BB0000000000000000001A /* Sources */ = {
 			isa = PBXGroup;
 			children = (
-				BB00000000000000000002 /* AppDelegate.swift */,
-				BB00000000000000000004 /* DemoViewController.swift */,
-				BB00000000000000000006 /* MockURLProtocol.swift */,
+				BB00000000000000000101 /* AlfredClient.swift */,
+				BB00000000000000000103 /* DemoApp.swift */,
+				BB00000000000000000105 /* DemoController.swift */,
+				BB00000000000000000107 /* DemoJSON.swift */,
+				BB00000000000000000109 /* DemoResult.swift */,
+				BB00000000000000000111 /* DemoTheme.swift */,
+				BB00000000000000000113 /* DemoUI.swift */,
+				BB00000000000000000115 /* PayScreen.swift */,
+				BB00000000000000000117 /* ResultScreen.swift */,
+				BB00000000000000000119 /* SessionScreen.swift */,
+				BB00000000000000000121 /* SimulationPreview.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -105,6 +133,9 @@
 			name = Demo;
 			packageProductDependencies = (
 				3C2B00000000000000000002 /* PurseHeadlessCheckout */,
+				3C2B0000000000000001002 /* PurseCheckoutApplePay */,
+				3C2B0000000000000001005 /* PurseCheckoutPayPal */,
+				3C2B0000000000000001008 /* PurseCheckoutKlarna */,
 			);
 			productName = Demo;
 			productReference = BB0000000000000000000A /* Demo.app */;
@@ -162,9 +193,17 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BB00000000000000000001 /* AppDelegate.swift in Sources */,
-				BB00000000000000000003 /* DemoViewController.swift in Sources */,
-				BB00000000000000000005 /* MockURLProtocol.swift in Sources */,
+				BB00000000000000000100 /* AlfredClient.swift in Sources */,
+				BB00000000000000000102 /* DemoApp.swift in Sources */,
+				BB00000000000000000104 /* DemoController.swift in Sources */,
+				BB00000000000000000106 /* DemoJSON.swift in Sources */,
+				BB00000000000000000108 /* DemoResult.swift in Sources */,
+				BB00000000000000000110 /* DemoTheme.swift in Sources */,
+				BB00000000000000000112 /* DemoUI.swift in Sources */,
+				BB00000000000000000114 /* PayScreen.swift in Sources */,
+				BB00000000000000000116 /* ResultScreen.swift in Sources */,
+				BB00000000000000000118 /* SessionScreen.swift in Sources */,
+				BB00000000000000000120 /* SimulationPreview.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -285,6 +324,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 3C2B00000000000000000005 /* XCLocalSwiftPackageReference ".." */;
 			productName = PurseHeadlessCheckout;
+		};
+		3C2B0000000000000001002 /* PurseCheckoutApplePay */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3C2B00000000000000000005 /* XCLocalSwiftPackageReference ".." */;
+			productName = PurseCheckoutApplePay;
+		};
+		3C2B0000000000000001005 /* PurseCheckoutPayPal */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3C2B00000000000000000005 /* XCLocalSwiftPackageReference ".." */;
+			productName = PurseCheckoutPayPal;
+		};
+		3C2B0000000000000001008 /* PurseCheckoutKlarna */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3C2B00000000000000000005 /* XCLocalSwiftPackageReference ".." */;
+			productName = PurseCheckoutKlarna;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -18,15 +18,34 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<!-- Set these via `source scripts/load-env.sh` (see .env.example); both resolve to an empty
-	     string when unset. With no WIDGET_DATA the Demo runs against its own canned session and a
-	     stubbed /validate; with one, it decodes that blob and talks to the real backend.
-	     The names must match .env.example exactly — they did not before, so the documented
-	     workflow set variables nothing ever read. -->
-	<key>WIDGET_DATA</key>
-	<string>$(WIDGET_DATA)</string>
-	<key>MONITORING_API_KEY</key>
-	<string>$(MONITORING_API_KEY)</string>
+	<!-- Set via `source scripts/load-env.sh` (see .env.example); resolves to an empty string when
+	     unset, and the app falls back to http://localhost:9001. The name must match .env.example
+	     exactly. MONITORING_API_KEY used to sit here and was read by nothing: the SDK takes its
+	     monitoring key from the session's own api_key and exposes no hook. -->
+	<key>ALFRED_BASE_URL</key>
+	<string>$(ALFRED_BASE_URL)</string>
+	<!-- alfred is a local dev server over plain http. Scoped to local hosts rather than a blanket
+	     allowance; Android's network_security_config.xml is the peer, and is blanket. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<!-- Where a redirect, Klarna and PayPal come back to. The redirect scheme must match the
+	     RedirectPolicy in DemoController. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.purse.headlesscheckout.demo.redirect</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.purse.headlesscheckout.demo.redirect</string>
+				<string>com.purse.headlesscheckout.demo.klarna</string>
+				<string>com.purse.headlesscheckout.demo.paypal</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
