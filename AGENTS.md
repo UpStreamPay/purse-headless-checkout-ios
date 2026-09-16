@@ -280,15 +280,52 @@ assumed either way, and documented on the type itself rather than silently wired
    Android, recorded in the module layout docs.
 4. Mirror the Android plugin's `/init` timing and failure modes — `docs/plugins/` there is per-PSP.
 
-## No concrete `PluginHost` exists yet
+## `PurseHeadlessCheckout.host(for:)` — the concrete `PluginHost`
 
-Every coordinator (`CardCoordinator`, `ApplePayCoordinator`, `PayPalCoordinator`, `KlarnaCoordinator`)
-takes `host: any PluginHost` as an init parameter, but nothing in this repo implements that protocol
-— `PurseHeadlessCheckout` does not conform to it, and there is no `host(item:)`-style factory either.
-Every plugin test constructs a bare `PartnerUIContext` directly instead. This is fine for what has
-been tested so far (the protocol half of each plugin), but a real merchant integration — and the
-eventual Demo app — needs this seam built before a coordinator can actually reach a live checkout.
-Don't assume it exists when writing anything that touches a coordinator; check first.
+`host(for item: any PrimarySource) throws -> PluginHost` is the seam a coordinator actually runs
+through in a real app. `item` must be a fresh `PrimaryMethod` or one of its saved `PaymentToken`s
+(anything else is a type error, not a runtime one — `PrimarySource` is the constraint). Asking for a
+host gives the plugin its `onSessionSet` exactly once per item id (`trackedPluginItemIds`), mirroring
+Android's `trackPlugin`/`activePlugins`. Throws `checkoutTornDown` after `teardown()`, same as every
+other network path. The returned host holds the checkout `unowned` — it must not outlive it.
+
+**`onSessionSet` does not re-fire for a *surviving* item across `setSession`, by design, matching
+Android.** An item survives only when its configuration is deep-equal to what it was — by definition
+there is nothing to refresh. `trackedPluginItemIds` is pruned to survivors on every `setSession` (and
+cleared at `teardown()`, along with cancelling any still-pending `onSessionSet` `Task`s) purely so a
+**dropped** id, if some later session's item happens to reuse it (ids are `"{partner}-{method}"`, not
+content hashes), is treated as new and correctly re-tracked — not to re-notify anything unchanged.
+Don't read the protocol's "or refreshed" docstring on `onSessionSet` as a promise iOS calls it again
+for every session update; it doesn't, deliberately, same as Android's `PurseHeadlessCheckout.kt`.
+
+The adapter (`PurseHeadlessCheckout.ItemHost`, private, nested) is deliberately thin: every member
+forwards to an existing public method (`setCollected`, `setFulfilled`, `setPrimary`/`setPrimaryToken`,
+`submitPayment`) or an existing public property (`session`, `remainingAmountToPay`). The one thing it
+does itself is `pluginContext(for:api:)` — the same context shape `PaymentValidator` builds at actual
+`/validate` time, except `amount` here is the *live* `remainingAmountToPay` (updates as the splitter
+moves), not a frozen split amount. Don't confuse the two: a plugin's `buildContext()` during form entry
+and its `preValidation` context at submit are built by different code for a reason.
+
+**Real bug this uncovered, fixed in the same change**: `CardCoordinator` held its host as `private
+weak var host`, the only one of the four coordinators to do so (the other three use `let`, matching
+Android's own strong reference). Nothing else keeps a `host(for:)`-produced `ItemHost` alive, so the
+weak reference went nil as soon as the caller's local variable went out of scope — `setCollected`/
+`setFulfilled` silently became no-ops right after `init`. Existing tests never caught it because they
+always kept a local `let` reference to their fake host alive for the coordinator's lifetime. Now `let`,
+matching the other three.
+
+Test coverage: `PluginHostTests.swift`. It claims no `PurseEnvironment` tier — `buildContext`/
+`setCollected`/`setFulfilled`/`setAsPrimary`/`onSessionSet` are all synchronous or in-process, no
+network involved, so it can safely share a host with another suite (see `WalletTests`' header comment
+for the same reasoning).
+
+**Pre-existing, separate gap, not touched by this change**: `PartnerUIPlugin.onAmountUpdate` (fired
+by Android whenever the splitter's remaining amount moves, e.g. a gift card gets applied/removed
+after a card form is already mounted) has no call site on iOS either, same as `destroyClient` above.
+`host(for:)` only wires `onSessionSet`. A plugin that needs to react to a live amount change mid-form
+has no way to today; flag before assuming it works, and scope it separately if a real MOP needs it —
+it's a distinct feature (Android's `notifyAmountUpdate`, driven off `activePlugins`), not a `host(for:)`
+bug.
 
 ## Error codes with no dedicated case still need a real carrier
 
@@ -365,3 +402,24 @@ committing to it as a CI gate. Adding an unvalidated lint config directly to a *
 risks blocking every future PR on an unknown volume of pre-existing violations. Do this properly
 when the tools are available: install both, run against the full tree, fix or explicitly baseline
 what they flag, *then* wire the CI step — not the other way around.
+
+**Why CI was red on every PR from `feat/card-payment` (#4) onward — and what actually fixed it.**
+`Package.swift` took `purse-securefields-ios` over **ssh** (`git@github.com:…`), and every run
+failed identically with `git@github.com: Permission denied (publickey)` while resolving that one
+dependency. PRs #1–#3 passed only because they predate the dependency entering the graph.
+
+It looked like a private-repo problem and was not. **SSH authenticates regardless of repository
+visibility**, so an SSH URL needs a key whether or not the repo is public — and a CI runner has
+none. Making `purse-securefields-ios` public was therefore necessary but not sufficient; the fix
+was switching the URL to `https://`, which needs no credentials for a public repo. An earlier
+version of this note predicted the opposite ("CI goes green with no workflow change needed once the
+repo is public"), which was wrong.
+
+Going public did remove the *other* blocker: the tags' `.binaryTarget` release assets now answer
+`200` unauthenticated, so the revision pin is gone and `Package.swift` takes a real version range.
+
+**When an artifact looks broken, wipe DerivedData first.** Switching between the source pin and the
+binary artifact leaves a stale `PurseSecureFields.framework` behind, and the mismatch surfaces as
+`Undefined symbol: PurseSecureFields.SecureFieldsStyle.default.unsafeMutableAddressor` on *every*
+tag — indistinguishable from a genuinely broken release. It cost one confident wrong diagnosis here;
+both tags build fine from clean.

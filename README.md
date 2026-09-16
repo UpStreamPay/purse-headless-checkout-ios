@@ -43,7 +43,8 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | Observability — batched event bus, monitoring collector, privacy-audited payloads | ✅ |
 | CI (build + test on PR), semantic versioning, release-please | ✅ (see `.github/workflows/`) |
 | `PrivacyInfo.xcprivacy` (no required-reason APIs; data-type declaration pending a privacy sign-off) | ✅ |
-| XCFramework signing/distribution, SwiftLint/SwiftFormat, docs | planned |
+| `PurseHeadlessCheckout.host(for:)` — the concrete `PluginHost` every coordinator runs through | ✅ |
+| XCFramework signing/distribution, SwiftLint/SwiftFormat, Demo app, docs | planned |
 
 ## Development
 
