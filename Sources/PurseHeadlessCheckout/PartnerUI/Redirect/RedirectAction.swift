@@ -43,7 +43,14 @@ public extension String {
     /// Web's `purse-redirection-data` query parameter marks the widget's own confirmation-page
     /// redirect — it carries the payment's signed final result for a browser to read.
     var isWidgetConfirmationRedirect: Bool {
-        contains("purse-redirection-data")
+        contains("purse-redirection-data") || isWidgetConfirmationEndpoint
+    }
+
+    /// The Payment API's own `…/client-sessions/{id}/redirection` endpoint — the confirmation hop
+    /// *before* it has bounced, so the `purse-redirection-data` marker is not on it yet.
+    var isWidgetConfirmationEndpoint: Bool {
+        guard let path = URLComponents(string: self)?.path else { return false }
+        return path.contains("/client-sessions/") && path.hasSuffix("/redirection")
     }
 
     /// The claims in a widget-confirmation redirect's `purse-redirection-data` **JWT** — not

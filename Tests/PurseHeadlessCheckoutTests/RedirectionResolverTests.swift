@@ -227,3 +227,40 @@ struct RedirectionResolverTests {
         #expect("https://shop.example/return?foo=bar".widgetRedirectionData == nil)
     }
 }
+
+/// The Payment API's own confirmation hop, in the shape a `/validate` returns it.
+@Suite struct WidgetConfirmationEndpointTests {
+
+    private let endpoint = "https://api.purse-test.com/payment/v2/client-sessions/2a335dd1-eb30-4f2a-bbcc-039602aafae2/redirection?api-key=a0440cda"
+
+    /// A `/validate` that already said `SUCCESS` returns this as its `redirection.url`. Following it
+    /// opens a browser on a payment that is already done.
+    @Test func theConfirmationEndpointIsNotAPSPRedirect() {
+        #expect(endpoint.isWidgetConfirmationEndpoint)
+        #expect(endpoint.isWidgetConfirmationRedirect)
+    }
+
+    @Test func theResolverDropsIt() {
+        let body = JSONValue.object([
+            "global_status": .string("SUCCESS"),
+            "redirection": .object(["url": .string(endpoint)]),
+        ])
+        #expect(RedirectionResolver.resolve(validateResponse: body, partner: "aci", method: "creditcard") == nil)
+    }
+
+    /// A real ACS step must still be followed — the drop keys on the endpoint's shape, not on the
+    /// response having succeeded.
+    @Test func aRealChallengeIsStillFollowed() {
+        let body = JSONValue.object([
+            "global_status": .string("WAITING"),
+            "redirection": .object(["url": .string("https://acs.bank.example/3ds")]),
+        ])
+        #expect(RedirectionResolver.resolve(validateResponse: body, partner: "aci", method: "creditcard")
+            == .get(url: "https://acs.bank.example/3ds"))
+    }
+
+    @Test func anOrdinaryURLIsNotTheEndpoint() {
+        #expect(!"https://acs.bank.example/3ds/redirection".isWidgetConfirmationEndpoint)
+        #expect(!"https://api.purse-test.com/payment/v2/client-sessions/abc".isWidgetConfirmationEndpoint)
+    }
+}
