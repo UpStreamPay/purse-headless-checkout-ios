@@ -403,13 +403,23 @@ risks blocking every future PR on an unknown volume of pre-existing violations. 
 when the tools are available: install both, run against the full tree, fix or explicitly baseline
 what they flag, *then* wire the CI step — not the other way around.
 
-**CI has been red on every PR from `feat/card-payment` (#4) onward, and it is not a code bug.**
-`Package.swift` pins `purse-securefields-ios` over `ssh` (`git@github.com:...`), the CI runner has
-no SSH key loaded for it, and the repo has no deploy key. Every run fails identically:
-`git@github.com: Permission denied (publickey)` while resolving that one dependency — confirmed by
-reading the actual failed-job log, not guessed. PRs #1–#3 pass only because they predate the
-dependency being added to the graph. **Not fixed here, deliberately**: the repo owner is making
-`purse-securefields-ios` public, expected within a day of this note (2026-09-14) — once that lands,
-CI goes green with no workflow change needed, since the same `git@github.com:...` URL resolves
-without auth against a public repo. Do not add a deploy key or PAT secret as a workaround; check
-whether the repo is public yet before investigating this again.
+**Why CI was red on every PR from `feat/card-payment` (#4) onward — and what actually fixed it.**
+`Package.swift` took `purse-securefields-ios` over **ssh** (`git@github.com:…`), and every run
+failed identically with `git@github.com: Permission denied (publickey)` while resolving that one
+dependency. PRs #1–#3 passed only because they predate the dependency entering the graph.
+
+It looked like a private-repo problem and was not. **SSH authenticates regardless of repository
+visibility**, so an SSH URL needs a key whether or not the repo is public — and a CI runner has
+none. Making `purse-securefields-ios` public was therefore necessary but not sufficient; the fix
+was switching the URL to `https://`, which needs no credentials for a public repo. An earlier
+version of this note predicted the opposite ("CI goes green with no workflow change needed once the
+repo is public"), which was wrong.
+
+Going public did remove the *other* blocker: the tags' `.binaryTarget` release assets now answer
+`200` unauthenticated, so the revision pin is gone and `Package.swift` takes a real version range.
+
+**When an artifact looks broken, wipe DerivedData first.** Switching between the source pin and the
+binary artifact leaves a stale `PurseSecureFields.framework` behind, and the mismatch surfaces as
+`Undefined symbol: PurseSecureFields.SecureFieldsStyle.default.unsafeMutableAddressor` on *every*
+tag — indistinguishable from a genuinely broken release. It cost one confident wrong diagnosis here;
+both tags build fine from clean.
