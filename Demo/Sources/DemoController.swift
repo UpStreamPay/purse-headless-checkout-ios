@@ -124,6 +124,27 @@ final class DemoController: ObservableObject {
 
     var giftCardMethods: [SecondaryMethod] { checkout?.secondaryMethods ?? [] }
 
+    /// Everything a row can select. **`checkout.paymentMethods` deliberately excludes saved cards**
+    /// — they live on `paymentTokens` — so looking a selection up in that list alone silently misses
+    /// every token.
+    var selectableItems: [PaymentItem] {
+        guard let checkout else { return [] }
+        return checkout.paymentMethods + checkout.paymentTokens.map(PaymentItem.paymentToken)
+    }
+
+    var selectedItem: PaymentItem? {
+        selectableItems.first { $0.id == selectedItemId }
+    }
+
+    /// What the Pay button gates on. With nothing selected it is the gift-cards-only path, which
+    /// needs the order fully covered.
+    var canPay: Bool {
+        guard let checkout else { return false }
+        guard let item = selectedItem else { return checkout.isPaymentFulfilled }
+        let element = element(for: item)
+        return element.hasUI ? element.isReady : true
+    }
+
     /// Apple Pay and PayPal render their own branded button and pay from its tap. Google Pay has no
     /// iOS peer; Apple Pay takes its slot in Android's Express checkout section.
     private static func isExpress(_ item: PaymentItem) -> Bool {
@@ -194,12 +215,17 @@ final class DemoController: ObservableObject {
         )
         listeners[key] = spy
         elements[key] = element
+        // `isReady` is published on the element, not on this controller, so without this the Pay
+        // button never re-renders when the card form becomes valid.
+        element.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
         Task { await element.prepare() }
         return element
     }
 
     func submit() {
-        guard let item = (checkout?.paymentMethods ?? []).first(where: { $0.id == selectedItemId }) else {
+        guard let item = selectedItem else {
             submitSecondariesOnly()
             return
         }
