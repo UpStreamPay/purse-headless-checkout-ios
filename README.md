@@ -33,7 +33,8 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | Redirect presentation (redirect-based 3-D Secure, PSP pages) | ✅ |
 | Gift cards, vouchers, loyalty (7 issuers + host-registrable) | ✅ |
 | Apple Pay | ✅ (separate `PurseCheckoutApplePay` product) |
-| PayPal, Klarna | planned |
+| PayPal | ✅ (separate `PurseCheckoutPayPal` product) |
+| Klarna | planned |
 | Saved methods, BNPL, theming, hooks | planned |
 | XCFramework distribution, monitoring, docs | planned |
 

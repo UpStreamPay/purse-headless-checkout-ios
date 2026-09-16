@@ -53,6 +53,13 @@ public extension String {
         return path.contains("/client-sessions/") && path.hasSuffix("/redirection")
     }
 
+    /// PayPal's own hosted approval pages — `checkoutnow` for a payment, `agreements/approve` for a
+    /// vault setup. Matched on host suffix + path so it covers both `www.paypal.com` and
+    /// `www.sandbox.paypal.com`.
+    var isPayPalApprovalEcho: Bool {
+        contains("paypal.com/checkoutnow") || contains("paypal.com/agreements/approve")
+    }
+
     /// The claims in a widget-confirmation redirect's `purse-redirection-data` **JWT** — not
     /// sibling query parameters, which the server does not send.
     var widgetRedirectionData: WidgetRedirectionData? {

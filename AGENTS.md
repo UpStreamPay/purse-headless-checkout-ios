@@ -178,6 +178,30 @@ If you introduce a new mapping between an external vocabulary and ours, write it
 `switch`/dictionary with a comment saying which two vocabularies it bridges, and add one test that
 would fail if `rawValue` had been cast directly instead.
 
+## Third-party vendor SDKs: verify before writing plugin code
+
+Before writing a line of plugin code against a vendor SDK (PayPal, Klarna, and whatever comes
+after), do the same three checks that caught real problems with Secure Fields and PayPal:
+
+1. **Does the package actually resolve?** `swift package resolve` against the real dependency URL,
+   in a throwaway scratch package — not a search result, not the vendor's own docs. Secure Fields'
+   tagged releases do not resolve at all (see the README); PayPal's do.
+2. **Which products does it actually export, and from where?** Don't assume `import Foo` gives you
+   everything the vendor's own sample code imports. PayPal's `CoreConfig`/`Environment` live in
+   `CorePayments`, a separate product from `PayPalWebPayments` that is not re-exported — this only
+   surfaced by building the actual `PurseCheckoutPayPal` product target directly
+   (`xcodebuild build -scheme PurseCheckoutPayPal`), not by building the umbrella scheme, which
+   silently didn't compile it.
+3. **Is its concurrency mode Swift 5 or 6, and does a vocabulary need mapping?** Assume a
+   delegate-based vendor SDK is non-`Sendable` until proven otherwise (PayPal's `CoreSDKError` and
+   `PayPalWebCheckoutResult` are), and check every delegate callback's exact parameter types — a
+   near-miss there (e.g. expecting `any Error` when the real signature takes a concrete
+   `CoreSDKError`) fails to conform to the protocol at compile time, which is at least loud; the
+   vocabulary-casting kind of bug (see above) is not.
+
+Always build the specific product's own scheme, not just the umbrella one — an unbuilt target in a
+multi-product package does not fail the umbrella build.
+
 ## What NOT to do
 
 - **Do not add a second observation mechanism.** One `ObservableObject` with `@Published`. Not
