@@ -130,6 +130,21 @@ types have no business in our public surface. A Secure Fields version bump must 
 change the checkout's API by accident, and the brand vocabularies differ regardless (`AMEX` vs
 `AMERICAN_EXPRESS`), so the mapping is mandatory on its own merits.
 
+### A plugin's `postValidation` cannot hold a closure from its own coordinator
+
+Android's `PartnerUiContext.collected` is an untyped `Map<String, Any>`, so a coordinator can stash
+a live `suspend () -> Boolean` callback in it and the plugin's `postValidation` pulls it back out.
+Ours is `[String: JSONValue]` — wire-safe on purpose, so nothing non-`Sendable` (or non-JSON at all)
+can ride through it. A closure cannot go in.
+
+Klarna is the first plugin whose shape needs this: `postValidation` must call Klarna's own
+`authorize()` on the live widget, but it runs as a **fresh** `PartnerUIPlugin` value with no
+reference to the `KlarnaCoordinator` that prepared that widget. The fix is a small in-product actor
+(`KlarnaAuthorizationRegistry`) that the coordinator registers its closure into, keyed by an opaque
+token; the coordinator stashes only that token — a plain string — in `collected`, and
+`postValidation` looks the closure up once and removes it. Reach for the same pattern for any future
+plugin whose native step must run *after* `/validate`, not before.
+
 ## Tests: the stub is global, suites are not
 
 swift-testing runs **suites in parallel**, and `StubURLProtocol` holds process-wide state. Handlers
@@ -201,6 +216,20 @@ after), do the same three checks that caught real problems with Secure Fields an
 
 Always build the specific product's own scheme, not just the umbrella one — an unbuilt target in a
 multi-product package does not fail the umbrella build.
+
+**A vendor SDK's own products table can mislead by naming pattern.** Klarna's manifest has no
+`KlarnaCore` *product* at all — `KlarnaCore` is only a *target*, bundled inside the `KlarnaPayments`
+product alongside `KlarnaCoreWebView`. Guessing a product name from a target/module name you see in
+an `import` line is exactly the mistake point 2 above warns about; read the package's own
+`Package.swift` (`curl` the raw tag, or read it after `swift package resolve` has fetched it).
+
+**When a vendor SDK ships no public source** (a binary xcframework, like Klarna's), its real Swift
+API — exact method signatures, spellings, deprecations — is not documentation, it's the
+`.swiftinterface` file SwiftPM already downloaded: after a scratch `swift package resolve`, find it
+under `.build/artifacts/<package>/<product>/*.xcframework/*/*.framework/Modules/*.swiftmodule/*.swiftinterface`.
+This is how Klarna's `finalise` (British spelling, not `finalize`) and the exact
+`KlarnaPaymentEventListener` callback signatures were confirmed — a docs page or a guessed signature
+would not have caught either.
 
 ## What NOT to do
 

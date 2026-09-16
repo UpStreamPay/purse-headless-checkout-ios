@@ -1,6 +1,15 @@
 {
-  "originHash" : "bd681e854a542eaa8598554a4d980d43af3693b445e39f7921bb767cd0e5dd7b",
+  "originHash" : "4ab8b5ea112e5622ec658073bcef5b21c039f065874cd458f36a750426114c6a",
   "pins" : [
+    {
+      "identity" : "klarna-mobile-sdk-spm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/klarna/klarna-mobile-sdk-spm.git",
+      "state" : {
+        "revision" : "f72fa33f386cc1d7de8a78571475d971c02e1e40",
+        "version" : "2.13.2"
+      }
+    },
     {
       "identity" : "paypal-ios",
       "kind" : "remoteSourceControl",
