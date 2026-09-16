@@ -515,6 +515,14 @@ final class ElementSpy: PaymentElementListener {
 
     func onOutcome(_ outcome: PaymentOutcome) {
         controller.log("\(item.id) → \(outcome)")
+        // The transactions lookup wants the **payment** session, and the `/validate` answer names
+        // it outright in `results[].session_id`.
+        if case let .completed(result) = outcome,
+           let sessionId = result.raw["results"]?.arrayValue?
+               .compactMap({ $0["session_id"]?.stringValue }).first(where: { !$0.isEmpty }) {
+            controller.alfredSessionId = sessionId
+            controller.log("\(item.id) → payment session=\(sessionId)")
+        }
         // A redirect return carries the payment id in its token, which the capture card wants and
         // which `onPaymentId` only fires for when `/validate` itself named one.
         if case let .returnedFromRedirect(url) = outcome,
