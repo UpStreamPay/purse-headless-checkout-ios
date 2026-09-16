@@ -136,6 +136,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
         self.splitter = PursePaymentSplitter(orderAmount: built.amount)
 
         refresh()
+        // Saved gift cards carry no balance in the session — re-`/init` each one now (web's
+        // `buildSecondaryPaymentToken` fires the same call as the token is built).
+        resolveSavedSecondaryBalances()
 
         // Nothing else ever called `sync()`, so the offset stayed 0 and every "server-corrected"
         // check was really the device clock. One sync at creation is what makes the correction real.
@@ -409,9 +412,32 @@ public final class PurseHeadlessCheckout: ObservableObject {
         refresh()
     }
 
-    /// Draw a saved gift card into the split.
+    /// Draw a saved gift card into the split. Re-reads the checkout's **current** copy rather than
+    /// trusting the caller's: a saved card starts at `balance = 0, balanceResolved = false` until
+    /// the background `/init` answers, and a merchant holding a value type captured before that
     public func applySecondary(_ token: SavedSecondaryToken, amount: Decimal? = nil) throws {
-        try applySecondary(token.asSecondaryToken(), amount: amount)
+        let current = savedSecondaryTokens.first { $0.id == token.id } ?? token
+
+        if let disabled = current.disabled {
+            throw PurseCheckoutError.secondaryTokenizationFailed(
+                "saved token \(current.id) is disabled (\(disabled.code.rawValue))",
+                .failedToInitSecondaryToken
+            )
+        }
+        guard current.balanceResolved else {
+            throw PurseCheckoutError.secondaryTokenizationFailed(
+                "saved token \(current.id) has no resolved balance yet",
+                .secondaryTokenEmptyBalance
+            )
+        }
+        guard current.balance > 0 else {
+            throw PurseCheckoutError.secondaryTokenizationFailed(
+                "saved token \(current.id) has no balance",
+                .secondaryTokenEmptyBalance
+            )
+        }
+
+        try applySecondary(current.asSecondaryToken(), amount: amount)
     }
 
     public func removeSecondary(_ token: SecondaryToken) {
@@ -507,6 +533,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
         validationConsumed = false
         sessionState = .ready
         refresh()
+        resolveSavedSecondaryBalances()
     }
 
     private func restorePrimary(id: String) {
@@ -565,5 +592,82 @@ public final class PurseHeadlessCheckout: ObservableObject {
         remainingAmountToPay = splitter.primaryReach
         amountSplit = splitter.splits
         isPaymentFulfilled = splitter.fulfilled && unfulfilledItemId == nil
+    }
+
+    // MARK: Saved secondary token balances
+
+    /// Re-`/init` every saved gift card to learn its balance — sequentially on one `Task`, because
+    /// `InitGuard` coalesces concurrent `/init`s of the same `(partner, method, amount)` and two
+    /// saved cards of one issuer would otherwise share a single answer.
+    private(set) var pendingSecondaryBalanceResolution: Task<Void, Never>?
+
+    private func resolveSavedSecondaryBalances() {
+        let saved = meansOfPayment.compactMap { item -> SavedSecondaryToken? in
+            if case let .savedSecondaryToken(token) = item { return token }
+            return nil
+        }
+        guard !saved.isEmpty else {
+            pendingSecondaryBalanceResolution = nil
+            return
+        }
+
+        let api = self.api
+        pendingSecondaryBalanceResolution = Task {
+            for token in saved {
+                await self.resolveSavedSecondaryBalance(token, api: api)
+            }
+        }
+    }
+
+    private func resolveSavedSecondaryBalance(_ token: SavedSecondaryToken, api: PaymentAPIClient) async {
+        guard let config = configs.config(partner: token.partner, method: token.method) else {
+            updateSavedSecondary(token.id) { $0.disabled = .tokenInitFailed }
+            return
+        }
+
+        let method = SecondaryMethod(
+            id: "\(token.partner.wireValue)-\(token.method.wireValue)",
+            partner: token.partner,
+            method: token.method,
+            configuration: token.configuration,
+            disabled: nil
+        )
+        let payload: [String: JSONValue] = [
+            "partner": .string(token.partner.wireValue),
+            "method": .string(token.method.wireValue),
+            "amount": .number(splitter.remaining.description),
+            "payment_data": .object(config.buildInitPaymentData(pan: token.pan, cvv: token.cvv))
+        ]
+
+        do {
+            let response = try await api.initPayment(payload)
+            let parsed = try config.parseToken(
+                method: method, initResponse: response, pan: token.pan, cvv: token.cvv
+            )
+            updateSavedSecondary(token.id) {
+                $0.balance = parsed.balance
+                $0.totalBalance = parsed.totalBalance
+                $0.balanceResolved = true
+            }
+        } catch let error as PaymentAPIError where error.isSessionTerminal {
+            // A terminal API answer ends the whole session (web's `onSessionTerminated`); anything
+            // else dims just this token — it stays listed, technically disabled.
+            sessionState = .terminated
+        } catch {
+            updateSavedSecondary(token.id) { $0.disabled = .tokenInitFailed }
+        }
+    }
+
+    /// Mutate one saved gift card in place and republish — a no-op if `setSession` already rebuilt
+    /// the list away from under an in-flight resolution.
+    private func updateSavedSecondary(_ tokenId: String, _ transform: (inout SavedSecondaryToken) -> Void) {
+        guard let index = meansOfPayment.firstIndex(where: {
+            if case let .savedSecondaryToken(token) = $0 { return token.id == tokenId }
+            return false
+        }), case var .savedSecondaryToken(token) = meansOfPayment[index] else { return }
+
+        transform(&token)
+        meansOfPayment[index] = .savedSecondaryToken(token)
+        refresh()
     }
 }

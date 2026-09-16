@@ -52,6 +52,7 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | `item-factory/factories.ts` | `checkout/session/PaymentSessionBuilder.kt` | `Checkout/Session/PaymentSessionBuilder.swift` |
 | `session/payment/payment.ts` | `checkout/session/PaymentSession.kt` | `Checkout/Session/PaymentSession.swift` |
 | `headless-checkout.ts` | `checkout/PurseHeadlessCheckout.kt` | `Checkout/PurseHeadlessCheckout.swift` |
+| `buildSecondaryPaymentToken` (saved-card balance) | `resolveSavedSecondaryBalances`/`resolveSavedSecondaryBalance` | `resolveSavedSecondaryBalances()`/`resolveSavedSecondaryBalance(_:api:)` in `Checkout/PurseHeadlessCheckout.swift` |
 | `utils/error/error.ts` (thrown) | `checkout/PurseCheckoutException.kt` | `Checkout/PurseCheckoutError.swift` |
 
 ## PartnerUI — landed
@@ -113,6 +114,8 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | Partner module discovery | `ServiceLoader` | `PluginRegistry.install(_:)` | No `ServiceLoader`, no lazy class loading (stated in SDK-12264). Android already supports explicit install; iOS makes it the only path. |
 | Secure Fields types | used directly | converted at the boundary | None of a Swift 5 module's public types are `Sendable` to us — `TokenizationResult`, and even `CardBrand`, a plain String enum. The coordinator converts inside the `nonisolated` delegate callback, before anything reaches the main actor. See AGENTS.md. |
 | Secure Fields dependency | `securefields-android:1.4.2` from Maven | `from: "1.9.0"` over https | Was a revision pin: while `purse-securefields-ios` was private, its tags' binary-target release assets 404'd to SwiftPM under every auth method, so no tag resolved for anyone. The repository is public now and the artifact resolves, links and passes — the pin is gone. Note the URL must be `https://`, not `git@github.com:`, which authenticates regardless of visibility and so needs a key CI does not have. |
+| Saved gift card name/expiry backfill from `/init` | `copy(name = it.name.ifBlank { parsed.name }, expirationDate = it.expirationDate ?: parsed.expirationDate…)` | not ported — `name`/`expirationDate`/`createdAt`/`pan`/`cvv` are `let`, not `internal(set) var` | Out of scope for this pass: iOS already sources the display name from the session's own `description.display_token` at build time (see `SavedSecondaryToken`'s doc comment), so Android's defensive fallback has nothing to guard against here. Revisit only if a real issuer is seen sending a blank name at session-build time. |
+| Test-infra: a cached **terminal** `/init` failure | not applicable — Android has no equivalent global test double | `InitGuard.shared` caches a `spent` terminal failure indefinitely, keyed `sessionId:partner:method:amount` | A test driving a real terminal failure through `PaymentAPIClient.initPayment` must `await InitGuard.shared.reset()` before and after, or it poisons that key for any later test reusing the same `(sessionId, partner, method, amount)` — the identical hazard class `StubURLProtocol`'s host-keying already documents, one layer down. See AGENTS.md. |
 
 ## Vocabulary
 
