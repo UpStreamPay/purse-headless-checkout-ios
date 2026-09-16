@@ -51,12 +51,20 @@ actor EventBatchQueue<Item: Sendable> {
             pendingFlush = Task { [flushAfterNanoseconds] in
                 try? await Task.sleep(nanoseconds: flushAfterNanoseconds)
                 guard !Task.isCancelled else { return }
-                await self.flush()
+                await self.timerFired()
             }
         }
     }
 
     func flush() async {
+        await flushNow()
+    }
+
+    /// The timer's own entry point, and the reason it cannot call ``flush()`` directly.
+    /// ``flushNow()`` starts by cancelling `pendingFlush` — which, on this path, is *the task
+    /// currently executing*.
+    private func timerFired() async {
+        pendingFlush = nil
         await flushNow()
     }
 

@@ -72,9 +72,29 @@ struct EventBatchQueueTests {
         }
         #expect(await delivered.batches == [[1]])
     }
+
+    /// The timer path must hand the processor an **uncancelled** task. `flushNow()` cancels
+    /// `pendingFlush`, which on the timer path is the task it is running in.
+    @Test func theTimerFlushRunsTheProcessorUncancelled() async throws {
+        let queue = EventBatchQueue<Int>(batchSize: 100, flushAfterSeconds: 0.05)
+        let observed = CancellationWitness()
+        await queue.setProcessor { _ in await observed.record(Task.isCancelled) }
+        await queue.add(1)
+
+        for _ in 0..<50 {
+            if await observed.sawCancellation != nil { break }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        #expect(await observed.sawCancellation == false)
+    }
 }
 
 private actor Counter {
     private(set) var batches: [[Int]] = []
     func append(_ batch: [Int]) { batches.append(batch) }
+}
+
+private actor CancellationWitness {
+    private(set) var sawCancellation: Bool?
+    func record(_ cancelled: Bool) { sawCancellation = cancelled }
 }
