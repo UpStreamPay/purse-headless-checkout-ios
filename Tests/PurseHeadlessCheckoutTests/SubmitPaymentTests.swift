@@ -417,3 +417,161 @@ struct SubmitPaymentTests {
         checkout.expiryWatchdog?.cancel()
     }
 }
+
+/// The redirect hand-off: what the checkout does with a `/validate` that asks for one.
+@MainActor
+@Suite(.serialized)
+struct RedirectHandoffTests {
+
+    /// A different tier from SubmitPaymentTests on purpose: the stub is keyed by host, and the two
+    /// suites run in parallel, so sharing a host means sharing handlers.
+    private static let host = "api.purse-test.com"
+
+    private struct StubCardPlugin: PartnerUIPlugin {
+        let partner: Partner
+        let method: PaymentMethod
+        func preValidation(_ context: PartnerUIContext) async throws -> ValidateItemPayload {
+            ItemPayload(partner: partner, method: method, amount: context.amount)
+        }
+    }
+
+    private struct StubModule: PartnerModule {
+        let id = "test.redirect.card"
+        @MainActor func register(into registry: PluginRegistry) {
+            registry.registerVault(vendor: .purse) { StubCardPlugin(partner: $0.partner, method: $0.method) }
+        }
+    }
+
+    /// Records what it was asked to present, and answers with whatever the test wants.
+    private final class SpyPresenter: RedirectPresenter {
+        var presented: [RedirectAction] = []
+        var answer: RedirectOutcome = .returned(url: nil)
+
+        func present(_ action: RedirectAction) async throws -> RedirectOutcome {
+            presented.append(action)
+            return answer
+        }
+    }
+
+    private func checkout(hooks: PurseCheckoutHooks? = nil) throws -> PurseHeadlessCheckout {
+        let registry = PluginRegistry()
+        registry.install(StubModule())
+        let checkout = try PurseHeadlessCheckout(
+            widgetData: TestSessions.widgetData(
+                environment: "test",
+                paymentSession: TestSessions.paymentSession(amount: 100)
+            ),
+            hooks: hooks,
+            registry: registry,
+            urlSession: StubURLProtocol.session()
+        )
+        let method = checkout.paymentMethods.compactMap { item -> PrimaryMethod? in
+            if case let .primaryMethod(method) = item { return method }
+            return nil
+        }.first!
+        try checkout.setPrimary(method)
+        return checkout
+    }
+
+    private func stubValidate(_ body: String) {
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/validate", .ok(body), host: Self.host)
+    }
+
+    private static let withRedirect =
+        #"{"global_status":"WAITING","results":[],"redirection":{"url":"https://acs.bank.example/3ds"}}"#
+
+    @Test func presentsTheRedirectAValidateAsksFor() async throws {
+        stubValidate(Self.withRedirect)
+        let checkout = try checkout()
+        let presenter = SpyPresenter()
+
+        let result = try await checkout.submitPayment()
+        let outcome = try await checkout.presentRedirectIfNeeded(for: result, using: presenter)
+
+        #expect(outcome == .returned(url: nil))
+        #expect(presenter.presented == [.get(url: "https://acs.bank.example/3ds")])
+    }
+
+    /// No redirect is the common case, and is not an error.
+    @Test func presentsNothingWhenNoRedirectIsAskedFor() async throws {
+        stubValidate(#"{"global_status":"SUCCESS","results":[]}"#)
+        let checkout = try checkout()
+        let presenter = SpyPresenter()
+
+        let result = try await checkout.submitPayment()
+        let outcome = try await checkout.presentRedirectIfNeeded(for: result, using: presenter)
+
+        #expect(outcome == nil)
+        #expect(presenter.presented.isEmpty)
+    }
+
+    /// A merchant returning `true` takes the redirect over: the SDK opens nothing.
+    @Test func theMerchantHookCanTakeTheRedirectOver() async throws {
+        stubValidate(Self.withRedirect)
+        let hooks = PurseCheckoutHooks(onRedirection: { _ in true })
+        let checkout = try checkout(hooks: hooks)
+        let presenter = SpyPresenter()
+
+        let result = try await checkout.submitPayment()
+        let outcome = try await checkout.presentRedirectIfNeeded(for: result, using: presenter)
+
+        #expect(outcome == nil)
+        #expect(presenter.presented.isEmpty)
+    }
+
+    /// Returning `false` lets the SDK proceed.
+    @Test func theMerchantHookCanDeclineToTakeItOver() async throws {
+        stubValidate(Self.withRedirect)
+        let hooks = PurseCheckoutHooks(onRedirection: { _ in false })
+        let checkout = try checkout(hooks: hooks)
+        let presenter = SpyPresenter()
+
+        let result = try await checkout.submitPayment()
+        _ = try await checkout.presentRedirectIfNeeded(for: result, using: presenter)
+
+        #expect(presenter.presented.count == 1)
+    }
+
+    /// A throwing hook opens nothing, and reports as a post-validate failure.
+    @Test func aThrowingHookOpensNothing() async throws {
+        struct HookError: Error {}
+        stubValidate(Self.withRedirect)
+        let hooks = PurseCheckoutHooks(onRedirection: { _ in throw HookError() })
+        let checkout = try checkout(hooks: hooks)
+        let presenter = SpyPresenter()
+
+        let result = try await checkout.submitPayment()
+        do {
+            _ = try await checkout.presentRedirectIfNeeded(for: result, using: presenter)
+            Issue.record("expected the hook failure to surface")
+        } catch let error as PurseCheckoutError {
+            #expect(error.code == .postValidateFailed)
+        }
+        #expect(presenter.presented.isEmpty)
+    }
+
+    /// A cancelled redirect is reported as such — the shopper may try again.
+    @Test func aCancelledRedirectIsReportedAsCancelled() async throws {
+        stubValidate(Self.withRedirect)
+        let checkout = try checkout()
+        let presenter = SpyPresenter()
+        presenter.answer = .canceled
+
+        let result = try await checkout.submitPayment()
+        #expect(try await checkout.presentRedirectIfNeeded(for: result, using: presenter) == .canceled)
+    }
+
+    /// The widget's own confirmation hop is not a redirect worth presenting.
+    @Test func theWidgetConfirmationHopIsNotPresented() async throws {
+        stubValidate(
+            #"{"global_status":"SUCCESS","results":[],"redirection":{"url":"https://shop.example/c?purse-redirection-data=x"}}"#
+        )
+        let checkout = try checkout()
+        let presenter = SpyPresenter()
+
+        let result = try await checkout.submitPayment()
+        #expect(try await checkout.presentRedirectIfNeeded(for: result, using: presenter) == nil)
+        #expect(presenter.presented.isEmpty)
+    }
+}

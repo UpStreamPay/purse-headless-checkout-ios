@@ -132,19 +132,40 @@ struct RedirectionResolverTests {
 
     // MARK: Payment id
 
-    @Test func readsThePaymentIdOffTheConfirmationRedirect() {
-        let url = "https://shop.example/confirmation?purse-redirection-data=abc&payment_id=pay_123"
+    /// The id lives **inside** the `purse-redirection-data` JWT, not in a sibling query parameter.
+    private static let confirmationJWT =
+        "header.eyJjbGllbnRfc2Vzc2lvbl9zdGF0dXMiOiJTVUJNSVRURUQiLCJwYXltZW50X2lkIjoicGF5XzEyMyIsImF1dGhvcml6YXRpb25fc3RhdHVzIjoiQVVUSE9SSVpFRCJ9.signature"
+
+    private static var confirmationURL: String {
+        "https://shop.example/confirmation?purse-redirection-data=\(confirmationJWT)"
+    }
+
+    @Test func readsThePaymentIdOutOfTheConfirmationJWT() {
         let id = RedirectionResolver.widgetConfirmationPaymentId(
-            validateResponse: response(redirection: ["url": .string(url)])
+            validateResponse: response(redirection: ["url": .string(Self.confirmationURL)])
         )
         #expect(id == "pay_123")
+    }
+
+    /// A percent-encoded JWT is the same JWT.
+    @Test func readsThePaymentIdWhenTheJWTIsPercentEncoded() {
+        let encoded = Self.confirmationJWT.replacingOccurrences(of: ".", with: "%2E")
+        let url = "https://shop.example/confirmation?purse-redirection-data=\(encoded)"
+        #expect(url.widgetConfirmationPaymentId == "pay_123")
+    }
+
+    /// A JWT with no `payment_id` in its payload yields nothing rather than guessing.
+    @Test func noPaymentIdWhenTheJWTPayloadHasNone() {
+        // {"client_session_status":"SUBMITTED"}
+        let jwt = "header.eyJjbGllbnRfc2Vzc2lvbl9zdGF0dXMiOiJTVUJNSVRURUQifQ.signature"
+        let url = "https://shop.example/confirmation?purse-redirection-data=\(jwt)"
+        #expect(url.widgetConfirmationPaymentId == nil)
     }
 
     /// Available even when the same redirect is suppressed — it is read off the response, not by
     /// following anything.
     @Test func thePaymentIdSurvivesSuppression() {
-        let url = "https://shop.example/confirmation?purse-redirection-data=abc&payment_id=pay_123"
-        let body = response(redirection: ["url": .string(url)])
+        let body = response(redirection: ["url": .string(Self.confirmationURL)])
 
         #expect(resolve(body) == nil)
         #expect(RedirectionResolver.widgetConfirmationPaymentId(validateResponse: body) == "pay_123")
@@ -162,5 +183,84 @@ struct RedirectionResolverTests {
         #expect(RedirectAction.get(url: "u").withReturnURLPrefix(prefix).returnURLPrefix == prefix)
         #expect(RedirectAction.postForm(url: "u", formDataURLEncoded: "f").withReturnURLPrefix(prefix).returnURLPrefix == prefix)
         #expect(RedirectAction.postHTML(html: "h").withReturnURLPrefix(prefix).returnURLPrefix == prefix)
+    }
+}
+
+/// The `purse-redirection-data` JWT's claims. It is how a redirect return reports the payment's
+/// status, and it is read unsigned — the suite exists to pin the shape, not to bless the trust.
+@Suite struct WidgetRedirectionDataTests {
+
+    private func url(_ payload: String) -> String {
+        let base64 = Data(payload.utf8).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        return "https://shop.example/return?purse-redirection-data=header.\(base64).signature"
+    }
+
+    @Test func readsEveryClaimTheTokenCarries() throws {
+        let data = try #require(url(
+            #"{"client_session_status":"SUBMITTED","payment_id":"pay_123","authorization_status":"AUTHORIZED"}"#
+        ).widgetRedirectionData)
+
+        #expect(data.paymentId == "pay_123")
+        #expect(data.authorizationStatus == "AUTHORIZED")
+        #expect(data.clientSessionStatus == "SUBMITTED")
+        #expect(data.isAuthorized)
+    }
+
+    @Test func aRefusalIsNotAuthorized() throws {
+        let data = try #require(url(#"{"authorization_status":"REFUSED"}"#).widgetRedirectionData)
+        #expect(!data.isAuthorized)
+        #expect(data.paymentId == nil)
+    }
+
+    /// A token that says nothing about authorization must not read as a refusal either — the caller
+    /// has to be able to tell "not authorized" from "did not say".
+    @Test func anAbsentStatusIsNotAClaim() throws {
+        let data = try #require(url(#"{"payment_id":"pay_9"}"#).widgetRedirectionData)
+        #expect(data.authorizationStatus == nil)
+        #expect(!data.isAuthorized)
+    }
+
+    @Test func aURLWithNoTokenCarriesNothing() {
+        #expect("https://shop.example/return?foo=bar".widgetRedirectionData == nil)
+    }
+}
+
+/// The Payment API's own confirmation hop, in the shape a `/validate` returns it.
+@Suite struct WidgetConfirmationEndpointTests {
+
+    private let endpoint = "https://api.purse-test.com/payment/v2/client-sessions/2a335dd1-eb30-4f2a-bbcc-039602aafae2/redirection?api-key=a0440cda"
+
+    /// A `/validate` that already said `SUCCESS` returns this as its `redirection.url`. Following it
+    /// opens a browser on a payment that is already done.
+    @Test func theConfirmationEndpointIsNotAPSPRedirect() {
+        #expect(endpoint.isWidgetConfirmationEndpoint)
+        #expect(endpoint.isWidgetConfirmationRedirect)
+    }
+
+    @Test func theResolverDropsIt() {
+        let body = JSONValue.object([
+            "global_status": .string("SUCCESS"),
+            "redirection": .object(["url": .string(endpoint)]),
+        ])
+        #expect(RedirectionResolver.resolve(validateResponse: body, partner: "aci", method: "creditcard") == nil)
+    }
+
+    /// A real ACS step must still be followed — the drop keys on the endpoint's shape, not on the
+    /// response having succeeded.
+    @Test func aRealChallengeIsStillFollowed() {
+        let body = JSONValue.object([
+            "global_status": .string("WAITING"),
+            "redirection": .object(["url": .string("https://acs.bank.example/3ds")]),
+        ])
+        #expect(RedirectionResolver.resolve(validateResponse: body, partner: "aci", method: "creditcard")
+            == .get(url: "https://acs.bank.example/3ds"))
+    }
+
+    @Test func anOrdinaryURLIsNotTheEndpoint() {
+        #expect(!"https://acs.bank.example/3ds/redirection".isWidgetConfirmationEndpoint)
+        #expect(!"https://api.purse-test.com/payment/v2/client-sessions/abc".isWidgetConfirmationEndpoint)
     }
 }

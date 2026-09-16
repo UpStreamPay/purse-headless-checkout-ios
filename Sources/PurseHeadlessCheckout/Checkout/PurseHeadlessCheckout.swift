@@ -243,9 +243,34 @@ public final class PurseHeadlessCheckout: ObservableObject {
         return result
     }
 
-    /// The redirect the last `/validate` asked for, if any — a 3-D Secure challenge or a PSP page.
-    /// Reaching the returned action's destination is **not** an outcome: the final redirect is
-    /// built server-side and can land on a URL this client cannot read.
+    /// Present the redirect the last `/validate` asked for, if there is one. Returns `nil` when no
+    /// redirect is required — the common case, and **not** an error.
+    @discardableResult
+    public func presentRedirectIfNeeded(
+        for result: ValidationResult,
+        using presenter: any RedirectPresenter
+    ) async throws -> RedirectOutcome? {
+        guard let action = pendingRedirect(for: result) else { return nil }
+
+        if let onRedirection = hooks?.onRedirection {
+            do {
+                // `true` means the merchant took it over: the SDK opens nothing.
+                if try await onRedirection(action) { return nil }
+            } catch {
+                throw PurseCheckoutError.hookFailed(
+                    hook: "onRedirection",
+                    underlying: error,
+                    code: .postValidateFailed
+                )
+            }
+        }
+
+        return try await presenter.present(action)
+    }
+
+    /// The redirect the last `/validate` asked for, if any. Reaching the returned action's
+    /// destination is **not** an outcome: the final redirect is built server-side and can land on a
+    /// URL this client cannot read.
     public func pendingRedirect(for result: ValidationResult) -> RedirectAction? {
         let primary = splitter.primaryMethod
         return RedirectionResolver.resolve(
