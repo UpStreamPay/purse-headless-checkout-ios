@@ -445,7 +445,7 @@ struct RedirectHandoffTests {
     /// Records what it was asked to present, and answers with whatever the test wants.
     private final class SpyPresenter: RedirectPresenter {
         var presented: [RedirectAction] = []
-        var answer: RedirectOutcome = .returned
+        var answer: RedirectOutcome = .returned(url: nil)
 
         func present(_ action: RedirectAction) async throws -> RedirectOutcome {
             presented.append(action)
@@ -489,7 +489,7 @@ struct RedirectHandoffTests {
         let result = try await checkout.submitPayment()
         let outcome = try await checkout.presentRedirectIfNeeded(for: result, using: presenter)
 
-        #expect(outcome == .returned)
+        #expect(outcome == .returned(url: nil))
         #expect(presenter.presented == [.get(url: "https://acs.bank.example/3ds")])
     }
 

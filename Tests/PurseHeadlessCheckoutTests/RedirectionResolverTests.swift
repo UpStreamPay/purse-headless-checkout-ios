@@ -185,3 +185,45 @@ struct RedirectionResolverTests {
         #expect(RedirectAction.postHTML(html: "h").withReturnURLPrefix(prefix).returnURLPrefix == prefix)
     }
 }
+
+/// The `purse-redirection-data` JWT's claims. It is how a redirect return reports the payment's
+/// status, and it is read unsigned — the suite exists to pin the shape, not to bless the trust.
+@Suite struct WidgetRedirectionDataTests {
+
+    private func url(_ payload: String) -> String {
+        let base64 = Data(payload.utf8).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        return "https://shop.example/return?purse-redirection-data=header.\(base64).signature"
+    }
+
+    @Test func readsEveryClaimTheTokenCarries() throws {
+        let data = try #require(url(
+            #"{"client_session_status":"SUBMITTED","payment_id":"pay_123","authorization_status":"AUTHORIZED"}"#
+        ).widgetRedirectionData)
+
+        #expect(data.paymentId == "pay_123")
+        #expect(data.authorizationStatus == "AUTHORIZED")
+        #expect(data.clientSessionStatus == "SUBMITTED")
+        #expect(data.isAuthorized)
+    }
+
+    @Test func aRefusalIsNotAuthorized() throws {
+        let data = try #require(url(#"{"authorization_status":"REFUSED"}"#).widgetRedirectionData)
+        #expect(!data.isAuthorized)
+        #expect(data.paymentId == nil)
+    }
+
+    /// A token that says nothing about authorization must not read as a refusal either — the caller
+    /// has to be able to tell "not authorized" from "did not say".
+    @Test func anAbsentStatusIsNotAClaim() throws {
+        let data = try #require(url(#"{"payment_id":"pay_9"}"#).widgetRedirectionData)
+        #expect(data.authorizationStatus == nil)
+        #expect(!data.isAuthorized)
+    }
+
+    @Test func aURLWithNoTokenCarriesNothing() {
+        #expect("https://shop.example/return?foo=bar".widgetRedirectionData == nil)
+    }
+}

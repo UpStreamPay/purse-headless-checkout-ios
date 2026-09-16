@@ -95,7 +95,7 @@ struct RedirectPolicyTests {
     /// The type deliberately has no `success` case. Reaching the return only means the shopper came
     /// back; the real outcome lives on the session.
     @Test func thereIsNoSuccessOutcome() {
-        let all: [RedirectOutcome] = [.returned, .canceled]
+        let all: [RedirectOutcome] = [.returned(url: nil), .canceled]
         #expect(all.count == 2)
     }
 }

@@ -6,8 +6,10 @@ import Foundation
 
 /// How a presented redirect ended. Note what is **not** here: success.
 public enum RedirectOutcome: Sendable, Equatable {
-    /// The shopper reached the return destination, or came back to the app at all.
-    case returned
+    /// The shopper reached the return destination, or came back to the app at all. `url` is what
+    /// they came back to, when the presenter could see it — the browser reports its callback and
+    /// the web view reports the navigation it stopped on.
+    case returned(url: URL?)
     /// The shopper dismissed the flow.
     case canceled
 }

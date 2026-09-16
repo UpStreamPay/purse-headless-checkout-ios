@@ -80,9 +80,9 @@ public final class WebAuthRedirectPresenter: NSObject, RedirectPresenter {
                         return
                     }
                     // Reaching the callback means the shopper came back. It does **not** mean the
-                    // payment succeeded: confirm against the session.
-                    _ = callbackURL
-                    continuation.resume(returning: .returned)
+                    // payment succeeded: confirm against the session. The URL travels with it
+                    // because it carries the reported status.
+                    continuation.resume(returning: .returned(url: callbackURL))
                 }
             }
 
@@ -265,7 +265,7 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
         // action carries.
         if policy.isReturn(url) || isConfiguredReturn(url) {
             decisionHandler(.cancel)
-            finish(.success(.returned))
+            finish(.success(.returned(url: url)))
             return
         }
 
@@ -273,7 +273,7 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
         // result the caller already has, and is caught even when no return URL is configured.
         if url.absoluteString.isWidgetConfirmationRedirect {
             decisionHandler(.cancel)
-            finish(.success(.returned))
+            finish(.success(.returned(url: url)))
             return
         }
 

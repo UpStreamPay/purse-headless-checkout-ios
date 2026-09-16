@@ -46,9 +46,9 @@ public extension String {
         contains("purse-redirection-data")
     }
 
-    /// Best-effort `payment_id` out of the widget-confirmation redirect's `purse-redirection-data`
-    /// **JWT** — not a sibling query parameter, which the server does not send.
-    var widgetConfirmationPaymentId: String? {
+    /// The claims in a widget-confirmation redirect's `purse-redirection-data` **JWT** — not
+    /// sibling query parameters, which the server does not send.
+    var widgetRedirectionData: WidgetRedirectionData? {
         let marker = "purse-redirection-data="
         guard let markerRange = range(of: marker) else { return nil }
 
@@ -66,6 +66,34 @@ public extension String {
         guard let data = Data(base64Encoded: payload),
               let json = try? JSONDecoder().decode(JSONValue.self, from: data)
         else { return nil }
-        return json["payment_id"]?.stringValue?.nonBlank
+
+        return WidgetRedirectionData(
+            paymentId: json["payment_id"]?.stringValue?.nonBlank,
+            authorizationStatus: json["authorization_status"]?.stringValue?.nonBlank,
+            clientSessionStatus: json["client_session_status"]?.stringValue?.nonBlank
+        )
     }
+
+    /// The id the orchestration API's `POST /v2/payments/{id}/captures` needs.
+    var widgetConfirmationPaymentId: String? { widgetRedirectionData?.paymentId }
+}
+
+/// What a widget-confirmation redirect reports, out of its `purse-redirection-data` JWT. Android
+/// confirmed the shape against a real one:
+/// `{"client_session_status":"SUBMITTED","payment_id":"…","authorization_status":"AUTHORIZED"}`.
+public struct WidgetRedirectionData: Sendable, Equatable {
+    public let paymentId: String?
+    /// `AUTHORIZED`, or whatever the API reported.
+    public let authorizationStatus: String?
+    /// `SUBMITTED`, and so on.
+    public let clientSessionStatus: String?
+
+    public init(paymentId: String?, authorizationStatus: String?, clientSessionStatus: String?) {
+        self.paymentId = paymentId
+        self.authorizationStatus = authorizationStatus
+        self.clientSessionStatus = clientSessionStatus
+    }
+
+    /// What the token *claims*. Never proof on its own — nothing here is signature-checked.
+    public var isAuthorized: Bool { authorizationStatus?.uppercased() == "AUTHORIZED" }
 }
