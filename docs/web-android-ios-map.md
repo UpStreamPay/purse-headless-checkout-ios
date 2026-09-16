@@ -95,7 +95,7 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | Following a redirect | `postValidation` opens an Activity | resolved after submit via `pendingRedirect(for:)` | Same as Android's reason: "follow a redirect" is `window.location` on web and needs nothing but the URL; natively it needs a presenter the pure protocol half must not own. |
 | Partner module discovery | `ServiceLoader` | `PluginRegistry.install(_:)` | No `ServiceLoader`, no lazy class loading (stated in SDK-12264). Android already supports explicit install; iOS makes it the only path. |
 | Secure Fields types | used directly | converted at the boundary | None of a Swift 5 module's public types are `Sendable` to us — `TokenizationResult`, and even `CardBrand`, a plain String enum. The coordinator converts inside the `nonisolated` delegate callback, before anything reaches the main actor. See AGENTS.md. |
-| Secure Fields dependency | `securefields-android:1.4.2` from Maven | **revision pin** `5df309a` | No tag of `purse-securefields-ios` can be resolved by SwiftPM: its binary target points at a GitHub release asset that 404s for a private repo under every auth method SwiftPM supports. The pinned revision is the source commit `v1.8.0` was cut from. |
+| Secure Fields dependency | `securefields-android:1.4.2` from Maven | `from: "1.9.0"` over https | Was a revision pin: while `purse-securefields-ios` was private, its tags' binary-target release assets 404'd to SwiftPM under every auth method, so no tag resolved for anyone. The repository is public now and the artifact resolves, links and passes — the pin is gone. Note the URL must be `https://`, not `git@github.com:`, which authenticates regardless of visibility and so needs a key CI does not have. |
 
 ## Vocabulary
 
