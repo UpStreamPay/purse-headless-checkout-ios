@@ -159,6 +159,25 @@ presenter into one.
 - A `WKNavigationDelegate` method whose signature is a near-miss **compiles, is never called, and
   silently disables the allowlist**. `decisionHandler` is `@escaping @MainActor @Sendable`.
 
+## Never cast between vocabularies that merely look alike
+
+Three separate near-identical-looking string vocabularies have bitten this codebase so far:
+`CardBrand` (Payment API) vs Secure Fields' own `CardBrand` (`AMEX` vs `AMERICAN_EXPRESS`), and now
+Apple Pay JS network names vs `PKPaymentNetwork.rawValue` (`"visa"`/`"Visa"`, and `amex`/`"AmEx"` —
+not even a consistent capitalisation rule). Every one of these compiles as a raw-value cast and
+fails silently at runtime: the value comes back `nil`, the field is just dropped from the request,
+and nothing in the type system stops it. A test that only checks "some non-nil supportedNetworks
+array" would have shipped this.
+
+**The check that catches it**: compare against the real framework's actual values (print them, or
+assert against literal string constants pulled from the SDK), never against what the naming pattern
+suggests. A `.visa == .visa` test proves nothing if both sides were built with the same wrong
+assumption.
+
+If you introduce a new mapping between an external vocabulary and ours, write it as an explicit
+`switch`/dictionary with a comment saying which two vocabularies it bridges, and add one test that
+would fail if `rawValue` had been cast directly instead.
+
 ## What NOT to do
 
 - **Do not add a second observation mechanism.** One `ObservableObject` with `@Published`. Not
