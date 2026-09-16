@@ -35,15 +35,21 @@ struct DemoResult {
                 detail: "global_status = \(result.globalStatus)"
             )
         case let .returnedFromRedirect(url):
-            // The return URL's `purse-redirection-data` JWT reports the outcome.
-            let reported = url?.absoluteString.widgetRedirectionData
-            let claim = reported?.authorizationStatus.map { "The redirect reported \($0). " } ?? ""
+            // The return URL's `purse-redirection-data` JWT reports the outcome, so the banner
+            // shows it rather than a shrug.
+            guard let status = url?.absoluteString.widgetRedirectionData?.authorizationStatus else {
+                return DemoResult(
+                    kind: .unconfirmed,
+                    method: method,
+                    detail: "The shopper came back, but the redirect reported nothing. Coming back "
+                        + "isn't proof of payment — fetch the transactions below to confirm."
+                )
+            }
             return DemoResult(
-                kind: .unconfirmed,
+                kind: status.uppercased() == "AUTHORIZED" ? .authorized : .failed,
                 method: method,
-                detail: claim
-                    + "Coming back from a redirect isn't proof of payment, and the token saying so "
-                    + "is not signature-checked here. Fetch the transactions below to confirm."
+                detail: "The redirect reported \(status). That is the redirect's own claim, not "
+                    + "signature-checked here — fetch the transactions below to confirm it."
             )
         case let .failed(error):
             // A `/validate` that left the device unanswered is not a failure: the payment may well
