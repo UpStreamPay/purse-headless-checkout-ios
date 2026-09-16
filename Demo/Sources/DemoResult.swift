@@ -42,11 +42,34 @@ struct DemoResult {
                     + "payment. Fetch the transactions below to confirm."
             )
         case let .failed(error):
+            // A `/validate` that left the device unanswered is not a failure: the payment may well
+            // exist. Showing it as one is the worst mistake this screen can make, so it goes to the
+            // transactions lookup like a redirect return does. Android does the same.
+            guard !outcomeUnknown(error) else {
+                return DemoResult(
+                    kind: .unconfirmed,
+                    method: method,
+                    detail: "No answer to /validate — the payment may exist. Fetch the transactions "
+                        + "below before telling anyone it failed. (\(error.message))"
+                )
+            }
             return DemoResult(kind: .failed, method: method, detail: "\(error)")
         case .canceled:
             // Not a result: the shopper may try again on the same screen.
             return nil
         }
+    }
+
+    /// Whether this error, or anything it wraps, is a Payment API call that left the device with no
+    /// answer. Every layer wraps — `PaymentValidator` turns a `PaymentAPIError` into
+    /// `validateFailed` — so a cast at the top matches nothing and the chain has to be walked.
+    private static func outcomeUnknown(_ error: any PurseError) -> Bool {
+        var current: (any Error)? = error
+        while let error = current {
+            if (error as? PaymentAPIError)?.outcomeUnknown == true { return true }
+            current = (error as? any PurseError)?.underlying
+        }
+        return false
     }
 
     /// Promote to authorized when alfred's transactions say the payment really landed — the same
