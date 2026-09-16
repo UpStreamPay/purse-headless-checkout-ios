@@ -13,14 +13,20 @@ public final class WebAuthRedirectPresenter: NSObject, RedirectPresenter {
 
     private let policy: RedirectPolicy
     private weak var presentingViewController: UIViewController?
+    private let prefersInAppWebView: Bool
     private var session: ASWebAuthenticationSession?
 
     /// - Parameters: - policy: where the redirect may go, and what counts as coming back. -
     /// presentingViewController: used for the POST cases, which are presented modally. The GET case
     /// anchors on the app's key window.
-    public init(policy: RedirectPolicy, presentingViewController: UIViewController? = nil) {
+    public init(
+        policy: RedirectPolicy,
+        presentingViewController: UIViewController? = nil,
+        prefersInAppWebView: Bool = false
+    ) {
         self.policy = policy
         self.presentingViewController = presentingViewController
+        self.prefersInAppWebView = prefersInAppWebView
     }
 
     public func present(_ action: RedirectAction) async throws -> RedirectOutcome {
@@ -34,7 +40,9 @@ public final class WebAuthRedirectPresenter: NSObject, RedirectPresenter {
             }
             // Only when the browser can actually observe the end of the flow — otherwise the web
             // view, which watches every navigation itself and works on every supported iOS.
-            guard browserCanObserveReturn else { return try await presentWebView(action) }
+            guard !prefersInAppWebView, browserCanObserveReturn else {
+                return try await presentWebView(action)
+            }
             return try await presentWebAuthentication(url)
 
         case .postForm, .postHTML:
