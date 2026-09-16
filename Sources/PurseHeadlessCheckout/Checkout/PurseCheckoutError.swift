@@ -35,6 +35,13 @@ public enum PurseCheckoutError: PurseError {
     case secondaryTokenizationFailed(String, PurseErrorCode, underlying: (any Error)? = nil)
     /// The PAN or CVV typed for a secondary method does not match that issuer's format.
     case invalidSecondaryCard(String, PurseErrorCode)
+    /// A wallet operation was refused — missing session, missing token, an invalid or taken label,
+    /// a method whose policy does not allow registration, or a failed delete-all.
+    case walletOperationFailed(String, PurseErrorCode)
+    /// The method carries no `simulable` label — there is nothing to quote.
+    case methodNotSimulable(itemId: String)
+    /// The simulation API refused the request or returned nothing usable.
+    case loanSimulationFailed(String, underlying: (any Error)?)
 
     public var code: PurseErrorCode {
         switch self {
@@ -50,6 +57,9 @@ public enum PurseCheckoutError: PurseError {
         case .postValidationFailed: .postValidateFailed
         case let .secondaryTokenizationFailed(_, code, _): code
         case let .invalidSecondaryCard(_, code): code
+        case let .walletOperationFailed(_, code): code
+        case .methodNotSimulable: .methodIsNotSimulable
+        case .loanSimulationFailed: .invalidLoanSimulation
         }
     }
 
@@ -59,6 +69,7 @@ public enum PurseCheckoutError: PurseError {
         case let .hookFailed(_, underlying, _): underlying
         case let .postValidationFailed(_, underlying): underlying
         case let .secondaryTokenizationFailed(_, _, underlying): underlying
+        case let .loanSimulationFailed(_, underlying): underlying
         default: nil
         }
     }
@@ -90,6 +101,12 @@ public enum PurseCheckoutError: PurseError {
         case let .secondaryTokenizationFailed(detail, _, _):
             detail
         case let .invalidSecondaryCard(detail, _):
+            detail
+        case let .walletOperationFailed(detail, _):
+            detail
+        case let .methodNotSimulable(itemId):
+            "\(itemId) is not simulable"
+        case let .loanSimulationFailed(detail, _):
             detail
         }
     }

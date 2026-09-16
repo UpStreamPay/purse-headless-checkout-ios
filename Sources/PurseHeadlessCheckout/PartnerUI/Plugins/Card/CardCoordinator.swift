@@ -63,7 +63,8 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
         host: any PluginHost,
         tenantId: String,
         supportedBrands: [CardBrand],
-        token: PayToken? = nil
+        token: PayToken? = nil,
+        options: PluginOptions = PluginOptions()
     ) {
         self.host = host
         self.mode = Mode.of(token)
@@ -79,14 +80,34 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
                 return supportedBrands.isEmpty ? [.visa, .mastercard, .carteBancaire] : supportedBrands
             }()
 
+            let resolved = (options.theme ?? .default).resolve()
+            let texts = options.cardFormTexts
+            let style = SecureFieldsStyle(
+                font: resolved.input.font ?? .systemFont(ofSize: 16),
+                textColor: resolved.input.color ?? .label,
+                placeholderColor: resolved.input.placeholderColor ?? .placeholderText,
+                backgroundColor: resolved.input.backgroundColor,
+                focus: Self.stateStyle(resolved.inputFocus),
+                valid: Self.stateStyle(resolved.inputValid),
+                invalid: Self.stateStyle(resolved.inputInvalid)
+            )
+
             let config = SecureFieldsConfig(
                 tenantId: tenantId,
                 environment: host.environment.vaultEnvironment,
                 brands: brands.compactMap(\.secureFieldsBrand),
+                style: style,
                 // Field subset *is* how CVV-only is expressed — there is no flag. With no PAN field
                 // mounted, Secure Fields omits the `card` object, which the Vault reads as a
                 // CVV-only submission (purse-securefields-ios >= 1.8.0).
-                fields: mode == .tokenCVV ? .cvvOnly : .all
+                fields: mode == .tokenCVV
+                    ? SecureFieldsFieldsConfig(cvv: .init(placeholder: texts.cvv.placeholder))
+                    : SecureFieldsFieldsConfig(
+                        pan: .init(placeholder: texts.cardNumber.placeholder),
+                        expDate: .init(placeholder: texts.expDate.placeholder),
+                        holderName: .init(placeholder: texts.holderName.placeholder),
+                        cvv: .init(placeholder: texts.cvv.placeholder)
+                    )
             )
             self.manager = SecureFieldsManager(config: config)
         } else {
@@ -189,6 +210,14 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
     private func resume(_ result: Result<CardTokenization, any Error>) {
         pending?.resume(with: result)
         pending = nil
+    }
+
+    /// A resolved theme field style as one of Secure Fields' own state overrides — `nil` when the
+    /// theme leaves every one of that state's values at the base style, so Secure Fields' own
+    /// "inherit the base style" behaviour applies instead of an all-nil override object.
+    private static func stateStyle(_ style: PurseTheme.FieldStyle) -> SecureFieldsStyle.StateStyle? {
+        guard style.color != nil || style.backgroundColor != nil else { return nil }
+        return SecureFieldsStyle.StateStyle(textColor: style.color, backgroundColor: style.backgroundColor)
     }
 }
 

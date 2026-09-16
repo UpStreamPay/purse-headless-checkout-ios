@@ -91,6 +91,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// Injectable so tests can stub the transport — the seam `purse-ios-securefields` calls
     /// `testURLSession`. Production callers never pass it.
     private let urlSession: URLSession
+    private let wallet: WalletTokens
+    /// Save-token decisions for a fresh primary method, keyed by item id.
+    private var registrationByMethod: [String: RegistrationState] = [:]
+    /// Save-token decisions for a temporary secondary instrument, keyed by item id.
+    private var registrationBySecondaryToken: [String: RegistrationState] = [:]
 
     // MARK: Creation
 
@@ -104,7 +109,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
         registry: PluginRegistry = .shared,
         secondaryConfigs: SecondaryConfigs = .shared,
         instanceId: String = UUID().uuidString,
-        urlSession: URLSession = .shared
+        urlSession: URLSession = .shared,
+        walletAPIRootOverride: String? = nil
     ) throws {
         let params = try SessionCodec.decode(widgetData)
         self.params = params
@@ -134,11 +140,25 @@ public final class PurseHeadlessCheckout: ObservableObject {
         self.session = built
         self.meansOfPayment = built.meansOfPayment
         self.splitter = PursePaymentSplitter(orderAmount: built.amount)
+        self.wallet = WalletTokens(
+            params: params,
+            walletAPIRoot: walletAPIRootOverride ?? environment.walletAPIRoot,
+            urlSession: urlSession
+        )
 
         refresh()
         // Saved gift cards carry no balance in the session — re-`/init` each one now (web's
         // `buildSecondaryPaymentToken` fires the same call as the token is built).
         resolveSavedSecondaryBalances()
+        // Only when the widget data actually carried a wallet_session — a checkout with none never
+        // calls the Wallet API at all. A failure is swallowed: the wallet only gates management
+        // operations and syncs names/favorites, so it must never break the checkout.
+        if wallet.client != nil {
+            pendingWalletSync = Task {
+                _ = try? await self.wallet.fetch()
+                self.syncWalletTokens()
+            }
+        }
 
         // Nothing else ever called `sync()`, so the offset stayed 0 and every "server-corrected"
         // check was really the device clock. One sync at creation is what makes the correction real.
@@ -217,7 +237,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
                 session: session.source,
                 collectedByItem: collectedByItem,
                 hooks: hooks,
-                skipOnBeforeValidate: skipOnBeforeValidate
+                skipOnBeforeValidate: skipOnBeforeValidate,
+                registrationByItem: currentRegistrations()
             )
         } catch {
             // The session is only spent once /validate actually answered — but there are three
@@ -522,6 +543,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
         session = built
         meansOfPayment = built.meansOfPayment
         fulfilledByItem = fulfilledByItem.filter { survivingIds.contains($0.key) }
+        // Save-token decisions belong to the item that was on screen when the shopper made them.
+        registrationByMethod = registrationByMethod.filter { survivingIds.contains($0.key) }
+        registrationBySecondaryToken.removeAll()
 
         // Gift cards were tokenized against the old session and cannot carry over.
         splitter.reset(orderAmount: built.amount)
@@ -534,6 +558,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
         sessionState = .ready
         refresh()
         resolveSavedSecondaryBalances()
+        // The wallet session outlives any one payment session — reapply what it already knows onto
+        // the freshly rebuilt items rather than fetching again.
+        if wallet.client != nil { syncWalletTokens() }
     }
 
     private func restorePrimary(id: String) {
@@ -669,5 +696,226 @@ public final class PurseHeadlessCheckout: ObservableObject {
         transform(&token)
         meansOfPayment[index] = .savedSecondaryToken(token)
         refresh()
+    }
+
+    // MARK: Wallet session
+
+    /// Exposed at `internal` access only so tests can `await` the initial wallet sync fired at
+    /// construction — a merchant has no need to touch it.
+    private(set) var pendingWalletSync: Task<Void, Never>?
+
+    /// Overlay the wallet's already-fetched names/favorites onto the session's token items — web's
+    /// subscription. No network call: the wallet session outlives any one payment session, so
+    /// `setSession` calls this again on the freshly rebuilt items rather than fetching anew.
+    private func syncWalletTokens() {
+        meansOfPayment = meansOfPayment.map { item in
+            switch item {
+            case let .paymentToken(original):
+                guard let walletToken = wallet.tokens.first(where: { $0.id == original.id }) else { return item }
+                var token = original
+                if let favorite = walletToken.favorite { token.favorite = favorite }
+                if let name = walletToken.name { token.name = name }
+                return .paymentToken(token)
+            case let .savedSecondaryToken(original):
+                guard let walletToken = wallet.tokens.first(where: { $0.id == original.id }) else { return item }
+                var token = original
+                if let favorite = walletToken.favorite { token.favorite = favorite }
+                if let name = walletToken.name { token.name = name }
+                return .savedSecondaryToken(token)
+            default:
+                return item
+            }
+        }
+        refresh()
+    }
+
+    // MARK: Registration (save-at-submit)
+
+    /// The current save-token decision for `method` (defaults from its `SaveTokenMode`).
+    public func registrationOf(_ method: PrimaryMethod) -> RegistrationState {
+        registrationByMethod[method.id] ?? RegistrationState(registered: method.saveTokenMode.registeredByDefault)
+    }
+
+    /// Decide whether `method`'s fresh card should be saved at `/validate`, optionally under `name`
+    /// — web's `method.register(value, {name})`. The label must match web's `^[a-zA-Z0-9\s]{1,25}$`
+    /// and be unique across saved tokens.
+    public func register(_ method: PrimaryMethod, registered: Bool = true, name: String? = nil) throws {
+        guard method.canBeRegistered else {
+            throw PurseCheckoutError.walletOperationFailed(
+                "\(method.id) cannot be registered (save_token_mode=\(method.saveTokenMode))",
+                .methodNotRegisterable
+            )
+        }
+        if let name { try validateTokenLabel(name, excludingTokenId: nil) }
+        registrationByMethod[method.id] = RegistrationState(
+            registered: registered, name: name ?? registrationByMethod[method.id]?.name
+        )
+    }
+
+    /// The current save decision for a **temporary** gift card (one the shopper just typed and
+    /// tokenized) — defaults from its method's `SaveTokenMode`, like primaries. Always
+    /// `registered == false` for a saved instrument: it is already saved.
+    public func registrationOf(_ token: SecondaryToken) -> RegistrationState {
+        token.isSaved
+            ? RegistrationState(registered: false)
+            : registrationBySecondaryToken[token.id]
+                ?? RegistrationState(registered: token.saveTokenMode.registeredByDefault)
+    }
+
+    /// Ask to keep a temporary gift card for the next session, optionally under `name` — web's
+    /// `temporaryToken.register(value, {name})`.
+    public func registerSecondary(_ token: SecondaryToken, registered: Bool = true, name: String? = nil) throws {
+        guard token.canBeRegistered else {
+            throw PurseCheckoutError.walletOperationFailed(
+                token.isSaved
+                    ? "\(token.id) is already a saved instrument"
+                    : "\(token.id) cannot be registered (save_token_mode=\(token.saveTokenMode))",
+                .tokenNotRegisterable
+            )
+        }
+        if let name { try validateTokenLabel(name, excludingTokenId: nil) }
+        registrationBySecondaryToken[token.id] = RegistrationState(
+            registered: registered, name: name ?? registrationBySecondaryToken[token.id]?.name
+        )
+    }
+
+    /// One `RegistrationState` per currently-split item that carries a save decision — a
+    /// `PrimaryMethod` always (even an explicit `false`), a `SecondaryToken` only when it
+    /// ``SecondaryToken/canBeRegistered``.
+    private func currentRegistrations() -> [String: RegistrationState] {
+        var registrations: [String: RegistrationState] = [:]
+        for split in splitter.splits {
+            if let method = split.source as? PrimaryMethod {
+                registrations[method.id] = registrationOf(method)
+            } else if let token = split.source as? SecondaryToken, token.canBeRegistered {
+                registrations[token.id] = registrationOf(token)
+            }
+        }
+        return registrations
+    }
+
+    // MARK: Wallet token management
+
+    /// Rename a saved card (`PATCH …/tokens/{id}/name`) — web's `token.edit({name})`. Needs a
+    /// wallet session and the token present in the wallet.
+    public func editToken(_ token: PaymentToken, name: String) async throws {
+        let client = try wallet.requireClient()
+        try wallet.requireToken(token.id)
+        try validateTokenLabel(name, excludingTokenId: token.id)
+        try await client.editTokenName(token.id, name: name)
+        updateTokenItem(token.id) { $0.name = name }
+    }
+
+    /// Rename a saved gift card (`PATCH …/tokens/{id}/name`) — same rules as the card overload.
+    public func editToken(_ token: SavedSecondaryToken, name: String) async throws {
+        let client = try wallet.requireClient()
+        try wallet.requireToken(token.id)
+        try validateTokenLabel(name, excludingTokenId: token.id)
+        try await client.editTokenName(token.id, name: name)
+        updateSavedSecondary(token.id) { $0.name = name }
+    }
+
+    /// Delete a saved card (`DELETE …/tokens/{id}`) — web's `token.delete()`: also clears it from
+    /// the split and removes it from ``paymentTokens``.
+    public func deleteToken(_ token: PaymentToken) async throws {
+        let client = try wallet.requireClient()
+        try wallet.requireToken(token.id)
+        try await client.deleteToken(token.id)
+        if splitter.primaryMethod?.id == token.id { splitter.setPrimary(nil) }
+        meansOfPayment.removeAll { $0.id == token.id }
+        wallet.forget(token.id)
+        refresh()
+    }
+
+    /// Toggle a saved card's favorite flag — web's `token.setAsFavorite()`: optimistic local
+    /// update, reverted if the wallet call fails.
+    public func setTokenFavorite(_ token: PaymentToken) async throws {
+        let client = try wallet.requireClient()
+        try wallet.requireToken(token.id)
+        let newFavorite = !token.favorite
+        updateTokenItem(token.id) { $0.favorite = newFavorite }
+        do {
+            try await client.setAsFavorite(token.id, favorite: newFavorite)
+            _ = try await wallet.fetch()
+            syncWalletTokens()
+        } catch {
+            updateTokenItem(token.id) { $0.favorite = !newFavorite }
+            throw error
+        }
+    }
+
+    /// Delete every wallet token — web's `deleteAllTokens()`.
+    public func deleteAllTokens() async throws {
+        let client = try wallet.requireClient()
+        try await client.deleteAllTokens()
+        let tokenIds = Set(paymentTokens.map(\.id))
+        if let primaryId = splitter.primaryMethod?.id, tokenIds.contains(primaryId) {
+            splitter.setPrimary(nil)
+        }
+        // Saved gift cards are wallet tokens too — gone with the rest, and out of the split.
+        for item in meansOfPayment {
+            if case let .savedSecondaryToken(token) = item { splitter.clearSplit(token.asSecondaryToken()) }
+        }
+        meansOfPayment.removeAll {
+            switch $0 {
+            case .paymentToken, .savedSecondaryToken: true
+            default: false
+            }
+        }
+        wallet.clear()
+        refresh()
+    }
+
+    private func validateTokenLabel(_ name: String, excludingTokenId: String?) throws {
+        let taken = (paymentTokens.map { ($0.id, $0.name) } + savedSecondaryTokens.map { ($0.id, $0.name) })
+            .filter { $0.0 != excludingTokenId }
+            .map(\.1)
+        try wallet.validateLabel(name, takenNames: taken, excludingTokenId: excludingTokenId)
+    }
+
+    /// Mutate one saved card in place and republish.
+    private func updateTokenItem(_ tokenId: String, _ transform: (inout PaymentToken) -> Void) {
+        guard let index = meansOfPayment.firstIndex(where: {
+            if case let .paymentToken(token) = $0 { return token.id == tokenId }
+            return false
+        }), case var .paymentToken(token) = meansOfPayment[index] else { return }
+
+        transform(&token)
+        meansOfPayment[index] = .paymentToken(token)
+        refresh()
+    }
+
+    // MARK: Loan simulation
+
+    /// One BNPL instalment schedule for `method` at `product`'s amount — gated on the method's own
+    /// `simulable` label (`configuration.labels.contains("simulable")`).
+    public func simulateLoan(_ method: PrimaryMethod, product: LoanProduct) async throws -> LoanSimulation {
+        guard method.simulable else { throw PurseCheckoutError.methodNotSimulable(itemId: method.id) }
+        do {
+            return try await api.getSimulation(partner: method.partner, method: method.method, product: product)
+        } catch {
+            throw Self.asLoanSimulationFailureOrSelf(error)
+        }
+    }
+
+    /// Every instalment schedule `method` offers for `product`'s amount — same gate as
+    /// ``simulateLoan(_:product:)``.
+    public func simulateLoans(_ method: PrimaryMethod, product: LoanProduct) async throws -> [LoanSimulation] {
+        guard method.simulable else { throw PurseCheckoutError.methodNotSimulable(itemId: method.id) }
+        do {
+            return try await api.getSimulationMulti(partner: method.partner, method: method.method, product: product)
+        } catch {
+            throw Self.asLoanSimulationFailureOrSelf(error)
+        }
+    }
+
+    /// Every API-level refusal (a 409 `EMPTY_SIMULATION`, say) surfaces as
+    /// ``PurseCheckoutError/loanSimulationFailed(_:underlying:)``; only a transport failure with no
+    /// HTTP status at all stays the raw ``PaymentAPIError``.
+    private static func asLoanSimulationFailureOrSelf(_ error: any Error) -> any Error {
+        guard let apiError = error as? PaymentAPIError,
+              apiError.errorCode == "INVALID_LOAN_SIMULATION" || apiError.status != nil
+        else { return error }
+        return PurseCheckoutError.loanSimulationFailed(apiError.message, underlying: apiError)
     }
 }

@@ -23,7 +23,8 @@ struct PaymentValidator {
         session: LegacyPaymentSession,
         collectedByItem: [String: [String: JSONValue]] = [:],
         hooks: PurseCheckoutHooks? = nil,
-        skipOnBeforeValidate: Bool = false
+        skipOnBeforeValidate: Bool = false,
+        registrationByItem: [String: RegistrationState] = [:]
     ) async throws -> ValidationResult {
         try requireDistinctSources(splits)
 
@@ -40,12 +41,15 @@ struct PaymentValidator {
                     // part of it.
                     throw PurseCheckoutError.noSecondaryConfig(itemId: token.id)
                 }
-                payloads.append(ItemPayload(
+                let payload = ItemPayload(
                     partner: token.partner,
                     method: token.method,
                     amount: split.amount,
                     paymentData: config.buildValidatePaymentData(token)
-                ))
+                )
+                // A gift card the shopper asked to keep — never for an instrument already saved.
+                let registration = registrationByItem[token.id].flatMap { $0.registered && !token.isSaved ? $0 : nil }
+                payloads.append(Self.enhanceWithRegistration(payload, registration))
                 continue
             }
 
@@ -69,12 +73,16 @@ struct PaymentValidator {
                 )
             }
 
+            // A saved card is already registered — only a fresh PrimaryMethod carries a decision.
+            let registration = source is PrimaryMethod ? registrationByItem[source.id] : nil
+
             let context = PartnerUIContext(
                 partner: source.partner,
                 method: source.method,
                 session: session,
                 amount: split.amount,
                 api: api,
+                register: registration?.registered == true,
                 token: token,
                 collected: collectedByItem[source.id] ?? [:]
             )
@@ -83,7 +91,7 @@ struct PaymentValidator {
                 throw PurseCheckoutError.validateFailed("client-side validation failed for \(source.id)", nil)
             }
 
-            payloads.append(try await plugin.preValidation(context))
+            payloads.append(Self.enhanceWithRegistration(try await plugin.preValidation(context), registration))
             prepared.append(Prepared(plugin: plugin, context: context))
         }
 
@@ -127,6 +135,34 @@ struct PaymentValidator {
             }
         }
         return result
+    }
+
+    /// `payment_preferences.registration` plus `payment_data.card.token_label` when the shopper
+    /// named the card — web's `headless-checkout-validation.ts` payload enhancement.
+    private static func enhanceWithRegistration(
+        _ payload: ValidateItemPayload, _ registration: RegistrationState?
+    ) -> ValidateItemPayload {
+        guard let registration else { return payload }
+        var preferences = payload.paymentPreferences
+        preferences["registration"] = .bool(registration.registered)
+
+        var paymentData = payload.paymentData
+        if registration.registered, let name = registration.name?.nonBlank {
+            var card = paymentData["card"]?.objectValue ?? [:]
+            card["token_label"] = .string(name)
+            paymentData["card"] = .object(card)
+        }
+
+        return ItemPayload(
+            partner: payload.partner,
+            method: payload.method,
+            amount: payload.amount,
+            stepId: payload.stepId,
+            paymentData: paymentData,
+            partnerData: payload.partnerData,
+            order: payload.order,
+            paymentPreferences: preferences
+        )
     }
 
     /// One `/validate` item per split, and never the same split source twice — a duplicate would
