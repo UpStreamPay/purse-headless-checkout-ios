@@ -3,6 +3,8 @@
 // Differs: no CVV path exists at all here (there never was one — a PayPal token carries no card).
 
 import Foundation
+import PaymentButtons
+import UIKit
 import PurseHeadlessCheckout
 
 /// The PayPal **wallet** (pay-now) plugin — the protocol half, no PayPal SDK types in sight. PayPal
@@ -112,5 +114,68 @@ public struct PayPalModule: PartnerModule {
 
     @MainActor public func register(into registry: PluginRegistry) {
         registry.register(partner: .paypal, method: .wallet) { PayPalPlugin(partner: $0.partner) }
+    }
+
+    @MainActor public func renders(_ plugin: any PartnerUIPlugin) -> Bool { plugin is PayPalPlugin }
+
+    @MainActor public func surface(
+        for plugin: any PartnerUIPlugin,
+        request: SurfaceRequest
+    ) -> PaymentSurface? {
+        let listener = request.listener
+        let coordinator = PayPalCoordinator(host: request.host)
+
+        // A saved PayPal account needs no approval and no button — it pays from the host's own
+        // Pay button like any other no-form token.
+        if request.isToken {
+            return .headless(
+                prepare: { listener.onReady(true) },
+                submit: {
+                    do {
+                        try await coordinator.authorize()
+                    } catch {
+                        listener.onOutcome(.failed(error.asPurseError()))
+                        return
+                    }
+                    await request.captureNow()
+                }
+            )
+        }
+
+        let button = PayPalButtonBox(coordinator: coordinator, request: request)
+        return PaymentSurface(
+            hasUI: true,
+            selfSubmitting: true,
+            makeView: { button.view },
+            prepare: { listener.onReady(true) },
+            submit: {}
+        )
+    }
+}
+
+/// Owns PayPal's own button and its target, which `UIControl` holds unowned.
+@MainActor
+private final class PayPalButtonBox {
+    let view: PayPalButton
+    private let coordinator: PayPalCoordinator
+    private let request: SurfaceRequest
+
+    init(coordinator: PayPalCoordinator, request: SurfaceRequest) {
+        self.coordinator = coordinator
+        self.request = request
+        self.view = PayPalButton()
+        view.addTarget(self, action: #selector(tapped), for: .touchUpInside)
+    }
+
+    @objc private func tapped() {
+        Task { @MainActor in
+            do {
+                try await coordinator.authorize()
+            } catch {
+                request.listener.onOutcome(.failed(error.asPurseError()))
+                return
+            }
+            await request.selectAndCapture()
+        }
     }
 }

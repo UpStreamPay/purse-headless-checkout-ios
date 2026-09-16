@@ -2,7 +2,9 @@
 // Same: token from the vault into /validate; saved token + CVV-only token side by side.
 // Differs: /init runs inside `preValidation`, not at `onSessionSet` (nothing about rendering depends on it — Secure Fields tokenizes independently).
 
+import Combine
 import Foundation
+import UIKit
 
 /// The `purse`-vendor vault-backed card plugin — the protocol half, with no Secure Fields types in
 /// sight. The interactive half (the form, tokenization) lives in ``CardCoordinator``.
@@ -116,5 +118,68 @@ struct CardModule: PartnerModule {
 
     @MainActor func register(into registry: PluginRegistry) {
         registry.registerVault(vendor: .purse) { CardPlugin(partner: $0.partner) }
+    }
+
+    @MainActor func renders(_ plugin: any PartnerUIPlugin) -> Bool { plugin is CardPlugin }
+
+    @MainActor func surface(for plugin: any PartnerUIPlugin, request: SurfaceRequest) -> PaymentSurface? {
+        let context = request.host.buildContext()
+        let coordinator = CardCoordinator(
+            host: request.host,
+            tenantId: context.vaultTenantId ?? "",
+            supportedBrands: context.configuration?.vault?.supportedBrands ?? [],
+            token: context.token,
+            options: context.options
+        )
+        let listener = request.listener
+        // A form gates on its own validity; a no-CVV token has nothing to fill in, so it is ready
+        // as soon as it exists.
+        let observer = CardReadinessObserver(coordinator: coordinator, listener: listener)
+
+        return PaymentSurface(
+            hasUI: coordinator.mode.rendersForm,
+            selfSubmitting: false,
+            makeView: {
+                guard coordinator.mode.rendersForm else { return nil }
+                let stack = UIStackView(arrangedSubviews: coordinator.fieldViews)
+                stack.axis = .vertical
+                stack.spacing = 12
+                return stack
+            },
+            prepare: { observer.start() },
+            submit: {
+                do {
+                    _ = try await coordinator.submit()
+                } catch {
+                    listener.onOutcome(.failed(error.asPurseError()))
+                    return
+                }
+                await request.captureNow()
+            }
+        )
+    }
+}
+
+/// Bridges `CardCoordinator.$isFormValid` onto the element listener. A no-CVV token renders no form
+/// and never publishes, so its readiness is asserted once instead.
+@MainActor
+private final class CardReadinessObserver {
+    private let coordinator: CardCoordinator
+    private let listener: any PaymentElementListener
+    private var cancellable: AnyCancellable?
+
+    init(coordinator: CardCoordinator, listener: any PaymentElementListener) {
+        self.coordinator = coordinator
+        self.listener = listener
+    }
+
+    func start() {
+        guard coordinator.mode.rendersForm else {
+            listener.onReady(true)
+            return
+        }
+        cancellable = coordinator.$isFormValid.sink { [listener] valid in
+            listener.onReady(valid)
+        }
     }
 }
