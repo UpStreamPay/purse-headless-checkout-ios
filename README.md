@@ -44,7 +44,9 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | CI (build + test on PR), semantic versioning, release-please | ✅ (see `.github/workflows/`) |
 | `PrivacyInfo.xcprivacy` (no required-reason APIs; data-type declaration pending a privacy sign-off) | ✅ |
 | `PurseHeadlessCheckout.host(for:)` — the concrete `PluginHost` every coordinator runs through | ✅ |
-| XCFramework signing/distribution, SwiftLint/SwiftFormat, Demo app, docs | planned |
+| Payment elements — one `hasUI`/`isReady`/`submit()` shape per method, with a sealed `PaymentOutcome` | ✅ |
+| Demo app (`Demo/Demo.xcodeproj`) — three screens over real sessions, every method | ✅ (see below) |
+| XCFramework signing/distribution, SwiftLint/SwiftFormat, docs | planned |
 
 ## Development
 
@@ -67,6 +69,34 @@ a simulator destination.
 
 Before changing anything, read [AGENTS.md](AGENTS.md): it lists the invariants that must not be
 broken and why each one exists.
+
+## Demo app
+
+`Demo/Demo.xcodeproj` — session → pay → result, the same three screens as Android's `:app`, against
+sessions minted by **alfred** (the `usp-widget` dev server that holds the server-side Purse
+credentials a real merchant backend would).
+
+```sh
+cd ../usp-widget && npm run dev:alfred          # port 9001
+cp .env.example .env                            # ALFRED_BASE_URL, blank ⇒ http://localhost:9001
+source scripts/load-env.sh                      # must be sourced; see the script for why
+xcodebuild build -project Demo/Demo.xcodeproj -scheme Demo \
+  -destination "platform=iOS Simulator,id=$SIM_ID" CODE_SIGNING_ALLOWED=NO
+```
+
+`localhost`, not Android's `10.0.2.2` — that is an emulator alias for the host loopback, and the
+Simulator shares the host's network stack. A physical device needs your machine's LAN IP.
+
+**There is no offline path.** Without alfred the demo mints nothing; paste a `widget.data` on screen
+1 instead. CI builds it in Debug and Release.
+
+**What still needs credentials this repo does not have.** Apple Pay's `/init` answers 400 without a
+real merchant id, and the sheet needs an entitlement — the button renders and the failure is
+reported, which is the honest result. Klarna needs a live client token. Everything else runs: the
+saved card, the redirection methods, gift-card split, loan simulation, `setSession`, teardown.
+
+**`-demo-autostart`** mints a session and opens the pay screen on launch, for smoke tests.
+
 
 ## License
 
