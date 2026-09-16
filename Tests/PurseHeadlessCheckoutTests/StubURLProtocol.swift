@@ -18,30 +18,38 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) private static var requestedPaths: [String] = []
     nonisolated(unsafe) private static var bodies: [String: Data] = [:]
 
-    static func set(_ suffix: String, _ response: Response) {
+    /// Handlers are keyed by **host** as well as path suffix. swift-testing runs suites in
+    /// parallel and this state is global, so two suites pointing at different API roots would
+    /// otherwise hand each other the wrong response — which is exactly what happened.
+    static func set(_ suffix: String, _ response: Response, host: String) {
         lock.lock(); defer { lock.unlock() }
-        handlers[suffix] = response
+        handlers[key(host, suffix)] = response
     }
 
-    static func reset() {
+    /// Clears only this host's state, leaving other suites alone.
+    static func reset(host: String) {
         lock.lock(); defer { lock.unlock() }
-        handlers.removeAll()
-        requestedPaths.removeAll()
-        bodies.removeAll()
+        handlers = handlers.filter { !$0.key.hasPrefix("\(host)|") }
+        requestedPaths = requestedPaths.filter { !$0.hasPrefix("\(host)|") }
+        bodies = bodies.filter { !$0.key.hasPrefix("\(host)|") }
     }
 
-    /// Paths requested so far, in order — lets a test assert a call did *not* happen.
-    static var paths: [String] {
+    /// Paths requested against `host`, in order — lets a test assert a call did *not* happen.
+    static func paths(host: String) -> [String] {
         lock.lock(); defer { lock.unlock() }
-        return requestedPaths
+        return requestedPaths.filter { $0.hasPrefix("\(host)|") }.map {
+            String($0.dropFirst(host.count + 1))
+        }
     }
 
-    /// The body posted to the first request whose path ends with `suffix`.
-    static func body(for suffix: String) -> JSONValueBox? {
+    /// The body posted to the first request against `host` whose path ends with `suffix`.
+    static func body(for suffix: String, host: String) -> JSONValueBox? {
         lock.lock(); defer { lock.unlock() }
-        guard let data = bodies[suffix] else { return nil }
+        guard let data = bodies[key(host, suffix)] else { return nil }
         return JSONValueBox(data: data)
     }
+
+    private static func key(_ host: String, _ suffix: String) -> String { "\(host)|\(suffix)" }
 
     /// A URLSession wired to this stub.
     static func session() -> URLSession {
@@ -55,13 +63,17 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
 
     override func startLoading() {
         let path = request.url?.path ?? ""
+        let host = request.url?.host ?? ""
         Self.lock.lock()
-        Self.requestedPaths.append(path)
-        let match = Self.handlers.first { path.hasSuffix($0.key) }
+        Self.requestedPaths.append("\(host)|\(path)")
+        let match = Self.handlers.first { entry in
+            let parts = entry.key.split(separator: "|", maxSplits: 1)
+            return parts.count == 2 && parts[0] == host && path.hasSuffix(String(parts[1]))
+        }
         // URLProtocol strips httpBody for streamed uploads; read the stream when that happens.
-        if let suffix = match?.key {
+        if let matchedKey = match?.key {
             if let body = request.httpBody {
-                Self.bodies[suffix] = body
+                Self.bodies[matchedKey] = body
             } else if let stream = request.httpBodyStream {
                 stream.open()
                 var data = Data()
@@ -72,7 +84,7 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
                     data.append(buffer, count: read)
                 }
                 stream.close()
-                Self.bodies[suffix] = data
+                Self.bodies[matchedKey] = data
             }
         }
         Self.lock.unlock()

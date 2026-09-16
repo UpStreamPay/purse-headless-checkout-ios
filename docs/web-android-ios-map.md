@@ -62,6 +62,8 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | `manageRedirection` shapes | `partnerui/redirect/RedirectAction.kt` | `PartnerUI/Redirect/RedirectAction.swift` |
 | `manageRedirection` | `partnerui/redirect/RedirectionResolver.kt` | `PartnerUI/Redirect/RedirectionResolver.swift` |
 | `plugins/generics/redirection` | `plugins/generics/redirection/RedirectionPlugin.kt` | `PartnerUI/Plugins/RedirectionPlugin.swift` |
+| `plugins/vaults/purse/creditcard` | `plugins/vaults/purse/creditcard/CardPlugin.kt`, `CardMapper.kt` | `PartnerUI/Plugins/Card/CardPlugin.swift` |
+| hosted-fields mount | `plugins/vaults/purse/creditcard/CardCoordinator.kt` | `PartnerUI/Plugins/Card/CardCoordinator.swift` |
 | `headless-checkout-validation.ts` | `checkout/validation/PaymentValidator.kt` | `Checkout/Validation/PaymentValidator.swift` |
 | `PurseHeadlessCheckoutHooks` | `checkout/PurseCheckoutHooks.kt` | `Checkout/Validation/PaymentValidator.swift` (`PurseCheckoutHooks`) |
 
@@ -92,6 +94,8 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | `Method` type name | `Method` | **`PaymentMethod`** | Foundation re-exports the Objective-C runtime's `Method` typedef. A merchant writing `-> Method` gets *"'Method' is ambiguous for type lookup"*, and cannot qualify it because the `PurseHeadlessCheckout` **class shadows the module of the same name**. Verified from a real consumer package, before and after. Web (TypeScript) and Android (Kotlin) have no such collision, so this is the one place naming parity had to give. |
 | Following a redirect | `postValidation` opens an Activity | resolved after submit via `pendingRedirect(for:)` | Same as Android's reason: "follow a redirect" is `window.location` on web and needs nothing but the URL; natively it needs a presenter the pure protocol half must not own. |
 | Partner module discovery | `ServiceLoader` | `PluginRegistry.install(_:)` | No `ServiceLoader`, no lazy class loading (stated in SDK-12264). Android already supports explicit install; iOS makes it the only path. |
+| Secure Fields types | used directly | converted at the boundary | None of a Swift 5 module's public types are `Sendable` to us — `TokenizationResult`, and even `CardBrand`, a plain String enum. The coordinator converts inside the `nonisolated` delegate callback, before anything reaches the main actor. See AGENTS.md. |
+| Secure Fields dependency | `securefields-android:1.4.2` from Maven | `from: "1.9.0"` over https | Was a revision pin: while `purse-securefields-ios` was private, its tags' binary-target release assets 404'd to SwiftPM under every auth method, so no tag resolved for anyone. The repository is public now and the artifact resolves, links and passes — the pin is gone. Note the URL must be `https://`, not `git@github.com:`, which authenticates regardless of visibility and so needs a key CI does not have. |
 
 ## Vocabulary
 

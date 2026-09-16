@@ -14,9 +14,10 @@ struct PluginRegistryTests {
         }
     }
 
+    /// A registry with the built-ins (card + redirection), plus whatever the test registers on top.
+    /// Later registrations win, which is how a test substitutes a stub for a built-in.
     private func registry(configuring: (PluginRegistry) -> Void = { _ in }) -> PluginRegistry {
         let registry = PluginRegistry()
-        registry.install(RedirectionModule())
         configuring(registry)
         return registry
     }
@@ -116,11 +117,16 @@ struct PluginRegistryTests {
 
     // MARK: Modules
 
+    /// A fresh registry already carries the built-ins, as Android's does.
+    @Test func theBuiltInsAreInstalledUpFront() {
+        #expect(PluginRegistry().modules == ["purse.card", "purse.redirection"])
+    }
+
     @Test func installingTheSameModuleTwiceIsANoOp() {
         let registry = PluginRegistry()
         registry.install(RedirectionModule())
         registry.install(RedirectionModule())
 
-        #expect(registry.modules == ["purse.redirection"])
+        #expect(registry.modules == ["purse.card", "purse.redirection"])
     }
 }

@@ -35,7 +35,13 @@ public final class PluginRegistry {
     private var methodFallbacks: [PaymentMethod: PluginBuilder] = [:]
     private var installed: [String] = []
 
-    public init() {}
+    /// The built-in plugins every merchant gets — the Purse-vault card and the generic redirection
+    /// template — are installed here, mirroring Android's `PluginRegistry` init block. A caller that
+    /// registers the same key afterwards wins, which is what lets a test substitute one.
+    public init() {
+        install(CardModule())
+        install(RedirectionModule())
+    }
 
     /// The ids of the modules currently contributing plugins, in installation order.
     public var modules: [String] { installed }
