@@ -34,6 +34,21 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | `sdk/src/API/types.ts` (`StatusStates`) | `core/payload/PaymentStatus.kt` | `Core/Payload/PaymentStatus.swift` |
 | *(none — JS objects)* | *(none — `org.json.JSONObject`)* | `Core/JSON/JSONValue.swift` |
 
+## Checkout — landed
+
+| Web | Android | iOS |
+|---|---|---|
+| `mops/disabled.ts` | `checkout/payment/item/DisabledState.kt` | `Checkout/Payment/Item/DisabledState.swift` |
+| mops recompute on `primaryReach` | `checkout/payment/item/MethodAvailability.kt` | `Checkout/Payment/Item/MethodAvailability.swift` |
+| `mops/item-factory` | `checkout/payment/item/PaymentItem.kt`, `PaymentToken.kt` | `Checkout/Payment/Item/PaymentItem.swift` |
+| `splitter/payment-splitter.ts` | `checkout/payment/split/PursePaymentSplitter.kt` | `Checkout/Payment/Split/PursePaymentSplitter.swift` |
+| `splitter/types.ts` | `checkout/payment/split/{PaymentSplit,SplitSource,PrimarySource}.kt` | `Checkout/Payment/Split/SplitSource.swift` |
+| secondaries token shape | `checkout/payment/secondary/SecondaryToken.kt` | `Checkout/Payment/Secondary/SecondaryToken.swift` |
+| `item-factory/factories.ts` | `checkout/session/PaymentSessionBuilder.kt` | `Checkout/Session/PaymentSessionBuilder.swift` |
+| `session/payment/payment.ts` | `checkout/session/PaymentSession.kt` | `Checkout/Session/PaymentSession.swift` |
+| `headless-checkout.ts` | `checkout/PurseHeadlessCheckout.kt` | `Checkout/PurseHeadlessCheckout.swift` |
+| `utils/error/error.ts` (thrown) | `checkout/PurseCheckoutException.kt` | `Checkout/PurseCheckoutError.swift` |
+
 ## Divergences and why
 
 | Topic | Android | iOS | Why |
@@ -46,8 +61,11 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | `InitGuard` on an exhausted **retryable** failure | stores `Entry.Spent` unconditionally | clears the key instead; only a non-retryable (4xx) failure is stored | Both types document fast-rejection as being for a *terminal* failure ("a 4xx is a definitive backend decision"). Storing a transport failure contradicts that: `shared` is process-wide, the key is stable across retries, and nothing evicts a spent entry — so losing signal for two seconds during `/init` kills that method for the life of the app process. **Android has the same defect against the same doc; report it.** |
 | Unpadded base64 in `widget.data` | accepted (JDK *basic* decoder: `'='` "is accepted … but is not required") | accepted — padding is restored before decoding | `Data(base64Encoded:)` rejects any length that is not a multiple of 4, so without this a backend that strips padding yields a working Android checkout and `SESSION_MALFORMED` on every iOS device. Same blob must not get two verdicts. |
 | `outcomeUnknown` for a request that never left the device | `status == null`, so an unusable URL or unencodable body reads as "the payment may exist" | additionally requires `requestSent` | The caller acts on `outcomeUnknown` by **spending the session**. Doing that for a call that provably sent no byte is wrong in the one direction that costs a shopper their order. Such an error is also not retryable — it fails identically every time. |
+| `PaymentItem` | `sealed class` + 4 data classes | `enum` + 4 structs | A `switch` over the four kinds is exhaustive, so a fifth kind cannot compile until every dispatch site handles it. |
+| Splitter | `class`, mutable, not thread-safe | `struct`, mutating methods | Value semantics; only ever touched on the main actor, so no `Sendable` question arises. |
+| Item ordering | inherits JSON object order | ties broken by id | Swift dictionaries have no stable iteration order, so items with no `position` would otherwise shuffle between builds. |
 | Error root | `abstract class PurseException` | `protocol PurseError` | Swift errors are values; a protocol lets session/API/checkout errors stay distinct types a caller can switch over. |
-| Suspension codes | 11 (3 web codes dropped as DOM-only) | 11 *(PR 6)* | iOS follows Android for consistency across native platforms. **SDK-12263's AC says 14 and must be amended.** |
+| Suspension codes | 11 (3 web codes dropped as DOM-only) | 11 | iOS follows Android for consistency across native platforms. **SDK-12263's AC says 14 and must be amended.** |
 | BNPL total | `initial + (count−2)×recurring + final` — fixes a web double-count | same *(PR 5)* | Web's figure is wrong in a credit disclosure; iOS keeps web's field names and Android's arithmetic. **Raise a web bug.** |
 | Partner discovery | `ServiceLoader` over `META-INF/services` | explicit `install()` *(PR 4)* | No `ServiceLoader` and no lazy class loading on this platform (stated in SDK-12264). Android already supports explicit install; iOS makes it the only path. |
 | Google Pay / Apple Pay | `:partner-googlepay` | `PurseCheckoutApplePay` *(PR 4)* | Not a rename — a different partner integration entirely. Net-new work, not a port. |
@@ -57,6 +75,6 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 
 | Web | Android | iOS |
 |---|---|---|
-| `mops` store | `paymentMethods` `StateFlow` | `paymentMethods` `@Published` *(PR 2)* |
-| `PurseHeadlessCheckout.init(widgetData)` | `init(widgetData, lockedEnvironment, hooks, options, disabledMethods)` | *(PR 2)* |
+| `mops` store | `paymentMethods` `StateFlow` | `paymentMethods` `@Published` |
+| `PurseHeadlessCheckout.init(widgetData)` | `init(widgetData, lockedEnvironment, hooks, options, disabledMethods)` | `init(widgetData:lockedEnvironment:disabledMethods:)` |
 | `teardown()` | `teardown()` | *(PR 6)* |
