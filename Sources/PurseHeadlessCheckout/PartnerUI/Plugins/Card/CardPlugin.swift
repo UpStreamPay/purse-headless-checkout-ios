@@ -4,6 +4,7 @@
 
 import Combine
 import Foundation
+import PurseSecureFields
 import UIKit
 
 /// The `purse`-vendor vault-backed card plugin — the protocol half, with no Secure Fields types in
@@ -141,7 +142,10 @@ struct CardModule: PartnerModule {
             selfSubmitting: false,
             makeView: {
                 guard coordinator.mode.rendersForm else { return nil }
-                let stack = UIStackView(arrangedSubviews: coordinator.fieldViews)
+                let theme = (context.options.theme ?? .default).resolve()
+                let stack = UIStackView(
+                    arrangedSubviews: coordinator.fieldViews.map { Self.matchingPAN($0, theme: theme) }
+                )
                 stack.axis = .vertical
                 stack.spacing = 12
                 return stack
@@ -157,6 +161,30 @@ struct CardModule: PartnerModule {
                 await request.captureNow()
             }
         )
+    }
+}
+
+extension CardModule {
+    /// The four field views do not arrive alike: `SecurePANContainer` ships its own chrome — a 48pt
+    /// rounded `.secondarySystemBackground` box holding the PAN field and the brand selector —
+    /// while the CVV, expiry and holder-name views are bare fields with no height and no background
+    @MainActor
+    static func matchingPAN(_ view: UIView, theme: PurseTheme.Resolved) -> UIView {
+        guard !(view is SecurePANContainer) else { return view }
+
+        view.translatesAutoresizingMaskIntoConstraints = false
+        let box = UIView()
+        box.backgroundColor = theme.input.backgroundColor ?? .secondarySystemBackground
+        box.layer.cornerRadius = 10
+        box.addSubview(view)
+        NSLayoutConstraint.activate([
+            view.topAnchor.constraint(equalTo: box.topAnchor, constant: 12),
+            view.leadingAnchor.constraint(equalTo: box.leadingAnchor, constant: 14),
+            view.trailingAnchor.constraint(equalTo: box.trailingAnchor, constant: -14),
+            view.bottomAnchor.constraint(equalTo: box.bottomAnchor, constant: -12),
+            box.heightAnchor.constraint(equalToConstant: 48),
+        ])
+        return box
     }
 }
 
