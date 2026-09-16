@@ -44,6 +44,8 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | `splitter/payment-splitter.ts` | `checkout/payment/split/PursePaymentSplitter.kt` | `Checkout/Payment/Split/PursePaymentSplitter.swift` |
 | `splitter/types.ts` | `checkout/payment/split/{PaymentSplit,SplitSource,PrimarySource}.kt` | `Checkout/Payment/Split/SplitSource.swift` |
 | secondaries token shape | `checkout/payment/secondary/SecondaryToken.kt` | `Checkout/Payment/Secondary/SecondaryToken.swift` |
+| `secondaries/configs/*.ts` | `checkout/payment/secondary/SecondaryConfig.kt` | `Checkout/Payment/Secondary/SecondaryConfig.swift` |
+| `secondaries` tokenization | `checkout/payment/secondary/SecondaryTokenizer.kt` | `Checkout/Payment/Secondary/SecondaryTokenizer.swift` |
 | `item-factory/factories.ts` | `checkout/session/PaymentSessionBuilder.kt` | `Checkout/Session/PaymentSessionBuilder.swift` |
 | `session/payment/payment.ts` | `checkout/session/PaymentSession.kt` | `Checkout/Session/PaymentSession.swift` |
 | `headless-checkout.ts` | `checkout/PurseHeadlessCheckout.kt` | `Checkout/PurseHeadlessCheckout.swift` |

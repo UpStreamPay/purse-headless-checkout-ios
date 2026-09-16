@@ -5,15 +5,17 @@
 import Foundation
 
 /// Builds the ready-to-consume ``PaymentSession`` from a decoded ``LegacyPaymentSession`` — web's
-/// `getSessionFromLegacy`. Turns `protocols` into the means-of-payment list and applies the
-/// build-time availability rules (against the full amount, before any split).
+/// `getSessionFromLegacy`. Turns `protocols` into the means-of-payment list and applies the build-
+/// time availability rules (against the full amount, before any split).
+@MainActor
 public enum PaymentSessionBuilder {
 
     /// - Parameter disabledMethods: methods this app build opts out of — dropped as if the session
     ///   did not offer them, their saved instruments included, whatever `protocols` says.
     public static func build(
         _ session: LegacyPaymentSession,
-        disabledMethods: Set<MethodKey> = []
+        disabledMethods: Set<MethodKey> = [],
+        configs: SecondaryConfigs? = nil
     ) -> PaymentSession {
         let isInformationRequest = session.informationRequest ?? (session.amount == nil || session.amount == 0)
         let amount = session.amount ?? 0
@@ -31,7 +33,8 @@ public enum PaymentSessionBuilder {
                 session,
                 isInformationRequest: isInformationRequest,
                 primaryReach: amount,
-                disabledMethods: disabledMethods
+                disabledMethods: disabledMethods,
+                configs: configs
             )
         )
     }
@@ -40,7 +43,8 @@ public enum PaymentSessionBuilder {
         _ session: LegacyPaymentSession,
         isInformationRequest: Bool,
         primaryReach: Decimal,
-        disabledMethods: Set<MethodKey>
+        disabledMethods: Set<MethodKey>,
+        configs: SecondaryConfigs?
     ) -> [PaymentItem] {
         var items: [PaymentItem] = []
 
@@ -78,10 +82,9 @@ public enum PaymentSessionBuilder {
                                 method: method,
                                 configuration: configuration,
                                 disabled: disabled,
-                                // ponytail: every issuer treated as splittable until SecondaryConfigs
-                                // lands in PR 4, which is where the per-issuer MAX policies live
-                                // (maxxing loyalty, easy2play vouchers).
-                                takePolicy: .none
+                                // The issuer's own policy: loyalty and vouchers are non-splittable.
+                                takePolicy: configs?
+                                    .config(partner: partner, method: method)?.takePolicy ?? .none
                             )))
                         } else {
                             items.append(.paymentToken(PaymentToken(

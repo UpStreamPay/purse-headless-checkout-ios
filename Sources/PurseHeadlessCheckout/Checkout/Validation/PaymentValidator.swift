@@ -11,6 +11,7 @@ struct PaymentValidator {
 
     let api: PaymentAPIClient
     let registry: PluginRegistry
+    let configs: SecondaryConfigs
 
     private struct Prepared {
         let plugin: any PartnerUIPlugin
@@ -30,11 +31,28 @@ struct PaymentValidator {
         var payloads: [ValidateItemPayload] = []
 
         for split in splits {
+            // A secondary split builds its payload from the issuer's own configuration — no plugin
+            // is involved, matching web.
+            if let token = split.source as? SecondaryToken {
+                guard let config = configs.config(partner: token.partner, method: token.method) else {
+                    // Refusing is the only safe answer: submitting without it would charge the
+                    // primary for the whole order while the shopper believes a gift card covered
+                    // part of it.
+                    throw PurseCheckoutError.noSecondaryConfig(itemId: token.id)
+                }
+                payloads.append(ItemPayload(
+                    partner: token.partner,
+                    method: token.method,
+                    amount: split.amount,
+                    paymentData: config.buildValidatePaymentData(token)
+                ))
+                continue
+            }
+
             guard let source = split.source as? any PrimarySource else {
-                // A secondary split needs its issuer's configuration to build a payload. Refusing is
-                // the only safe answer: submitting without it would charge the primary for the whole
-                // order while the shopper believes a gift card covered part of it.
-                throw PurseCheckoutError.noSecondaryConfig(itemId: split.source.id)
+                throw PurseCheckoutError.validateFailed(
+                    "unsupported split source \(split.source.id)", nil
+                )
             }
 
             guard let plugin = registry.plugin(partner: source.partner, method: source.method, session: session) else {

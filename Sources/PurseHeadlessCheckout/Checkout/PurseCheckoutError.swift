@@ -31,6 +31,10 @@ public enum PurseCheckoutError: PurseError {
     /// `/validate` **answered** — the payment exists, approved or declined — and a plugin's
     /// `postValidation` then threw.
     case postValidationFailed(result: ValidationResult, underlying: any Error)
+    /// A secondary instrument could not be tokenized — a refused `/init`, or an empty balance.
+    case secondaryTokenizationFailed(String, PurseErrorCode, underlying: (any Error)? = nil)
+    /// The PAN or CVV typed for a secondary method does not match that issuer's format.
+    case invalidSecondaryCard(String, PurseErrorCode)
 
     public var code: PurseErrorCode {
         switch self {
@@ -44,6 +48,8 @@ public enum PurseCheckoutError: PurseError {
         case .validateFailed: .validateFailed
         case let .hookFailed(_, _, code): code
         case .postValidationFailed: .postValidateFailed
+        case let .secondaryTokenizationFailed(_, code, _): code
+        case let .invalidSecondaryCard(_, code): code
         }
     }
 
@@ -52,6 +58,7 @@ public enum PurseCheckoutError: PurseError {
         case let .validateFailed(_, underlying): underlying
         case let .hookFailed(_, underlying, _): underlying
         case let .postValidationFailed(_, underlying): underlying
+        case let .secondaryTokenizationFailed(_, _, underlying): underlying
         default: nil
         }
     }
@@ -80,6 +87,10 @@ public enum PurseCheckoutError: PurseError {
             "the \(hook) hook failed: \(underlying)"
         case let .postValidationFailed(result, underlying):
             "validate answered \(result.globalStatus) but postValidation failed: \(underlying)"
+        case let .secondaryTokenizationFailed(detail, _, _):
+            detail
+        case let .invalidSecondaryCard(detail, _):
+            detail
         }
     }
 }

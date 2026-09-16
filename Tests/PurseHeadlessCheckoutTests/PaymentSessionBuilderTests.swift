@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import PurseHeadlessCheckout
 
+@MainActor
 struct PaymentSessionBuilderTests {
 
     private func build(
