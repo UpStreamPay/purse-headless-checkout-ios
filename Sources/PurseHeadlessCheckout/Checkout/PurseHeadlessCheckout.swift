@@ -32,8 +32,13 @@ public final class PurseHeadlessCheckout: ObservableObject {
     public var currentSessionId: String { session.id }
 
     private let environment: PurseEnvironment
-    /// Kept so ``setSession(_:)`` can re-apply the same trust decision to the incoming blob.
+    /// The override actually passed at creation, if any — kept separately from the resolved
+    /// ``environment`` because two things need the *decision*, not its result: ``setSession(_:)``
+    /// re-applies the same trust rule to the incoming blob's `api_url`, and ``saveState()`` hands
     private let lockedEnvironment: PurseEnvironment?
+    /// The `widget.data` string decoded at creation — kept only so ``saveState()`` can round-trip
+    /// the exact session ``restore(_:hooks:registry:secondaryConfigs:urlSession:)`` rebuilds from.
+    private var widgetData: String
 
     // MARK: Published state
 
@@ -41,6 +46,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
     @Published public private(set) var session: PaymentSession
 
     @Published public private(set) var sessionState: SessionState = .ready
+
+    /// `true` once ``teardown()`` ran. Every further operation that touches the network or mutates
+    /// the session throws ``PurseCheckoutError/checkoutTornDown``.
+    @Published public private(set) var isTornDown = false
 
     /// Selectable means of payment: primary and secondary **methods** only. Saved instruments have
     /// their own properties (``paymentTokens``, ``savedSecondaryTokens``), and filtered-disabled
@@ -114,9 +123,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
     ) throws {
         let params = try SessionCodec.decode(widgetData)
         self.params = params
+        self.widgetData = widgetData
+        self.lockedEnvironment = lockedEnvironment
         let environment = lockedEnvironment ?? params.environment
         self.environment = environment
-        self.lockedEnvironment = lockedEnvironment
         self.paymentAPIRoot = Self.resolveAPIRoot(params, locked: lockedEnvironment, environment: environment)
         self.disabledMethods = disabledMethods
         self.hooks = hooks
@@ -194,15 +204,23 @@ public final class PurseHeadlessCheckout: ObservableObject {
         return declared
     }
 
-    /// The Payment API client for the session in force.
+    /// The Payment API client for the session in force. Every network path goes through here, so
+    /// one guard covers them all — web's `apiClient()`.
     private var api: PaymentAPIClient {
-        PaymentAPIClient(
-            apiKey: params.apiKey,
-            apiRoot: paymentAPIRoot,
-            entityId: params.entityId,
-            sessionId: session.id,
-            session: urlSession
-        )
+        get throws {
+            try requireOpen()
+            return PaymentAPIClient(
+                apiKey: params.apiKey,
+                apiRoot: paymentAPIRoot,
+                entityId: params.entityId,
+                sessionId: session.id,
+                session: urlSession
+            )
+        }
+    }
+
+    private func requireOpen() throws {
+        if isTornDown { throw PurseCheckoutError.checkoutTornDown }
     }
 
     // MARK: Submitting
@@ -211,6 +229,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// `postValidation`.
     @discardableResult
     public func submitPayment(skipOnBeforeValidate: Bool = false) async throws -> ValidationResult {
+        try requireOpen()
         try await acquireSubmitLock()
 
         guard splitter.fulfilled else {
@@ -229,7 +248,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
             refresh()
         }
 
-        let validator = PaymentValidator(api: api, registry: registry, configs: configs)
+        let validator = PaymentValidator(api: try api, registry: registry, configs: configs)
         let result: ValidationResult
         do {
             result = try await validator.execute(
@@ -491,6 +510,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// Hand the checkout a **new** Client Session without tearing the screen down — the cart
     /// changed, or the previous session expired and your backend minted a fresh one.
     public func setSession(_ widgetData: String) throws {
+        try requireOpen()
         // Never while a submit is in flight. `submitPayment` suspends at `await validator.execute`,
         // releasing the main actor, and a `setSession` landing in that window replaces the session,
         // resets the splitter and clears `validationConsumed` — so when `/validate` answers, the
@@ -540,6 +560,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
         }
 
         params = newParams
+        // The blob too, not just the decoded params: `saveState()` serialises this, so leaving it
+        // pinned to the first session meant a restore rebuilt a **superseded** one — matched
+        // `primaryId` and `secondaries` against the wrong catalogue, on a session that is typically
+        self.widgetData = widgetData
         session = built
         meansOfPayment = built.meansOfPayment
         fulfilledByItem = fulfilledByItem.filter { survivingIds.contains($0.key) }
@@ -633,12 +657,14 @@ public final class PurseHeadlessCheckout: ObservableObject {
             if case let .savedSecondaryToken(token) = item { return token }
             return nil
         }
-        guard !saved.isEmpty else {
+        // `try?`, not `try`: this fires from `init`/`setSession`, neither of which can be torn
+        // down yet, and a pathological same-tick `teardown()` should just skip the resolution
+        // rather than propagate — nothing here is a merchant-visible entry point to fail loudly.
+        guard !saved.isEmpty, let api = try? api else {
             pendingSecondaryBalanceResolution = nil
             return
         }
 
-        let api = self.api
         pendingSecondaryBalanceResolution = Task {
             for token in saved {
                 await self.resolveSavedSecondaryBalance(token, api: api)
@@ -917,5 +943,111 @@ public final class PurseHeadlessCheckout: ObservableObject {
               apiError.errorCode == "INVALID_LOAN_SIMULATION" || apiError.status != nil
         else { return error }
         return PurseCheckoutError.loanSimulationFailed(apiError.message, underlying: apiError)
+    }
+
+    // MARK: State restoration
+
+    /// Snapshot this checkout for ``restore(_:hooks:registry:secondaryConfigs:urlSession:)`` after
+    /// process death: the session's `widget.data`, the primary selection, the applied gift cards
+    /// and their slices, the save decisions, what the native steps collected (JSON-representable
+    public func saveState() throws -> CheckoutSavedState {
+        try requireOpen()
+        let secondaries: [(token: SecondaryToken, amount: Decimal)] = splitter.splits.compactMap { split in
+            (split.source as? SecondaryToken).map { ($0, split.amount) }
+        }
+        return CheckoutSavedState(
+            widgetData: widgetData,
+            lockedEnvironment: lockedEnvironment,
+            disabledMethods: disabledMethods,
+            instanceId: instanceId,
+            primaryId: splitter.primaryMethod?.id,
+            secondaries: secondaries,
+            registrationByMethod: registrationByMethod,
+            registrationBySecondaryToken: registrationBySecondaryToken,
+            collectedByItem: collectedByItem,
+            submitted: validationConsumed || sessionState == .submitting || sessionState == .submitted,
+            savedAt: Date()
+        )
+    }
+
+    /// Rebuild a checkout from a ``CheckoutSavedState`` — after the process was killed while the
+    /// shopper was in a bank app, PayPal or a 3-D Secure page.
+    public static func restore(
+        _ state: CheckoutSavedState,
+        hooks: PurseCheckoutHooks? = nil,
+        registry: PluginRegistry = .shared,
+        secondaryConfigs: SecondaryConfigs = .shared,
+        urlSession: URLSession = .shared
+    ) throws -> PurseHeadlessCheckout {
+        let checkout = try PurseHeadlessCheckout(
+            widgetData: state.widgetData,
+            lockedEnvironment: state.lockedEnvironment,
+            disabledMethods: state.disabledMethods,
+            hooks: hooks,
+            registry: registry,
+            secondaryConfigs: secondaryConfigs,
+            instanceId: state.instanceId,
+            urlSession: urlSession
+        )
+        checkout.applySavedState(state)
+        return checkout
+    }
+
+    private func applySavedState(_ state: CheckoutSavedState) {
+        registrationByMethod.merge(state.registrationByMethod) { _, new in new }
+        registrationBySecondaryToken.merge(state.registrationBySecondaryToken) { _, new in new }
+        for (id, data) in state.collectedByItem { collectedByItem[id] = data }
+        for (token, amount) in state.secondaries {
+            // A slice the new session cannot honour (a smaller order, a spent usage limit) is
+            // dropped rather than failing the whole restore.
+            try? splitter.takeSplit(token, requestedAmount: amount)
+        }
+        if let primaryId = state.primaryId { restoreSavedPrimary(id: primaryId) }
+        if state.submitted { markSubmittedBeforeDeath() }
+        refresh()
+    }
+
+    /// Distinct from ``restorePrimary(id:)``, which `setSession` uses for a primary already known
+    /// to survive: a saved primary might no longer be selectable at all (disabled, or gone), so
+    /// this checks first and skips silently rather than assuming.
+    private func restoreSavedPrimary(id: String) {
+        guard let item = meansOfPayment.first(where: { $0.id == id }), item.disabled == nil else { return }
+        switch item {
+        case let .primaryMethod(method):
+            splitter.setPrimary(method)
+        case let .paymentToken(token):
+            // Armed at selection, as setPrimaryToken does: a CVV-gated token stays unfulfilled
+            // until its form says otherwise.
+            if token.requiresCVV { fulfilledByItem[token.id] = fulfilledByItem[token.id] ?? false }
+            splitter.setPrimary(token)
+        default:
+            break
+        }
+    }
+
+    /// A `/validate` left the device before the process died: the session's one submit is spent
+    /// whatever the answer was. Never send another; the merchant confirms the outcome.
+    private func markSubmittedBeforeDeath() {
+        validationConsumed = true
+        if sessionState != .expired, sessionState != .terminated {
+            sessionState = .submitted
+        }
+    }
+
+    // MARK: Teardown
+
+    /// Releases everything this checkout owns — cancels any in-flight background work (the saved
+    /// secondary token balance resolution, the wallet sync) and marks the checkout closed. Web's
+    /// `teardown()`.
+    public func teardown() {
+        guard !isTornDown else { return }
+        isTornDown = true
+        pendingSecondaryBalanceResolution?.cancel()
+        pendingWalletSync?.cancel()
+        pendingClockSync?.cancel()
+        // Otherwise it keeps waking every five seconds for the life of the process. It holds `self`
+        // weakly so it would end on deallocation anyway, but a merchant who tears down and keeps
+        // the object around is exactly who called this.
+        expiryWatchdog?.cancel()
     }
 }

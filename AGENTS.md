@@ -280,6 +280,27 @@ assumed either way, and documented on the type itself rather than silently wired
    Android, recorded in the module layout docs.
 4. Mirror the Android plugin's `/init` timing and failure modes — `docs/plugins/` there is per-PSP.
 
+## No concrete `PluginHost` exists yet
+
+Every coordinator (`CardCoordinator`, `ApplePayCoordinator`, `PayPalCoordinator`, `KlarnaCoordinator`)
+takes `host: any PluginHost` as an init parameter, but nothing in this repo implements that protocol
+— `PurseHeadlessCheckout` does not conform to it, and there is no `host(item:)`-style factory either.
+Every plugin test constructs a bare `PartnerUIContext` directly instead. This is fine for what has
+been tested so far (the protocol half of each plugin), but a real merchant integration — and the
+eventual Demo app — needs this seam built before a coordinator can actually reach a live checkout.
+Don't assume it exists when writing anything that touches a coordinator; check first.
+
+## Error codes with no dedicated case still need a real carrier
+
+`PurseErrorCodeCoverageTests` asserts every `PurseErrorCode` is producible by some `PurseError`
+value, not that a dedicated `case` exists for each. Several `PurseCheckoutError` cases
+(`hookFailed`, `invalidTake`, `invalidSecondaryCard`, `secondaryTokenizationFailed`,
+`walletOperationFailed`) take an explicit `PurseErrorCode` parameter for exactly this reason —
+`.postValidateFailed` and `.uiValidationFailedError`, say, have no case of their own and are raised
+through `hookFailed(hook:underlying:code:)` instead. Adding a new `PurseErrorCode` case does not by
+itself require a new `PurseCheckoutError` case: check whether an existing flexible carrier already
+covers it before adding one.
+
 ## Repo layout
 
 ```

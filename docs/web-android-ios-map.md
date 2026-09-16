@@ -82,6 +82,8 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 
 | Topic | Android | iOS | Why |
 |---|---|---|---|
+| `teardown()` and plugin `destroyClient` | tracks every live plugin instance in `activePlugins`, calls `destroyClient` on each at teardown | calls none — no persistent plugin instance exists to call it on | iOS never retains a plugin across calls: each submit resolves and discards its own via `PluginRegistry.plugin(...)`, and each coordinator (`CardCoordinator`, `ApplePayCoordinator`, …) is a separate object the merchant already owns and releases with its own UI. There is currently no `PluginHost` implementation shipped at all on iOS (see the next row) — `destroyClient` has no call site to reach even if a future one wanted to invoke it. |
+| A concrete `PluginHost` | `PurseHeadlessCheckout.host(item)` implements it | **not implemented yet, by any type** | Every coordinator (`CardCoordinator` etc.) takes `host: any PluginHost` as an init parameter, and every plugin test constructs a bare `PartnerUIContext` directly rather than going through a real host — real end-to-end use (the eventual Demo app) needs this seam built. Flagged, not silently worked around; tracked for the Demo app / SDK-12266 work. |
 | Free-form JSON | `org.json.JSONObject` | `JSONValue` enum | `JSONObject` is a mutable reference type; Swift 6 needs a `Sendable` value type to cross an actor boundary. Also fixes decimal precision: numbers keep their literal text instead of going through `Double`. |
 | Networking | blocking `HttpURLConnection`, callers hop to `Dispatchers.IO` | `async` `URLSession` | Nothing to offload — and nothing in the call path touches the main actor, so "no network on the main thread" is enforced by the compiler (SDK-12263). |
 | `InitGuard` | `object` + `synchronized` + `CountDownLatch` | `actor` + `Task` | Same three behaviours (coalesce, retry, fast-reject); waiters await the leader's `Task` rather than a latch. |
@@ -133,4 +135,7 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 |---|---|---|
 | `mops` store | `paymentMethods` `StateFlow` | `paymentMethods` `@Published` |
 | `PurseHeadlessCheckout.init(widgetData)` | `init(widgetData, lockedEnvironment, hooks, options, disabledMethods)` | `init(widgetData:lockedEnvironment:disabledMethods:)` |
-| `teardown()` | `teardown()` | *(PR 6)* |
+| `teardown()` | `teardown()` | `teardown()` *(PR #14)* |
+| `saveState()`/`restore()` | `CheckoutSavedState`, `PurseHeadlessCheckout.saveState()`/`.restore()` | `CheckoutSavedState`, `saveState()`/`PurseHeadlessCheckout.restore(_:)` *(PR #14)* |
+| `apiClient()` as the one teardown choke point | `requireOpen()` called from `apiClient()`, `setSession`, `host()` | `requireOpen()` called from the `api` `get throws` computed property, `setSession`, `submitPayment`, `saveState` *(PR #14)* — iOS has no `host()` equivalent, see the divergence row below |
+| `PurseErrorCodeCoverageTest` | one exception instance per code, several reused generically via an explicit `code` parameter | `PurseErrorCodeCoverageTests` *(PR #14)* — identical technique: `hookFailed`/`invalidTake`/`invalidSecondaryCard`/`secondaryTokenizationFailed`/`walletOperationFailed` each accept an explicit `PurseErrorCode`, so a code with no single dedicated case still gets a real carrier |
