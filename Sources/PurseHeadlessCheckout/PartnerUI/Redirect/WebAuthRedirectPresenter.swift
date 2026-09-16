@@ -207,16 +207,27 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
         load()
     }
 
-    private func load() {
+    /// What the first navigation should be. Pulled out of ``load()`` so it can be tested without a
+    /// view lifecycle: the `.get` case was unreachable and answered "a GET redirect belongs in the
+    /// browser, not this view" until `prefersInAppWebView` started routing here, and nothing could
+    enum FirstLoad: Equatable {
+        case request(URL)
+        case html(String, baseURL: URL?)
+        case refused(String)
+    }
+
+    static func firstLoad(for action: RedirectAction, policy: RedirectPolicy) -> FirstLoad {
+        func allowed(_ raw: String) -> URL? {
+            guard let url = URL(string: raw), policy.allowsLoading(url) else { return nil }
+            return url
+        }
+
         switch action {
         case let .postForm(url, formData, _):
-            guard let url = URL(string: url), policy.allowsLoading(url) else {
-                finish(.failure(PartnerUIError("refused redirect url: \(action.targetURL ?? "")")))
-                return
-            }
+            guard let url = allowed(url) else { return .refused(action.targetURL ?? "") }
             // Not `URLRequest.httpBody` + `load(_:)`: WebKit drops the body of a `load(_:)` request,
             // so the ACS would get an empty POST and answer 400 — see `FormRedirectHTML`.
-            webView.loadHTMLString(
+            return .html(
                 FormRedirectHTML.autoSubmitting(actionURL: url.absoluteString, dataString: formData),
                 baseURL: url
             )
@@ -224,10 +235,25 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
         case let .postHTML(html, _):
             // The server sent literal markup to inject and auto-submit. There is no base URL to
             // resolve against, which also means relative loads cannot escape to an unexpected host.
-            webView.loadHTMLString(html, baseURL: nil)
+            return .html(html, baseURL: nil)
 
-        case .get:
-            finish(.failure(PartnerUIError("a GET redirect belongs in the browser, not this view")))
+        case let .get(url, _):
+            // Reached when the host set `prefersInAppWebView`, which is what Android does for every
+            // case. Policy is re-checked here because this is the only gate on the first
+            // navigation — the delegate below sees every hop after it, not this one.
+            guard let url = allowed(url) else { return .refused(action.targetURL ?? "") }
+            return .request(url)
+        }
+    }
+
+    private func load() {
+        switch Self.firstLoad(for: action, policy: policy) {
+        case let .request(url):
+            webView.load(URLRequest(url: url))
+        case let .html(html, baseURL):
+            webView.loadHTMLString(html, baseURL: baseURL)
+        case let .refused(url):
+            finish(.failure(PartnerUIError("refused redirect url: \(url)")))
         }
     }
 

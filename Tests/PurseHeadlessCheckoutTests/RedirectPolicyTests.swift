@@ -99,3 +99,63 @@ struct RedirectPolicyTests {
         #expect(all.count == 2)
     }
 }
+
+/// What the in-app web view loads first, for each action shape. The `.get` case used to answer "a
+/// GET redirect belongs in the browser, not this view" — true while only the browser served GETs,
+/// and wrong the moment `prefersInAppWebView` existed.
+@MainActor
+struct RedirectFirstLoadTests {
+
+    private let policy = RedirectPolicy(
+        returnDestination: .universalLink(host: "return.example", path: "/done")
+    )
+
+    private func firstLoad(_ action: RedirectAction) -> RedirectWebViewController.FirstLoad {
+        RedirectWebViewController.firstLoad(for: action, policy: policy)
+    }
+
+    @Test func aGetIsLoadedRatherThanRefused() {
+        let url = "https://acs.bank.example/3ds"
+        #expect(firstLoad(.get(url: url)) == .request(URL(string: url)!))
+    }
+
+    @Test func aPostFormBecomesAnAutoSubmittingPage() throws {
+        let action = RedirectAction.postForm(url: "https://acs.bank.example/3ds", formDataURLEncoded: "a=1")
+        guard case let .html(html, baseURL) = firstLoad(action) else {
+            Issue.record("expected html, got \(firstLoad(action))")
+            return
+        }
+        // WebKit drops a `load(_:)` body, so the POST has to be a real form the page submits.
+        #expect(html.contains("form"))
+        #expect(baseURL == URL(string: "https://acs.bank.example/3ds"))
+    }
+
+    @Test func serverSentMarkupGetsNoBaseURL() {
+        guard case let .html(_, baseURL) = firstLoad(.postHTML(html: "<form></form>")) else {
+            Issue.record("expected html")
+            return
+        }
+        // No base URL also means a relative load cannot escape to an unexpected host.
+        #expect(baseURL == nil)
+    }
+
+    /// The first navigation is the one the delegate never sees, so it is the one this must gate.
+    @Test func aDisallowedURLIsRefusedForEveryShape() {
+        let blocked = RedirectPolicy(
+            returnDestination: .universalLink(host: "return.example", path: "/done"),
+            additionalAllowedHosts: ["allowed.example"]
+        )
+        let actions: [RedirectAction] = [
+            .get(url: "https://evil.example/x"),
+            .postForm(url: "https://evil.example/x", formDataURLEncoded: "a=1"),
+        ]
+        for action in actions {
+            let load = RedirectWebViewController.firstLoad(for: action, policy: blocked)
+            #expect(load == .refused("https://evil.example/x"))
+        }
+    }
+
+    @Test func aNonHTTPSGetIsRefused() {
+        #expect(firstLoad(.get(url: "http://acs.bank.example/3ds")) == .refused("http://acs.bank.example/3ds"))
+    }
+}
