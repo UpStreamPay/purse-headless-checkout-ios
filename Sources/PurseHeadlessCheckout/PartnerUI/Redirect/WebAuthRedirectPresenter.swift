@@ -163,6 +163,8 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
     private let action: RedirectAction
     private let policy: RedirectPolicy
     private var completion: ((Result<RedirectOutcome, any Error>) -> Void)?
+    /// A return URL seen with no status token, kept in case none ever carries one.
+    private var bareReturn: URL?
     private lazy var webView = WKWebView(frame: .zero, configuration: configuration)
 
     private var configuration: WKWebViewConfiguration {
@@ -261,14 +263,28 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
     /// usually redirects to the merchant's configured return page rather than straight to the app's
     /// scheme.
     static func isReturn(_ url: URL, action: RedirectAction, policy: RedirectPolicy) -> Bool {
-        if policy.isReturn(url) { return true }
-        if let prefix = action.returnURLPrefix, !prefix.isEmpty,
-           url.absoluteString.hasPrefix(prefix) {
-            return true
-        }
+        returnKind(url, action: action, policy: policy) != .notReturn
+    }
+
+    /// What reaching `url` means for the flow.
+    enum ReturnKind: Equatable {
+        /// A return carrying `purse-redirection-data`: the outcome is in the URL. Finish here.
+        case reported
+        /// A return with nothing to report yet. The token usually arrives one hop later, so keep
+        /// loading and settle for this only if none ever does.
+        case bare
+        case notReturn
+    }
+
+    static func returnKind(_ url: URL, action: RedirectAction, policy: RedirectPolicy) -> ReturnKind {
+        let text = url.absoluteString
         // The widget's own confirmation hop carries the result the caller already has, and is caught
         // even when no return URL is configured.
-        return url.absoluteString.isWidgetConfirmationRedirect
+        if text.isWidgetConfirmationRedirect { return .reported }
+
+        let isReturn = policy.isReturn(url)
+            || (action.returnURLPrefix.map { !$0.isEmpty && text.hasPrefix($0) } ?? false)
+        return isReturn ? .bare : .notReturn
     }
 
     @objc private func cancelTapped() {
@@ -295,13 +311,26 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
             return
         }
 
-        if Self.isReturn(url, action: action, policy: policy) {
+        switch Self.returnKind(url, action: action, policy: policy) {
+        case .reported:
             decisionHandler(.cancel)
             finish(.success(.returned(url: url)))
-            return
+        case .bare:
+            // Let it load. The status token usually arrives on the next hop, and closing on the
+            // first return-shaped URL throws away the only report of the outcome this client ever
+            // gets. `didFinish` settles for this one if nothing more comes.
+            bareReturn = url
+            decisionHandler(.allow)
+        case .notReturn:
+            decisionHandler(policy.allowsLoading(url) ? .allow : .cancel)
         }
+    }
 
-        decisionHandler(policy.allowsLoading(url) ? .allow : .cancel)
+    /// The return page finished loading and no `purse-redirection-data` ever appeared. Report the
+    /// return anyway — the shopper is plainly back — rather than leaving them on the page.
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard let url = bareReturn else { return }
+        finish(.success(.returned(url: url)))
     }
 
     /// A server-side `302` chain does not reliably re-enter `decidePolicyFor`, and the last hop of
@@ -311,8 +340,12 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
         _ webView: WKWebView,
         didReceiveServerRedirectForProvisionalNavigation navigation: WKNavigation!
     ) {
-        guard let url = webView.url, Self.isReturn(url, action: action, policy: policy) else { return }
-        finish(.success(.returned(url: url)))
+        guard let url = webView.url else { return }
+        switch Self.returnKind(url, action: action, policy: policy) {
+        case .reported: finish(.success(.returned(url: url)))
+        case .bare: bareReturn = url
+        case .notReturn: break
+        }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {

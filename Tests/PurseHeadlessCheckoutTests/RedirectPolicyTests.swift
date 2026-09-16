@@ -174,6 +174,10 @@ struct RedirectReturnDetectionTests {
         RedirectWebViewController.isReturn(URL(string: raw)!, action: action, policy: policy)
     }
 
+    private func kind(_ raw: String, action: RedirectAction) -> RedirectWebViewController.ReturnKind {
+        RedirectWebViewController.returnKind(URL(string: raw)!, action: action, policy: policy)
+    }
+
     private let plain = RedirectAction.get(url: "https://acs.bank.example/3ds")
 
     @Test func thePolicysOwnDestinationEndsTheFlow() {
@@ -204,5 +208,38 @@ struct RedirectReturnDetectionTests {
     @Test func theQueryStringIsNotPartOfTheMatch() {
         #expect(isReturn("https://return.example/done", action: plain))
         #expect(isReturn("https://return.example/done?purse-redirection-data=a.b.c&foo=1", action: plain))
+    }
+}
+
+/// Closing on the first return-shaped URL throws away the outcome: the status token usually arrives
+/// one hop later. A return is only worth finishing on once it reports something.
+@MainActor
+struct RedirectReturnKindTests {
+
+    private let policy = RedirectPolicy(
+        returnDestination: .universalLink(host: "cdn.purse-dev.com", path: "/return/done.html")
+    )
+    private let action = RedirectAction.get(url: "https://acs.bank.example/3ds")
+
+    private func kind(_ raw: String) -> RedirectWebViewController.ReturnKind {
+        RedirectWebViewController.returnKind(URL(string: raw)!, action: action, policy: policy)
+    }
+
+    @Test func aReturnWithNoTokenIsNotWorthFinishingOn() {
+        #expect(kind("https://cdn.purse-dev.com/return/done.html") == .bare)
+    }
+
+    @Test func aReturnCarryingTheTokenIs() {
+        #expect(kind("https://cdn.purse-dev.com/return/done.html?purse-redirection-data=a.b.c") == .reported)
+    }
+
+    /// The token is what makes a URL worth finishing on, wherever it appears — a session that
+    /// configured no return URL still ends here.
+    @Test func theTokenAloneIsEnough() {
+        #expect(kind("https://somewhere.else.example/x?purse-redirection-data=a.b.c") == .reported)
+    }
+
+    @Test func anOrdinaryChallengeHopIsNeither() {
+        #expect(kind("https://acs.bank.example/3ds/step2") == .notReturn)
     }
 }
