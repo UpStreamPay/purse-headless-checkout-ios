@@ -21,13 +21,14 @@ packages:
 
 | Directory | Android package | Mirrors web | Responsibility |
 |---|---|---|---|
-| `Core/` | `eu.purse.core` | `sdk` + `model` + `common` | Payment API client, environment targets, the `Partner`/`Method`/`VaultVendor`/`CardBrand` enums, `MethodConfiguration`, the raw `LegacyPaymentSession` DTO and its base64 `widget.data` decode, the typed `ItemPayload`/`ValidationResult`. No orchestration. |
+| `Core/` | `eu.purse.core` | `sdk` + `model` + `common` | Payment API client, environment targets, the `Partner`/`PaymentMethod`/`VaultVendor`/`CardBrand` enums, `MethodConfiguration`, the raw `LegacyPaymentSession` DTO and its base64 `widget.data` decode, the typed `ItemPayload`/`ValidationResult`. No orchestration. |
 | `PartnerUI/` | `eu.purse.partnerui` | `partner-ui` | The plugin lifecycle contract, the shared redirect machinery, and the two plugins every merchant gets: Purse-vault card (wrapping `PurseSecureFields`) and the generic redirection template. |
-| `Checkout/` | `eu.purse.checkout` | `headless-checkout` | `PurseHeadlessCheckout`: session state, the built payment model, the splitter, the plugin-driven create-payment pipeline, payment elements. |
+| `Checkout/` | `eu.purse.checkout` | `headless-checkout` | `PurseHeadlessCheckout`: session state, the built payment model, the splitter, the create-payment pipeline, and confirmation from the session's transactions. |
+| `Element/` | `eu.purse.checkout.element` | — | `PaymentElement`, its surface and listener: one `hasUI`/`isReady`/`submit()` shape per method, whatever the partner renders. |
 
 Dependency direction: `Checkout → {PartnerUI, Core}`, `PartnerUI → Core`, never back. `PartnerUI`
 reaches the engine only through the `PluginHost` protocol, implemented by
-`PurseHeadlessCheckout.host(item)` — the same seam Android uses to keep its `partnerui` package
+`PurseHeadlessCheckout.host(for:)` — the same seam Android uses to keep its `partnerui` package
 from depending on `checkout`.
 
 ## The Purse-payment concept
@@ -46,7 +47,7 @@ from depending on `checkout`.
 ## Amount units
 
 Amounts in a session are decimal major-currency-unit values (`payment_min_amount: 0.01`), carried as
-`Decimal` and parsed from the JSON **literal text**, never through `Double`. The splitter will work
+`Decimal` and parsed from the JSON **literal text**, never through `Double`. The splitter works
 in integer cents internally. See the invariant in [AGENTS.md](../../AGENTS.md).
 
 ## Environments
