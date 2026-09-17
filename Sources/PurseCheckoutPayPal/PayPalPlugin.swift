@@ -7,8 +7,8 @@ import PaymentButtons
 import UIKit
 import PurseHeadlessCheckout
 
-/// The PayPal **wallet** (pay-now) plugin — the protocol half, no PayPal SDK types. PayPal is the
-/// one method whose native step leaves the app and back, and it happens **before** `/validate`.
+/// The PayPal **wallet** (pay-now) plugin — the protocol half, no PayPal SDK types. Its native step
+/// leaves the app and comes back **before** `/validate`, where Klarna's authorize runs after it.
 public struct PayPalPlugin: PartnerUIPlugin {
 
     /// Keys ``PayPalCoordinator`` uses in `setCollected` for what the approval produced.

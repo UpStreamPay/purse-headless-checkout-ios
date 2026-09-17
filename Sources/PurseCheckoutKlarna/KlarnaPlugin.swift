@@ -6,8 +6,12 @@ import Foundation
 import UIKit
 import PurseHeadlessCheckout
 
-/// The shopper declined Klarna's own authorization. Distinct from ``PartnerUIError`` so it can be
-/// reported as a cancellation, not a failure — Android's `KlarnaAuthorizationDeclined`.
+/// The shopper declined Klarna's own authorization, thrown from `postValidation` — so `/validate`
+/// has already answered and the session is spent.
+///
+/// A distinct type so a host can match on it rather than on a message. It still carries
+/// `partnerUIError` and still surfaces as a failed outcome: nothing maps it to `.canceled`, whatever
+/// Android does with its own `KlarnaAuthorizationDeclined`.
 public struct KlarnaAuthorizationDeclined: PurseError {
     public var code: PurseErrorCode { .partnerUIError }
     public var message: String { "Klarna declined to authorize" }
