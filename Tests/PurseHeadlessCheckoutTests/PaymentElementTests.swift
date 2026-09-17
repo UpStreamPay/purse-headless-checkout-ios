@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import PurseHeadlessCheckout
 
@@ -299,5 +300,26 @@ struct PaymentElementTests {
 
         #expect(StubURLProtocol.paths(host: Self.host).filter { $0.hasSuffix("/validate") }.count == 1)
         #expect(spy.outcomes.count == 1)
+    }
+}
+
+/// The height rule behind `PaymentElementView.sizeThatFits`. Extracted because a
+/// `UIViewRepresentableContext` cannot be built in a test, so the branch is tested on its own.
+@Suite
+struct PaymentElementSizingTests {
+
+    /// Apple Pay and PayPal have different intrinsic heights; an express row that stacks both needs
+    /// one height, and asking for it must win over either.
+    @Test func anExplicitHeightIsHonoured() {
+        #expect(PaymentElementView.explicitHeight(ProposedViewSize(width: 320, height: 48)) == 48)
+    }
+
+    /// "Size yourself" in its three spellings. Each must fall through to the partner view's own
+    /// height — returning 0 or infinity here would collapse or explode the row.
+    @Test func anUnspecifiedHeightFallsBackToTheIntrinsicOne() {
+        #expect(PaymentElementView.explicitHeight(ProposedViewSize(width: 320, height: nil)) == nil)
+        #expect(PaymentElementView.explicitHeight(ProposedViewSize(width: 320, height: .infinity)) == nil)
+        #expect(PaymentElementView.explicitHeight(ProposedViewSize(width: 320, height: 0)) == nil)
+        #expect(PaymentElementView.explicitHeight(.unspecified) == nil)
     }
 }

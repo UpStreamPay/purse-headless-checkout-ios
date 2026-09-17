@@ -34,11 +34,27 @@ public struct PaymentElementView: UIViewRepresentable {
     /// Without this the container reports zero height in a `VStack` and the form collapses.
     public func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIView, context: Context) -> CGSize? {
         let width = proposal.width ?? UIView.layoutFittingCompressedSize.width
+
+        if let height = Self.explicitHeight(proposal) {
+            return CGSize(width: width, height: height)
+        }
+
         let fitting = uiView.systemLayoutSizeFitting(
             CGSize(width: width, height: UIView.layoutFittingCompressedSize.height),
             withHorizontalFittingPriority: .required,
             verticalFittingPriority: .fittingSizeLevel
         )
         return CGSize(width: width, height: fitting.height)
+    }
+
+    /// The height a host explicitly asked for, or `nil` for the partner view's own.
+    ///
+    /// The partner's view is pinned to all four container edges, so it stretches to fill. Apple Pay
+    /// and PayPal have different intrinsic heights (~30pt and ~43pt), so an express row stacking
+    /// both would otherwise get two button heights. An unspecified, infinite or non-positive
+    /// proposal means "size yourself".
+    static func explicitHeight(_ proposal: ProposedViewSize) -> CGFloat? {
+        guard let height = proposal.height, height.isFinite, height > 0 else { return nil }
+        return height
     }
 }
