@@ -92,9 +92,9 @@ Same keys on all three platforms; each is a config, not a plugin.
 
 | Other secondaries behaviour | Web | Android | iOS |
 |---|---|---|---|
-| Saved gift cards (`integrated_tokens` on a secondary) | ✅ | ✅ | ✅ — background balance resolution, sequential per `/init` (PR #11) |
+| Saved gift cards (`integrated_tokens` on a secondary) | ✅ | ✅ | ✅ — background balance resolution, sequential per `/init` |
 | Keep a temporary gift card (registration) | ✅ | ✅ | ✅ |
-| Host-registered issuer config | — (static table) | ✅ `SecondaryConfigs.register` | ✅ `SecondaryConfigs.register` — same extension point on both native platforms, the literal SDK-12261 AC |
+| Host-registered issuer config | — (static table) | ✅ `SecondaryConfigs.register` | ✅ `SecondaryConfigs.register` — same extension point on both native platforms |
 | Splitter autofill middlewares (voucher → loyalty → primary) | ✅ | ❌ | ❌ |
 
 ## Reading the matrix

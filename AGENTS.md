@@ -88,7 +88,7 @@ pins the whole set. Adding a code means adding it on the other platforms too, or
 Swift 6 language mode, strict concurrency, and it currently compiles clean — keep it that way.
 
 - Networking is `async` on `URLSession` and touches no actor. That is what keeps SDK network calls
-  off the main thread *by construction* rather than by convention (SDK-12263).
+  off the main thread *by construction* rather than by convention.
 - Shared mutable state is an `actor` (`InitGuard`, `ServerDatetimeChecker`), not a lock.
 - `ISO8601DateFormatter` is **not** `Sendable`. It is built per call in `ISO8601Date.parse` rather
   than cached in a static. Do not "optimise" that into a shared instance.
@@ -247,7 +247,7 @@ This is how Klarna's `finalise` (British spelling, not `finalize`) and the exact
 would not have caught either.
 
 **The same discipline applies to our own dependencies, not just PayPal/Klarna.** `PurseTheme`
-(SDK-12262) was designed against an *assumed* gap — "Secure Fields has no styling API, so theming
+was designed against an *assumed* gap — "Secure Fields has no styling API, so theming
 has no real integration point yet" — until its actual `SecureFieldsConfig.swift` was read and turned
 out to already carry a real `SecureFieldsStyle` (font/colors/per-state overrides) and
 `SecureFieldsFieldsConfig` (per-field placeholder/accessibility label). The assumption would have
@@ -351,7 +351,7 @@ monitoring state without checking whether the multi-instance case actually matte
 **Do not copy a payload field from Android without checking it against the privacy AC first.**
 Android's own `LoanSimulator.call` includes `"amount" to product.amount.toPlainString()` in
 `HEADLESS_CHECKOUT_METHOD_LOAN_SIM` — a real inconsistency with its own documented invariant ("no
-raw amount in any event", SDK-12220) that this port does not carry forward. Every monitoring call
+raw amount in any event") that this port does not carry forward. Every monitoring call
 site here only ever sends `partner`/`method`/`currencyCode`/counts/booleans — the amount itself
 never appears. `monitoringPayload`/`errorPayload`/`summarizeValidationResults`
 (`Checkout/Monitoring/MonitoringPayloads.swift`) are the one place that decides what a payload can
@@ -378,7 +378,7 @@ The version lives in the git tag and nowhere else. `scripts/generate-version.sh`
 `SDKVersion.swift`; the checked-in value is `0.0.0-SNAPSHOT`. Releases are conventional-commit
 driven through release-please.
 
-## Privacy manifest and lint — where SDK-12264 actually stands
+## Privacy manifest and lint — where they actually stand
 
 `Sources/PurseHeadlessCheckout/PrivacyInfo.xcprivacy` exists and its
 `NSPrivacyAccessedAPITypes`/`NSPrivacyTracking` sections are real and verified: grepped this
@@ -389,7 +389,7 @@ behalf. Secure Fields itself ships no manifest of its own (same gap as its missi
 this repo's to fix, but worth knowing if the merchant's own aggregate manifest ever gets audited.
 
 **`NSPrivacyCollectedDataTypes` is deliberately left empty with a comment, not filled in.** The
-monitoring collector (SDK-12265) sends device model, OS version, screen dimensions and a
+monitoring collector sends device model, OS version, screen dimensions and a
 self-generated instance id — never an IDFA/IDFV, never used for tracking — but whether that counts
 as a declarable "collected data type" under Apple's taxonomy, and at what linkage level, is a
 privacy/legal categorization call, not an engineering one. Don't fill it in without that sign-off;
@@ -403,7 +403,7 @@ risks blocking every future PR on an unknown volume of pre-existing violations. 
 when the tools are available: install both, run against the full tree, fix or explicitly baseline
 what they flag, *then* wire the CI step — not the other way around.
 
-**Why CI was red on every PR from `feat/card-payment` (#4) onward — and what actually fixed it.**
+**Why CI was red on every PR once `purse-securefields-ios` entered the graph — and what fixed it.**
 `Package.swift` took `purse-securefields-ios` over **ssh** (`git@github.com:…`), and every run
 failed identically with `git@github.com: Permission denied (publickey)` while resolving that one
 dependency. PRs #1–#3 passed only because they predate the dependency entering the graph.

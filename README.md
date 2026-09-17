@@ -142,6 +142,6 @@ Two things that are easy to get wrong here:
   PurseSecureFields.SecureFieldsStyle.default.unsafeMutableAddressor`, which reads exactly like a
   broken release and is not one.
 
-Still relevant to SDK-12264: this SDK's own release workflow was going to copy that binary-target
+Still relevant here: this SDK's own release workflow was going to copy that binary-target
 mechanism, so whoever builds it should decide deliberately whether the packaged XCFramework is
 reachable by every consumer that needs it.
