@@ -25,8 +25,11 @@ struct DemoScreen<Content: View, Action: View>: View {
 }
 
 struct ScreenHeader: View {
-    let step: Int
+    /// The playground's wizard position. `nil` in checkout mode: a shopper is not on "step 2 of 3".
+    var step: Int?
     let title: String
+    /// Replaces the step label when there is no step — a plain line of shopper-facing context.
+    var subtitle: String?
     var onBack: (() -> Void)?
 
     var body: some View {
@@ -36,7 +39,11 @@ struct ScreenHeader: View {
                     .accessibilityLabel("Back")
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text("Step \(step) of 3").font(.caption).foregroundStyle(.secondary)
+                if let step {
+                    Text("Step \(step) of 3").font(.caption).foregroundStyle(.secondary)
+                } else if let subtitle {
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                }
                 Text(title).font(.largeTitle.weight(.semibold))
             }
             Spacer()

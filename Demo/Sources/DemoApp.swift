@@ -6,13 +6,24 @@ struct DemoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            DemoRouter(controller: controller)
+            DemoRootView(controller: controller)
                 // Android never tears down on Activity destroy. This does.
                 .onDisappear { controller.teardownCheckout() }
-                // `-demo-autostart` mints a session and opens the pay screen, so a smoke test
-                // reaches the methods without a tap. Never on by default.
+                // `-demo-autostart` mints a session and opens the playground's pay screen, so a
+                // smoke test reaches the methods without a tap. `-demo-checkout` opens the shopper
+                // flow at its basket instead. Neither is on by default.
                 .task {
-                    guard CommandLine.arguments.contains("-demo-autostart") else { return }
+                    let arguments = CommandLine.arguments
+                    let autostart = arguments.contains("-demo-autostart")
+                    if arguments.contains("-demo-checkout") {
+                        controller.enter(.checkout)
+                        // With `-demo-autostart` too, mint the session and land on the payment page,
+                        // so a smoke test reaches the methods in this mode without a tap.
+                        if autostart { controller.startCheckout() }
+                        return
+                    }
+                    guard autostart else { return }
+                    controller.enter(.playground)
                     controller.createSession()
                     while controller.checkout == nil, !Task.isCancelled {
                         try? await Task.sleep(nanoseconds: 200_000_000)
@@ -23,36 +34,20 @@ struct DemoApp: App {
     }
 }
 
-/// Three screens off one controller, plus the snackbar and the back gesture.
+/// The playground's three screens off one controller. The snackbar lives on `DemoRootView`, which
+/// both modes sit inside — two hosts would show it twice.
 struct DemoRouter: View {
     @ObservedObject var controller: DemoController
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Group {
-                switch controller.step {
-                case .session: SessionScreen(controller: controller)
-                case .pay: PayScreen(controller: controller)
-                case .result: ResultScreen(controller: controller)
-                }
-            }
-            .transition(.opacity)
-            .animation(.easeInOut(duration: 0.2), value: controller.step)
-
-            if let snackbar = controller.snackbar {
-                Text(snackbar)
-                    .font(.footnote)
-                    .foregroundStyle(.white)
-                    .padding(12)
-                    .background(Color.black.opacity(0.85))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .padding(.bottom, 100)
-                    .padding(.horizontal, 20)
-                    .task(id: snackbar) {
-                        try? await Task.sleep(nanoseconds: 3_000_000_000)
-                        controller.snackbar = nil
-                    }
+        Group {
+            switch controller.step {
+            case .session: SessionScreen(controller: controller)
+            case .pay: PayScreen(controller: controller)
+            case .result: ResultScreen(controller: controller)
             }
         }
+        .transition(.opacity)
+        .animation(.easeInOut(duration: 0.2), value: controller.step)
     }
 }

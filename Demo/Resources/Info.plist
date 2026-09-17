@@ -46,6 +46,13 @@
 			</array>
 		</dict>
 	</array>
+	<!-- Albert Sans, the Purse brand face. Only checkout mode uses it; the playground stays on the
+	     system font so the two are told apart at a glance. -->
+	<key>UIAppFonts</key>
+	<array>
+		<string>AlbertSans-Regular.ttf</string>
+		<string>AlbertSans-SemiBold.ttf</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -7,6 +7,10 @@
 .swiftpm/xcode/*
 !.swiftpm/xcode/xcshareddata/
 
+# Xcode regenerates this lock for the Demo project's package references; the root
+# Package.resolved is the one that pins anything.
+Demo/Demo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+
 # Xcode (keep shared schemes under xcshareddata/)
 xcuserdata/
 DerivedData/

@@ -45,7 +45,9 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | `PrivacyInfo.xcprivacy` (no required-reason APIs; data-type declaration pending a privacy sign-off) | ✅ |
 | `PurseHeadlessCheckout.host(for:)` — the concrete `PluginHost` every coordinator runs through | ✅ |
 | Payment elements — one `hasUI`/`isReady`/`submit()` shape per method, with a sealed `PaymentOutcome` | ✅ |
-| Demo app (`Demo/Demo.xcodeproj`) — three screens over real sessions, every method | ✅ (see below) |
+| Confirmation — `sessionTransactions()`, `paymentStatus()`, `awaitPaymentOutcome()` over a typed `PaymentSessionStatus` | ✅ |
+| Payment-method badges — `PurseAssets`, `iconURL(for:)`, `schemeAssets(for:)` (CDN URLs; you render them) | ✅ |
+| Demo app (`Demo/Demo.xcodeproj`) — a playground and a shopper-facing checkout, both over real sessions | ✅ (see below) |
 | XCFramework signing/distribution, SwiftLint/SwiftFormat, docs | planned |
 
 ## Development
@@ -72,9 +74,23 @@ broken and why each one exists.
 
 ## Demo app
 
-`Demo/Demo.xcodeproj` — session → pay → result, the same three screens as Android's `:app`, against
-sessions minted by **alfred** (the `usp-widget` dev server that holds the server-side Purse
-credentials a real merchant backend would).
+`Demo/Demo.xcodeproj` opens on a mode picker, against sessions minted by **alfred** (the `usp-widget`
+dev server that holds the server-side Purse credentials a real merchant backend would).
+
+| Mode | What it is |
+|---|---|
+| **Playground** | Session → pay → result, the same three screens as Android's `:app`: raw session and transaction dumps, an event log, a `widget.data` paste box, a manual capture tool. For working on the SDK. |
+| **Checkout** | Basket → payment → confirmation. What a shopper sees, with the same SDK calls and none of the developer chrome. Its confirmation screen resolves the outcome with `awaitPaymentOutcome()` rather than asking alfred, because that is the only path a real merchant has. |
+
+Checkout mode is styled to the Purse reference (`Demo/Sources/PurseDS.swift`): Albert Sans, an ink
+call to action with Peppermint reserved for identity and selected states, and Lucide icons shipped
+as template SVGs in the asset catalogue. Method names come from the **method**, not the partner, the
+same way `usp-widget` does it — a shopper picks "Bank card", not "Ingenico". The playground keeps the
+system font and its greyscale on purpose, so the two modes are told apart at a glance.
+
+Bundled assets: [Albert Sans](https://fonts.google.com/specimen/Albert+Sans) under the SIL Open Font
+License, and [Lucide](https://lucide.dev) icons under the ISC License. Both are demo-only and ship in
+no SDK product.
 
 ```sh
 cd ../usp-widget && npm run dev:alfred          # port 9001
@@ -95,7 +111,9 @@ real merchant id, and the sheet needs an entitlement — the button renders and 
 reported, which is the honest result. Klarna needs a live client token. Everything else runs: the
 saved card, the redirection methods, gift-card split, loan simulation, `setSession`, teardown.
 
-**`-demo-autostart`** mints a session and opens the pay screen on launch, for smoke tests.
+**Launch flags**, for smoke tests, never on by default. `-demo-autostart` mints a session and opens
+the playground's pay screen. `-demo-checkout` opens checkout mode at its basket; with
+`-demo-autostart` as well, it mints and lands on the payment page.
 
 
 ## License

@@ -12,6 +12,14 @@ enum DemoStep { case session, pay, result }
 @MainActor
 final class DemoController: ObservableObject {
 
+    // MARK: Mode
+
+    /// `nil` until a mode is picked. The playground is the SDK workbench; checkout is the
+    /// shopper-facing flow. Both drive this one controller — a second would be a second copy of the
+    /// session-minting path.
+    @Published var mode: DemoMode?
+    @Published var checkoutStep: CheckoutStep = .cart
+
     // MARK: Session
 
     @Published var step: DemoStep = .session
@@ -29,6 +37,15 @@ final class DemoController: ObservableObject {
     @Published var snackbar: String?
     @Published var events: [String] = []
     @Published var giftCards: [String: GiftCardState] = [:]
+
+    // MARK: Confirmation (checkout mode)
+
+    /// What the session's own transactions say, via the SDK's `awaitPaymentOutcome()`. `nil` until
+    /// asked. The playground's alfred lookup is deliberately not used here.
+    @Published var confirmedStatus: PaymentSessionStatus?
+    @Published var confirming = false
+    /// A stable order number for the confirmation page, minted per checkout run.
+    @Published var orderReference = "PRS-\(Int.random(in: 100_000...999_999))"
 
     // MARK: Result
 
@@ -113,6 +130,70 @@ final class DemoController: ObservableObject {
         step = .pay
     }
 
+    // MARK: Checkout mode
+
+    func enter(_ mode: DemoMode) {
+        self.mode = mode
+    }
+
+    /// The basket's Checkout button. Mints a session if there is not already one, then moves to the
+    /// payment page — the shopper never sees that alfred was involved.
+    func startCheckout() {
+        guard checkout == nil else {
+            checkoutStep = .pay
+            return
+        }
+        creatingSession = true
+        sessionError = nil
+        Task {
+            do {
+                let session = try await alfred.createSession()
+                widgetData = session.widgetData
+                if let id = session.orchestrationSessionId { alfredSessionId = id }
+                initCheckout()
+                if sessionError == nil { checkoutStep = .pay }
+            } catch {
+                sessionError = "\(error.localizedDescription)\n\nIs alfred running? \(alfredBaseURL)"
+            }
+            creatingSession = false
+        }
+    }
+
+    func backToCart() {
+        guard !submitting else { return }
+        checkoutStep = .cart
+    }
+
+    /// Ask the **session** whether the money moved — the call a merchant actually has. The
+    /// playground answers the same question through alfred, which no merchant can do.
+    func confirmPayment() {
+        guard let checkout, !confirming else { return }
+        confirming = true
+        Task {
+            do {
+                confirmedStatus = try await checkout.awaitPaymentOutcome(
+                    timeout: .seconds(20), pollInterval: .seconds(2)
+                )
+            } catch {
+                // A confirmation that cannot be fetched is not a failed payment, so the screen keeps
+                // whatever the attempt itself reported rather than inventing a verdict.
+                snackbar = "Couldn't reach the payment session: \(error.localizedDescription)"
+            }
+            confirming = false
+        }
+    }
+
+    func backToShop() {
+        startOver()
+        confirmedStatus = nil
+        orderReference = Self.newOrderReference()
+        checkoutStep = .cart
+    }
+
+    private static func newOrderReference() -> String {
+        "PRS-\(Int.random(in: 100_000...999_999))"
+    }
+
     // MARK: Screen 2
 
     var expressMethods: [PaymentItem] {
@@ -164,6 +245,109 @@ final class DemoController: ObservableObject {
                 ?? token.id.nonEmpty ?? "Saved card"
         default:
             return "\(item.partner.wireValue) · \(item.method.wireValue)"
+        }
+    }
+
+    /// The CDN badge for a row, straight from the SDK. Checkout mode's rows show it; the playground
+    /// deliberately does not, so the two modes differ in chrome and not in capability.
+    func iconURL(for item: PaymentItem) -> String {
+        checkout?.iconURL(for: item) ?? ""
+    }
+
+    /// A name a shopper recognises. `label(_:)` is the developer-facing one and prints raw wire
+    /// values, which is right in the playground and wrong on a payment page.
+    func shopperLabel(_ item: PaymentItem) -> String {
+        switch item {
+        case let .paymentToken(token):
+            let brand = Self.brandName(token.brand)
+            guard let pan = token.maskedPAN.nonEmpty else { return brand }
+            return "\(brand) \(pan.suffix(4))"
+        case let .primaryMethod(method):
+            return Self.methodName(method.method)
+        case let .secondaryMethod(method):
+            return Self.methodName(method.method)
+        default:
+            return label(item)
+        }
+    }
+
+    /// Keyed off the **method**, not the partner — the same way `usp-widget` does it (its
+    /// `translation.method` block: `CREDITCARD` → "Bank card", `INSTALLMENTS` → "Pay in
+    /// instalments"). A shopper picks how they want to pay, not which acquirer routes it: "Redsys"
+    /// and "Ingenico" are names they have never seen, and two rows both reading "Card" is a better
+    /// problem than one row reading "Worldline".
+    ///
+    /// Only a wallet keeps a brand, because there the brand *is* the method.
+    private static func methodName(_ method: PaymentMethod) -> String {
+        switch method {
+        case .creditCard: return "Bank card"
+        case .applePay: return "Apple Pay"
+        case .wallet: return "PayPal"
+        case .installments: return "Pay in instalments"
+        case .bnpl: return "Pay later"
+        case .giftCard: return "Gift card"
+        case let .other(wire):
+            // usp-widget's own table, for the wire values this SDK has no case for.
+            switch wire.uppercased() {
+            case "GOOGLEPAY": return "Google Pay"
+            case "PAYPAL": return "PayPal"
+            case "VOUCHER": return "Voucher"
+            case "INVOICE": return "Invoice payment"
+            case "SEPA", "SEPASINGLE": return "SEPA direct debit"
+            case "SEPAINSTANT": return "Instant SEPA direct debit"
+            case "SEPARECURRENT": return "Recurring SEPA direct debit"
+            case "IDEAL": return "iDeal"
+            case "MBWAY": return "MB Way"
+            case "MULTIBANCO": return "Multibanco"
+            case "BANCONTACT": return "Bank card (Bancontact)"
+            case "BIZUM": return "Bizum"
+            case "TWINT": return "Twint"
+            case "INSTANTPAYMENT": return "Instant payment"
+            case "LOAN": return "Deferred payment"
+            case "PAYLATER": return "Pay in 30 days by bank card"
+            case "REVOLVING": return "Revolving credit payment"
+            case "COMPTANT": return "Pay in full"
+            case "LOYALTYCARD": return "Loyalty card"
+            case "CONNECT": return "Connect"
+            // An unknown method is still a payment method, not a partner: show the wire value
+            // rather than inventing a brand.
+            default: return wire.capitalized
+            }
+        }
+    }
+
+    /// Wire values arrive shouting (`VISA`, `PAYPAL`). A brand is a proper noun, so it keeps its own
+    /// capitalisation — but never the wire's.
+    private static func brandName(_ wire: String) -> String {
+        switch wire.uppercased() {
+        case "": return "Card"
+        case "VISA": return "Visa"
+        case "MASTERCARD": return "Mastercard"
+        case "AMERICAN_EXPRESS", "AMEX": return "American Express"
+        case "CARTE_BANCAIRE", "CB": return "Cartes Bancaires"
+        case "MAESTRO": return "Maestro"
+        case "PAYPAL": return "PayPal"
+        case "DINERS_CLUB": return "Diners Club"
+        case "DISCOVER": return "Discover"
+        case "UNIONPAY": return "UnionPay"
+        case "JCB": return "JCB"
+        case "ONEY": return "Oney"
+        default: return wire.capitalized
+        }
+    }
+
+    /// One line under the name, or nothing. A shopper needs to know a security code is coming, not
+    /// which template the method uses.
+    func shopperDetail(_ item: PaymentItem) -> String? {
+        switch item {
+        case let .paymentToken(token):
+            return token.requiresCVV ? "Security code required" : "Ready to pay"
+        case let .primaryMethod(method):
+            if method.disabled != nil { return "Not available for this order" }
+            if method.configuration.template == "redirection" { return "Continue on the provider's page" }
+            return nil
+        default:
+            return nil
         }
     }
 
@@ -410,10 +594,21 @@ final class DemoController: ObservableObject {
     func back() {
         guard !submitting else { return }
         switch step {
-        case .session: break
+        // The first screen's back goes up a level, to the mode picker.
+        case .session: exitMode()
         case .pay: step = .session
         case .result: step = .pay
         }
+    }
+
+    /// Leave the current mode and return to the picker, tearing the session down on the way out so
+    /// the other mode starts clean.
+    func exitMode() {
+        guard !submitting else { return }
+        startOver()
+        confirmedStatus = nil
+        checkoutStep = .cart
+        mode = nil
     }
 
     // MARK: Element callbacks
@@ -434,6 +629,9 @@ final class DemoController: ObservableObject {
         }
         self.result = result
         step = .result
+        // Checkout mode has its own last screen, which resolves the outcome through the SDK rather
+        // than through alfred.
+        checkoutStep = .confirmation
     }
 
     /// Android never tears down on Activity destroy; this does, which is what the SDK asks for.
