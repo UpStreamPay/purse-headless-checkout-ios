@@ -17,6 +17,7 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | `sdk/src/types.ts` (`VaultVendors`) | `core/vault/VaultVendor.kt` | `Core/Vault/VaultVendor.swift` |
 | model card brands | `core/vault/CardBrand.kt` | `Core/Vault/CardBrand.swift` |
 | model `vault.vendor_front_data` | `core/vault/SessionVault.kt` | `Core/Vault/SessionVault.swift` |
+| `packages/assets` (`iconUrl`, card-scheme badges) | `core/assets/PurseAssets.kt` | `Core/Assets/PurseAssets.swift`, plus `iconURL(for:)`/`schemeAssets(for:)` on the checkout |
 | model `protocols[…].configurations` | `core/payment/MethodConfiguration.kt` | `Core/Payment/MethodConfiguration.swift` |
 | model `save_token_mode` | `core/payment/SaveTokenMode.kt` | `Core/Payment/SaveTokenMode.swift` |
 | model `integrated_tokens[]` | `core/payment/IntegratedToken.kt` | `Core/Payment/IntegratedToken.swift` |
@@ -58,6 +59,7 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | wallet client + rename/delete/favorite/delete-all | `core/api/WalletApiClient.kt`, `checkout/wallet/WalletTokens.kt` | `Core/API/WalletAPIClient.swift`, `Checkout/Wallet/WalletTokens.swift` |
 | `LoanProduct`/`LoanSimulation`/`simulateLoan(s)` | `core/payment/LoanSimulation.kt`, `checkout/simulation/LoanSimulator.kt` | `Core/Payment/LoanSimulation.swift`, `getSimulation`/`getSimulationMulti` on `PaymentAPIClient`, `simulateLoan`/`simulateLoans` on `PurseHeadlessCheckout` |
 | `commons/PartnerUI/theming/*` | `partnerui/PurseTheme.kt`, `ThemeValues` | `PartnerUI/PurseTheme.swift` (`PurseTheme`, `CardFormTexts`) |
+| none — web lands on the merchant's success page | `checkout/confirmation/PaymentSessionStatus.kt`, `sessionTransactions()`/`paymentStatus()`/`awaitPaymentOutcome()` | `Checkout/Confirmation/PaymentSessionStatus.swift`, same three methods on `PurseHeadlessCheckout` |
 
 ## PartnerUI — landed
 
@@ -147,6 +149,9 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | `HEADLESS_CHECKOUT_METHOD_LOAN_SIM` payload | includes `"amount"` — inconsistent with Android's own SDK-12220 "no raw amount in any event" invariant | `partner`/`method`/`currencyCode` only, no amount | A real inconsistency in the Android source, not a design worth porting; iOS's own privacy tests (`MonitoringPayloadsTests`) hold every event to the stated invariant instead of to Android's actual behaviour. |
 | `ApiCallMonitor` (`PARTNER_API_CALL_START`/`_END`, per-call timing) | a process-wide listener seam `PaymentApiClient` calls into | not ported | Low-value relative to effort for this pass: it traces network timing, not payment outcomes. Every code that matters to "did the payment work and why" is wired; this one is declared in `CheckoutEventCode` for dashboard parity and simply never fires. Revisit if request-level tracing is ever asked for. |
 | `ensureClientCompatibility` probe / `PartnerArtifacts` diagnosis | proactively probes every plugin at session build, posts `PARTNER_UI_EVENT`/`METHOD_DISABLED` for an incompatible or missing one | not ported | Depends on features iOS doesn't have: plugins are resolved fresh per submit here, never proactively probed at session-build time, and there is no `PartnerArtifacts`-style "which product provides this plugin" registry to diagnose a missing one against. Would need those built first, not just the event wiring. |
+
+| `awaitPaymentOutcome` timeout/cancellation | `timeoutMs`/`pollIntervalMs` `Long`; returns the last status at timeout | `Duration`; returns the last status at timeout **and** on cancellation | `Task.sleep` throws `CancellationError`, so a caller driving it from a `.task { }` whose view disappears got a throw where the contract promised a status — exactly the case ("a caller that has just taken a shopper's money needs something to show them") the contract exists for. |
+| `PaymentElementView` sizing | n/a — Compose measures the partner's composable | a finite, positive proposed height wins over the partner view's intrinsic one | Apple Pay renders ~30pt and PayPal ~43pt, so an express row stacking both got two button heights with no way to reconcile them. The partner view is already pinned to all four container edges, so it stretches; unspecified, infinite and non-positive proposals still mean "size yourself". |
 
 ## Vocabulary
 

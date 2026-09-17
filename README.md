@@ -6,9 +6,9 @@ A headless iOS SDK for Purse payments. It owns the payment engine — session, p
 primary/secondary split, `/validate` — and leaves the checkout UI to you. Same concepts as the web
 `usp-widget` headless SDK and the Purse Android SDK, in Swift.
 
-> **In development.** The engine has landed (session, methods, split, reactive state); payment
-> submission and the partner plugins have not. See
-> [docs/README.md](docs/README.md) for what is built and what is next.
+> **In development.** The engine, the partner plugins and the payment flow have landed; packaging
+> and the integration docs have not. The table below is the current state — see
+> [docs/README.md](docs/README.md) for what is left.
 
 ## Requirements
 
