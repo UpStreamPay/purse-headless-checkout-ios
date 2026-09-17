@@ -4,9 +4,7 @@
 
 import Foundation
 
-/// `GET /datetime` — the server clock, used to check session expiry against server time instead of
-/// trusting the device clock. Mirrors web's `FetchDatetimeAPI`: unversioned root, `x-api-key` auth,
-/// `{ "iso": "..." }` response.
+/// Web's `FetchDatetimeAPI`: unversioned root, `x-api-key` auth, `{ "iso": "..." }` response.
 public struct DatetimeAPIClient: Sendable {
     private let apiKey: String
     private let root: String
@@ -18,7 +16,6 @@ public struct DatetimeAPIClient: Sendable {
         self.session = session
     }
 
-    /// The server's current datetime.
     /// - Throws: ``PaymentAPIError`` on transport, HTTP or parse failure.
     public func datetime() async throws -> Date {
         guard let url = URL(string: root) else {

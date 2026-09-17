@@ -14,9 +14,8 @@ final class DemoController: ObservableObject {
 
     // MARK: Mode
 
-    /// `nil` until a mode is picked. The playground is the SDK workbench; checkout is the
-    /// shopper-facing flow. Both drive this one controller — a second would be a second copy of the
-    /// session-minting path.
+    /// `nil` until a mode is picked. Playground is the SDK workbench, checkout the shopper flow;
+    /// both drive this one controller.
     @Published var mode: DemoMode?
     @Published var checkoutStep: CheckoutStep = .cart
 
@@ -40,11 +39,9 @@ final class DemoController: ObservableObject {
 
     // MARK: Confirmation (checkout mode)
 
-    /// What the session's own transactions say, via the SDK's `awaitPaymentOutcome()`. `nil` until
-    /// asked. The playground's alfred lookup is deliberately not used here.
+    /// From the SDK's `awaitPaymentOutcome()`, not alfred — the call a merchant actually has.
     @Published var confirmedStatus: PaymentSessionStatus?
     @Published var confirming = false
-    /// A stable order number for the confirmation page, minted per checkout run.
     @Published var orderReference = "PRS-\(Int.random(in: 100_000...999_999))"
 
     // MARK: Result
@@ -62,9 +59,8 @@ final class DemoController: ObservableObject {
     let alfred = AlfredClient(baseURL: AlfredClient.fromInfoPlist)
     var alfredBaseURL: String { alfred.baseURL }
 
-    /// One presenter for every redirect, returning to the page `AlfredClient` puts on the order.
-    /// `prefersInAppWebView` because this demo claims no Associated Domain for `cdn.purse-dev.com`
-    /// — nobody's demo app could.
+    /// One presenter for every redirect. `prefersInAppWebView` because this demo claims no
+    /// Associated Domain for `cdn.purse-dev.com`.
     private let presenter = WebAuthRedirectPresenter(
         policy: RedirectPolicy(
             returnDestination: .universalLink(host: "cdn.purse-dev.com", path: "/return/done.html")
@@ -77,8 +73,8 @@ final class DemoController: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
 
     init() {
-        // No `ServiceLoader` on this platform: each partner product is installed explicitly.
-        // Apple Pay's merchant id is entitlement-bound, so it can only come from the app.
+        // No `ServiceLoader` here: partner products are installed explicitly, and Apple Pay's
+        // merchant id is entitlement-bound so only the app can supply it.
         PluginRegistry.shared.install(ApplePayModule(configuration: ApplePayConfiguration(
             merchantIdentifier: "merchant.eu.purse.demo",
             merchantName: "Purse Demo"
@@ -111,8 +107,8 @@ final class DemoController: ObservableObject {
         do {
             let checkout = try PurseHeadlessCheckout(widgetData: widgetData)
             self.checkout = checkout
-            // The screens read `@Published` state off the checkout; SwiftUI only observes the
-            // object it was handed, so the change has to be forwarded.
+            // SwiftUI only observes the object it was handed, so the checkout's changes have to be
+            // forwarded.
             checkout.objectWillChange
                 .sink { [weak self] _ in self?.objectWillChange.send() }
                 .store(in: &cancellables)
@@ -136,8 +132,6 @@ final class DemoController: ObservableObject {
         self.mode = mode
     }
 
-    /// The basket's Checkout button. Mints a session if there is not already one, then moves to the
-    /// payment page — the shopper never sees that alfred was involved.
     func startCheckout() {
         guard checkout == nil else {
             checkoutStep = .pay
@@ -164,8 +158,8 @@ final class DemoController: ObservableObject {
         checkoutStep = .cart
     }
 
-    /// Ask the **session** whether the money moved — the call a merchant actually has. The
-    /// playground answers the same question through alfred, which no merchant can do.
+    /// Ask the **session** whether the money moved. The playground asks alfred, which no merchant
+    /// can do.
     func confirmPayment() {
         guard let checkout, !confirming else { return }
         confirming = true
@@ -175,8 +169,8 @@ final class DemoController: ObservableObject {
                     timeout: .seconds(20), pollInterval: .seconds(2)
                 )
             } catch {
-                // A confirmation that cannot be fetched is not a failed payment, so the screen keeps
-                // whatever the attempt itself reported rather than inventing a verdict.
+                // A confirmation that cannot be fetched is not a failed payment: leave the screen
+                // on whatever the attempt itself reported.
                 snackbar = "Couldn't reach the payment session: \(error.localizedDescription)"
             }
             confirming = false
@@ -209,9 +203,8 @@ final class DemoController: ObservableObject {
 
     var giftCardMethods: [SecondaryMethod] { checkout?.secondaryMethods ?? [] }
 
-    /// Everything a row can select. **`checkout.paymentMethods` deliberately excludes saved cards**
-    /// — they live on `paymentTokens` — so looking a selection up in that list alone silently misses
-    /// every token.
+    /// Everything a row can select. **`checkout.paymentMethods` excludes saved cards** — they live
+    /// on `paymentTokens` — so that list alone silently misses every token.
     var selectableItems: [PaymentItem] {
         guard let checkout else { return [] }
         return checkout.paymentMethods + checkout.paymentTokens.map(PaymentItem.paymentToken)
@@ -221,8 +214,7 @@ final class DemoController: ObservableObject {
         selectableItems.first { $0.id == selectedItemId }
     }
 
-    /// What the Pay button gates on. With nothing selected it is the gift-cards-only path, which
-    /// needs the order fully covered.
+    /// Nothing selected means the gift-cards-only path, which needs the order fully covered.
     var canPay: Bool {
         guard let checkout else { return false }
         guard let item = selectedItem else { return checkout.isPaymentFulfilled }
@@ -230,8 +222,8 @@ final class DemoController: ObservableObject {
         return element.hasUI ? element.isReady : true
     }
 
-    /// Apple Pay and PayPal render their own branded button and pay from its tap. Google Pay has no
-    /// iOS peer; Apple Pay takes its slot in Android's Express checkout section.
+    /// These render their own branded button. Apple Pay takes Google Pay's slot in Android's
+    /// Express section.
     private static func isExpress(_ item: PaymentItem) -> Bool {
         item.method == .applePay || (item.partner == .paypal && item.method == .wallet)
     }
@@ -239,8 +231,7 @@ final class DemoController: ObservableObject {
     func label(_ item: PaymentItem) -> String {
         switch item {
         case let .paymentToken(token):
-            // A vaulted card can arrive with no name and no masked PAN; the row must still say
-            // something.
+            // A vaulted card can arrive with no name and no masked PAN.
             return token.name.nonEmpty ?? token.maskedPAN.nonEmpty ?? token.brand.nonEmpty
                 ?? token.id.nonEmpty ?? "Saved card"
         default:
@@ -248,14 +239,12 @@ final class DemoController: ObservableObject {
         }
     }
 
-    /// The CDN badge for a row, straight from the SDK. Checkout mode's rows show it; the playground
-    /// deliberately does not, so the two modes differ in chrome and not in capability.
+    /// The CDN badge for a row. Checkout mode shows it; the playground deliberately does not.
     func iconURL(for item: PaymentItem) -> String {
         checkout?.iconURL(for: item) ?? ""
     }
 
-    /// A name a shopper recognises. `label(_:)` is the developer-facing one and prints raw wire
-    /// values, which is right in the playground and wrong on a payment page.
+    /// A name a shopper recognises; `label(_:)` is developer-facing and prints raw wire values.
     func shopperLabel(_ item: PaymentItem) -> String {
         switch item {
         case let .paymentToken(token):
@@ -271,13 +260,8 @@ final class DemoController: ObservableObject {
         }
     }
 
-    /// Keyed off the **method**, not the partner — the same way `usp-widget` does it (its
-    /// `translation.method` block: `CREDITCARD` → "Bank card", `INSTALLMENTS` → "Pay in
-    /// instalments"). A shopper picks how they want to pay, not which acquirer routes it: "Redsys"
-    /// and "Ingenico" are names they have never seen, and two rows both reading "Card" is a better
-    /// problem than one row reading "Worldline".
-    ///
-    /// Only a wallet keeps a brand, because there the brand *is* the method.
+    /// Keyed off the **method**, not the partner, as `usp-widget`'s `translation.method` block does
+    /// — a shopper picks how to pay, not which acquirer routes it. Only a wallet keeps a brand.
     private static func methodName(_ method: PaymentMethod) -> String {
         switch method {
         case .creditCard: return "Bank card"
@@ -309,15 +293,13 @@ final class DemoController: ObservableObject {
             case "COMPTANT": return "Pay in full"
             case "LOYALTYCARD": return "Loyalty card"
             case "CONNECT": return "Connect"
-            // An unknown method is still a payment method, not a partner: show the wire value
-            // rather than inventing a brand.
+            // An unknown method is still a method, not a partner: show the wire value.
             default: return wire.capitalized
             }
         }
     }
 
-    /// Wire values arrive shouting (`VISA`, `PAYPAL`). A brand is a proper noun, so it keeps its own
-    /// capitalisation — but never the wire's.
+    /// Wire values arrive shouting (`VISA`, `PAYPAL`); a brand is a proper noun.
     private static func brandName(_ wire: String) -> String {
         switch wire.uppercased() {
         case "": return "Card"
@@ -336,8 +318,6 @@ final class DemoController: ObservableObject {
         }
     }
 
-    /// One line under the name, or nothing. A shopper needs to know a security code is coming, not
-    /// which template the method uses.
     func shopperDetail(_ item: PaymentItem) -> String? {
         switch item {
         case let .paymentToken(token):
@@ -364,8 +344,8 @@ final class DemoController: ObservableObject {
         }
     }
 
-    /// Selecting is what creates the element: building one runs the partner's `prepare`, which for
-    /// Klarna and redirection methods is a `POST /init`. Nothing is prepared for an unselected row.
+    /// Selecting is what creates the element, and building one runs the partner's `prepare` — a
+    /// `POST /init` for Klarna and redirection methods. Nothing is prepared for an unselected row.
     func select(_ item: PaymentItem?) {
         guard let checkout else { return }
         guard let item, item.id != selectedItemId else {
@@ -388,8 +368,8 @@ final class DemoController: ObservableObject {
         _ = element(for: item)
     }
 
-    /// The element for `item`, built once and kept. Keyed on the item's generation, which
-    /// `setSession` bumps for a method whose configuration changed.
+    /// Built once and kept, keyed on the item's generation — `setSession` bumps that for a method
+    /// whose configuration changed.
     func element(for item: PaymentItem) -> PaymentElement {
         let key = "\(item.id):\(checkout?.itemGenerations[item.id] ?? 0)"
         if let existing = elements[key] { return existing }
@@ -403,8 +383,8 @@ final class DemoController: ObservableObject {
         )
         listeners[key] = spy
         elements[key] = element
-        // `isReady` is published on the element, not on this controller, so without this the Pay
-        // button never re-renders when the card form becomes valid.
+        // `isReady` is published on the element, not here: without this the Pay button never
+        // re-renders when the card form becomes valid.
         element.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
@@ -424,8 +404,7 @@ final class DemoController: ObservableObject {
         }
     }
 
-    /// Gift cards covering the whole order: there is no primary to drive, so the checkout is
-    /// submitted directly.
+    /// Gift cards covering the whole order: no primary to drive, so submit the checkout directly.
     private func submitSecondariesOnly() {
         guard let checkout, checkout.isPaymentFulfilled else {
             snackbar = "Pick a payment method first"
@@ -594,15 +573,13 @@ final class DemoController: ObservableObject {
     func back() {
         guard !submitting else { return }
         switch step {
-        // The first screen's back goes up a level, to the mode picker.
         case .session: exitMode()
         case .pay: step = .session
         case .result: step = .pay
         }
     }
 
-    /// Leave the current mode and return to the picker, tearing the session down on the way out so
-    /// the other mode starts clean.
+    /// Back to the picker, tearing the session down so the other mode starts clean.
     func exitMode() {
         guard !submitting else { return }
         startOver()
@@ -615,9 +592,8 @@ final class DemoController: ObservableObject {
 
     func log(_ line: String) { events.append(line) }
 
-    /// Only a payment that was actually in flight reaches the result screen. A setup failure — an
-    /// express method whose `prepare` could not `/init`, say — is reported where the shopper is and
-    /// leaves them free to pick something else.
+    /// Only a payment actually in flight reaches the result screen; a setup failure (an express
+    /// method whose `prepare` could not `/init`) is reported where the shopper already is.
     func finish(_ outcome: PaymentOutcome, method: String) {
         guard submitting else {
             if case let .failed(error) = outcome { snackbar = "\(method): \(error.message)" }
@@ -629,8 +605,7 @@ final class DemoController: ObservableObject {
         }
         self.result = result
         step = .result
-        // Checkout mode has its own last screen, which resolves the outcome through the SDK rather
-        // than through alfred.
+        // Checkout mode's own last screen, which resolves the outcome through the SDK, not alfred.
         checkoutStep = .confirmation
     }
 
@@ -713,16 +688,16 @@ final class ElementSpy: PaymentElementListener {
 
     func onOutcome(_ outcome: PaymentOutcome) {
         controller.log("\(item.id) → \(outcome)")
-        // The transactions lookup wants the **payment** session, and the `/validate` answer names
-        // it outright in `results[].session_id`.
+        // The transactions lookup wants the **payment** session, which `/validate` names in
+        // `results[].session_id`.
         if case let .completed(result) = outcome,
            let sessionId = result.raw["results"]?.arrayValue?
                .compactMap({ $0["session_id"]?.stringValue }).first(where: { !$0.isEmpty }) {
             controller.alfredSessionId = sessionId
             controller.log("\(item.id) → payment session=\(sessionId)")
         }
-        // A redirect return carries the payment id in its token, which the capture card wants and
-        // which `onPaymentId` only fires for when `/validate` itself named one.
+        // A redirect return carries the payment id in its token; `onPaymentId` only fires when
+        // `/validate` itself named one.
         if case let .returnedFromRedirect(url) = outcome,
            let paymentId = url?.absoluteString.widgetRedirectionData?.paymentId {
             controller.capturePaymentId = paymentId

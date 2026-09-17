@@ -6,11 +6,11 @@ import Foundation
 
 /// Who hosts card data capture for a `creditcard` method.
 public enum VaultVendor: String, Sendable, CaseIterable {
-    /// Purse's own Vault (the Secure Fields iOS SDK) — the only vendor this SDK targets.
+    /// The Secure Fields iOS SDK — the only vendor this SDK targets.
     case purse
     /// PSP-hosted fields — out of scope.
     case pciProxy = "pci_proxy"
-    /// No vault — secondary methods like Illicado.
+    /// Secondary methods like Illicado.
     case none
     case unknown = ""
 

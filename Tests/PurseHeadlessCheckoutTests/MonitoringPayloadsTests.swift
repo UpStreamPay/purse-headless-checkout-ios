@@ -2,9 +2,9 @@ import Foundation
 import Testing
 @testable import PurseHeadlessCheckout
 
-/// `monitoringPayload`/`summarizeValidationResults`/`errorPayload` — the shared helpers every
-/// monitoring call site routes through, which is what actually enforces SDK-12265's privacy
-/// invariants: no raw amount, no PAN, no personal data, no transaction id, and never a
+/// `monitoringPayload`/`summarizeValidationResults`/`errorPayload` — the shared helpers that hold
+/// the privacy line: no raw amount, no PAN, no personal data, no transaction id, and a
+/// `DisabledState`'s code but never its message.
 struct MonitoringPayloadsTests {
 
     // MARK: monitoringPayload
@@ -108,8 +108,7 @@ struct MonitoringPayloadsTests {
     // MARK: The privacy invariant, structurally
 
     /// Helper-level only: it builds its own payload, so it pins nothing about what the checkout
-    /// actually emits — which is why a real leak (`removeSecondary` sending a PAN-derived id)
-    /// sailed past it.
+    /// actually emits. `MonitoringPrivacyTests` is what covers that.
     @Test func theHelperCarriesADisabledStateCodeThrough() {
         let state = DisabledState.minAmountNotMet(minAmount: 10, restToPay: 4.80)
         // What every real call site actually sends — the code, not the message.

@@ -9,16 +9,14 @@ struct DemoApp: App {
             DemoRootView(controller: controller)
                 // Android never tears down on Activity destroy. This does.
                 .onDisappear { controller.teardownCheckout() }
-                // `-demo-autostart` mints a session and opens the playground's pay screen, so a
-                // smoke test reaches the methods without a tap. `-demo-checkout` opens the shopper
-                // flow at its basket instead. Neither is on by default.
+                // `-demo-autostart` mints a session and opens the playground's pay screen so a
+                // smoke test needs no tap; `-demo-checkout` opens the shopper flow at its basket.
                 .task {
                     let arguments = CommandLine.arguments
                     let autostart = arguments.contains("-demo-autostart")
                     if arguments.contains("-demo-checkout") {
                         controller.enter(.checkout)
-                        // With `-demo-autostart` too, mint the session and land on the payment page,
-                        // so a smoke test reaches the methods in this mode without a tap.
+                        // With `-demo-autostart` too, land straight on the payment page.
                         if autostart { controller.startCheckout() }
                         return
                     }
@@ -34,8 +32,8 @@ struct DemoApp: App {
     }
 }
 
-/// The playground's three screens off one controller. The snackbar lives on `DemoRootView`, which
-/// both modes sit inside — two hosts would show it twice.
+/// The playground's three screens off one controller. The snackbar lives on `DemoRootView` instead,
+/// which both modes sit inside — two hosts would show it twice.
 struct DemoRouter: View {
     @ObservedObject var controller: DemoController
 

@@ -64,9 +64,8 @@ struct PayScreen: View {
                     EventLog(events: controller.events)
                 }
             } bottomAction: {
-                // Gated on the element's own readiness — a card form that is not yet complete would
-                // otherwise reach Secure Fields and come back `FIELDS_INCOMPLETE`, which reads as a
-                // bug rather than "you haven't finished typing".
+                // Gated on the element's own readiness: an incomplete card form would otherwise
+                // reach Secure Fields and come back `FIELDS_INCOMPLETE`, which reads as a bug.
                 BigButton(text: payTitle, enabled: controller.canPay) { controller.submit() }
             }
 

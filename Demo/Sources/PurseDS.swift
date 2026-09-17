@@ -1,11 +1,8 @@
 import SwiftUI
 
-/// The Purse styling reference, used by **checkout mode only** — the playground keeps `DemoTheme`'s
-/// greyscale and system font so the two are told apart at a glance.
-///
-/// The rule that shapes everything below: **Peppermint is the identity colour, not the action
-/// colour.** Buttons are ink; Peppermint marks focus rings, selected states and the logo, and never
-/// carries white text.
+/// The Purse styling reference, checkout mode only — the playground keeps `DemoTheme`'s greyscale.
+/// The rule below it all: **Peppermint is the identity colour, not the action colour.** Buttons are
+/// ink; Peppermint marks focus rings and selected states, and never carries white text.
 enum PurseDS {
 
     // MARK: Colour
@@ -30,12 +27,10 @@ enum PurseDS {
     /// One shade darker than `ink`, for a pressed action button. Never opacity, never scale.
     static let inkPressed = Color(hex: 0x181B1B)
 
-    /// The focus ring: Peppermint at 35%.
     static let focusRing = Color(hex: 0x00CEAC).opacity(0.35)
 
     // MARK: Type
 
-    /// The scale, in points: 10, 12, 14 (body), 16, 20, 24, 32.
     enum Size {
         static let micro: CGFloat = 10
         static let caption: CGFloat = 12
@@ -54,7 +49,6 @@ enum PurseDS {
 
     // MARK: Spacing, radius, elevation
 
-    /// Base-4: 4, 8, 12, 16, 24, 32, 48.
     enum Space {
         static let xs: CGFloat = 4
         static let s: CGFloat = 8
@@ -76,10 +70,9 @@ enum PurseDS {
     static let cardShadow = Color(red: 16 / 255, green: 24 / 255, blue: 40 / 255).opacity(0.08)
     static let sheetShadow = Color(red: 16 / 255, green: 24 / 255, blue: 40 / 255).opacity(0.16)
 
-    /// 120–200ms ease on colour and shadow. No bounces.
+    /// Ease on colour and shadow. No bounces.
     static let motion: Animation = .easeInOut(duration: 0.16)
 
-    /// The smallest a tap target may be.
     static let minTapTarget: CGFloat = 44
 }
 
@@ -95,8 +88,8 @@ extension Color {
 
 // MARK: - Icons
 
-/// A Lucide icon, 2px stroke. Template imagesets, so they take `foregroundStyle` like a symbol.
-/// Not SF Symbols: a different drawing set with a different weight, and mixing the two shows.
+/// A Lucide icon, 2px stroke. Template imagesets, so they take `foregroundStyle` like a symbol —
+/// but not SF Symbols: a different drawing set at a different weight, and mixing the two shows.
 struct PurseIcon: View {
     let name: String
     var size: CGFloat = 24
@@ -139,7 +132,6 @@ struct PurseButtonStyle: ButtonStyle {
     }
 }
 
-/// The quieter action: a hairline outline, ink text, no fill.
 struct PurseSecondaryButtonStyle: ButtonStyle {
     var enabled = true
 
@@ -159,7 +151,6 @@ struct PurseSecondaryButtonStyle: ButtonStyle {
     }
 }
 
-/// A full-width call to action.
 struct PurseButton: View {
     let title: String
     var loading = false
@@ -198,7 +189,6 @@ struct PurseSecondaryButton: View {
     }
 }
 
-/// A card: hairline border, shadow just off the surface.
 struct PurseCard<Content: View>: View {
     var padding: CGFloat = PurseDS.Space.l
     var selected = false
@@ -257,7 +247,6 @@ struct PurseField: View {
     }
 }
 
-/// A section heading.
 struct PurseSectionTitle: View {
     let text: String
     init(_ text: String) { self.text = text }

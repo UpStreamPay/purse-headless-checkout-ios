@@ -178,9 +178,8 @@ struct CardPluginTests {
         #expect(CardBrand.dinersClub.secureFieldsBrand == nil)
     }
 
-    /// Every tier, not a sample: this asserted three of the four and skipped `.test`, which was the
-    /// one pointing at the wrong vault. A tenant exists only in its own tier's vault, so the
-    /// mismatch surfaced as "no tenant with id was found" — a message that names nothing.
+    /// Every tier, not a sample: a tenant exists only in its own tier's vault, and a mismatch
+    /// surfaces as "no tenant with id was found", which names nothing.
     @Test func everyEnvironmentMapsToItsOwnVaultTier() {
         #expect(PurseEnvironment.production.vaultEnvironment == .production)
         #expect(PurseEnvironment.sandbox.vaultEnvironment == .sandbox)
@@ -194,8 +193,7 @@ struct CardPluginTests {
 
     // MARK: Fulfilment across a tokenization
 
-    /// Records what the coordinator does to the checkout. A real `PurseHeadlessCheckout` would do
-    /// just as well, but this keeps the assertion on the two calls that matter.
+    /// Records what the coordinator does to the checkout, so the assertion stays on two calls.
     private final class RecordingHost: PluginHost {
         var fulfilled: Bool?
         var collected: [String: JSONValue] = [:]
@@ -214,13 +212,11 @@ struct CardPluginTests {
         }
     }
 
-    /// The regression this pins: Secure Fields zeroes its fields and reports the form invalid
-    /// *before* the network round trip, so a tokenization that then succeeds used to leave the item
-    /// unfulfilled — and `submitPayment()` refuses an unfulfilled item outright.
+    /// Secure Fields reports the form invalid *before* its round trip, so a tokenization that then
+    /// succeeds must re-fulfil the item — `submitPayment()` refuses an unfulfilled one outright.
     @Test func aSuccessfulTokenizationLeavesTheItemFulfilled() throws {
         let host = RecordingHost(context: try context())
-        // No form, so no live vault is needed to construct it; the fulfilment logic under test is
-        // the same for every mode.
+        // No form, so no live vault is needed; the fulfilment logic is the same for every mode.
         let coordinator = CardCoordinator(
             host: host,
             tenantId: "tenant-1",

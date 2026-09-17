@@ -7,8 +7,7 @@ import Foundation
 /// Decodes the base64-encoded `widget.data` blob handed to the app by the merchant backend.
 public enum SessionCodec {
 
-    /// - Throws: ``PurseSessionError/sessionMalformed(_:)`` if `widgetData` is not valid
-    ///   base64/JSON, or the decoded session fails the checks in ``LegacyPaymentSessionParser``.
+    /// - Throws: ``PurseSessionError/sessionMalformed(_:)``.
     public static func decode(_ widgetData: String) throws -> PurseSessionParams {
         guard let data = Data(base64Encoded: paddedBase64(widgetData)) else {
             throw PurseSessionError.sessionMalformed("could not base64-decode widget data")
@@ -41,17 +40,15 @@ public enum SessionCodec {
         )
     }
 
-    /// Restores the `=` padding `Data(base64Encoded:)` insists on. Android decodes with the JDK
-    /// **basic** decoder, whose documented contract is that `'='` "is accepted and interpreted as
-    /// the end of the encoded byte data, but is not required".
+    /// Restores the `=` padding `Data(base64Encoded:)` insists on — the JDK decoder Android uses
+    /// does not require it, so the blob can arrive unpadded.
     private static func paddedBase64(_ base64: String) -> String {
         let remainder = base64.count % 4
         guard remainder != 0 else { return base64 }
         return base64 + String(repeating: "=", count: 4 - remainder)
     }
 
-    /// A `wallet_session` missing its id or owner reference grants nothing, so it is dropped rather
-    /// than half-built — matching Android.
+    /// A `wallet_session` missing its id or owner reference is dropped, not half-built — as Android.
     private static func parseWalletSession(_ json: JSONValue?) -> WalletSessionParams? {
         guard let json,
               let sessionId = json["session_id"]?.stringValue,

@@ -2,8 +2,8 @@ import SwiftUI
 
 enum CheckoutStep { case cart, pay, confirmation }
 
-/// Cart → pay → confirmation, off the same `DemoController` the playground uses. One controller,
-/// one session-minting path: two would be two things to keep in step.
+/// Cart → pay → confirmation, off the same `DemoController` the playground uses — one controller,
+/// one session-minting path.
 struct CheckoutRouter: View {
     @ObservedObject var controller: DemoController
 

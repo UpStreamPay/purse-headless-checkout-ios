@@ -4,8 +4,8 @@
 
 import Foundation
 
-/// The session-level `vault` field — distinct from the per-method ``VaultInfo`` inside
-/// ``MethodConfiguration``. This is where the Secure Fields SDK's `tenantId` comes from.
+/// The session-level `vault` field, source of the Secure Fields `tenantId` — distinct from the
+/// per-method ``VaultInfo`` inside ``MethodConfiguration``.
 public struct SessionVault: Sendable, Equatable {
     public let vendorFrontData: VendorFrontData
 

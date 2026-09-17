@@ -2,9 +2,8 @@ import Foundation
 import Testing
 @testable import PurseHeadlessCheckout
 
-/// What a redirect is allowed to load, and what counts as coming back. This is a security boundary:
-/// a redirect chain that can load anything is an exfiltration path, and a "return" another app can
-/// fabricate is a fake approval.
+/// A security boundary: a redirect chain that can load anything is an exfiltration path, and a
+/// "return" another app can fabricate is a fake approval.
 struct RedirectPolicyTests {
 
     private let universalLink = RedirectPolicy(
@@ -100,9 +99,8 @@ struct RedirectPolicyTests {
     }
 }
 
-/// What the in-app web view loads first, for each action shape. The `.get` case used to answer "a
-/// GET redirect belongs in the browser, not this view" — true while only the browser served GETs,
-/// and wrong the moment `prefersInAppWebView` existed.
+/// What the in-app web view loads first, for each action shape — GETs included, since
+/// `prefersInAppWebView` routes them here rather than to the browser.
 @MainActor
 struct RedirectFirstLoadTests {
 
@@ -160,9 +158,8 @@ struct RedirectFirstLoadTests {
     }
 }
 
-/// What counts as coming back, for the in-app web view. Pure, so it covers the paths a presented
-/// `WKWebView` would otherwise hide — including the server-redirect one, where the last hop of a
-/// payment return actually arrives.
+/// What counts as coming back, for the in-app web view. Pure, so it covers paths a presented
+/// `WKWebView` hides — including the server redirect that carries the last hop of a return.
 @MainActor
 struct RedirectReturnDetectionTests {
 

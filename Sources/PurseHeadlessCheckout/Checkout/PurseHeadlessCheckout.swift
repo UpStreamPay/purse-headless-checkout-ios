@@ -33,12 +33,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
     public var currentSessionId: String { session.id }
 
     private let environment: PurseEnvironment
-    /// The override actually passed at creation, if any — kept separately from the resolved
-    /// ``environment`` because two things need the *decision*, not its result: ``setSession(_:)``
-    /// re-applies the same trust rule to the incoming blob's `api_url`, and ``saveState()`` hands
+    /// The override as passed, kept apart from the resolved ``environment`` because `setSession`
+    /// and `saveState` need the *decision*, not its result.
     private let lockedEnvironment: PurseEnvironment?
-    /// The `widget.data` string decoded at creation — kept only so ``saveState()`` can round-trip
-    /// the exact session ``restore(_:hooks:registry:secondaryConfigs:urlSession:)`` rebuilds from.
+    /// Kept so `saveState()` can round-trip the exact session `restore` rebuilds from.
     private var widgetData: String
 
     // MARK: Published state
@@ -151,10 +149,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
         )
     }
 
-    /// The designated initialiser. **Internal**, because `serverClockOverride` is a test seam with
-    /// no production caller: a merchant can plausibly want to pass a configured `URLSession`, but
-    /// nobody outside this package has a reason to supply a clock. Keeping it off the public surface
-    /// keeps it out of the SDK's semver contract.
+    /// Designated, and internal: `serverClockOverride` is a test seam with no production caller,
+    /// so it stays out of the SDK's semver contract.
     init(
         widgetData: String,
         lockedEnvironment: PurseEnvironment? = nil,
@@ -211,9 +207,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
         // Saved gift cards carry no balance in the session — re-`/init` each one now (web's
         // `buildSecondaryPaymentToken` fires the same call as the token is built).
         resolveSavedSecondaryBalances()
-        // Only when the widget data actually carried a wallet_session — a checkout with none never
-        // calls the Wallet API at all. A failure is swallowed: the wallet only gates management
-        // operations and syncs names/favorites, so it must never break the checkout.
+        // Only with a `wallet_session`. Failures are swallowed: the wallet gates management
+        // operations and syncs names, so it must never break the checkout.
         if wallet.client != nil {
             pendingWalletSync = Task {
                 do {
@@ -232,9 +227,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
             apiKey: params.apiKey,
             monitoringAPIRoot: monitoringAPIRootOverride ?? environment.monitoringAPIRoot,
             envWireValue: environment.wireValue,
-            // The injected transport, like every other client here. Without it the collector used
-            // `URLSession.shared`, so the whole test suite and the Demo app POSTed real telemetry
-            // to the live host — and no stub could see what was sent.
+            // The injected transport, like every other client here — otherwise tests and the Demo
+            // POST real telemetry to the live host, unseen by any stub.
             session: urlSession
         )
         let createPayload = monitoringPayload([
@@ -898,9 +892,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
         }
 
         params = newParams
-        // The blob too, not just the decoded params: `saveState()` serialises this, so leaving it
-        // pinned to the first session meant a restore rebuilt a **superseded** one — matched
-        // `primaryId` and `secondaries` against the wrong catalogue, on a session that is typically
+        // The blob too, not just the decoded params: `saveState()` serialises it, so a stale one
+        // makes `restore` rebuild a superseded session.
         self.widgetData = widgetData
         session = built
         meansOfPayment = built.meansOfPayment
@@ -1359,14 +1352,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
     // MARK: Confirming the payment
 
-    /// Every transaction made so far against this session, raw.
+    /// Every transaction so far, raw. Prefer ``paymentStatus()`` unless you need untouched rows.
     ///
-    /// Prefer ``paymentStatus()`` unless you need the untouched rows.
-    ///
-    /// This goes to the Payment API under the **same** session id as `/init` and `/validate`, which
-    /// is `payment_session.id` from `widget.data`. Do not confuse it with
-    /// `legacy_payment_session_id`, a different id in a different service's key space: the two are
-    /// not interchangeable, and the Demo's alfred lookup deliberately uses the other one.
+    /// Uses the **same** session id as `/init` and `/validate` — `payment_session.id`, not
+    /// `legacy_payment_session_id`, which belongs to a different service's key space.
     public func sessionTransactions() async throws -> [JSONValue] {
         try await api.getSession()
     }
@@ -1449,9 +1438,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
     // MARK: State restoration
 
-    /// Snapshot this checkout for ``restore(_:hooks:registry:secondaryConfigs:urlSession:)`` after
-    /// process death: the session's `widget.data`, the primary selection, the applied gift cards
-    /// and their slices, the save decisions, what the native steps collected (JSON-representable
+    /// Snapshot this checkout for `restore` after process death: the session blob, the primary
+    /// selection, the applied gift cards and slices, the save decisions and what was collected.
+    /// Never card data.
     public func saveState() throws -> CheckoutSavedState {
         try requireOpen()
         let secondaries: [(token: SecondaryToken, amount: Decimal)] = splitter.splits.compactMap { split in

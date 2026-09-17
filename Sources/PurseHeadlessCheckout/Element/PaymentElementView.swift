@@ -1,6 +1,6 @@
 // Web: the DOM container `appendTo` renders into.
 // Same: the host decides where the partner's UI goes.
-// Differs: Android's peer is a one-line `@Composable`; this is that plus the `UIViewRepresentable` every host would otherwise write.
+// Differs: Android's peer is a one-line `@Composable`; this adds the `UIViewRepresentable` every host would otherwise write.
 
 import SwiftUI
 import UIKit
@@ -47,12 +47,9 @@ public struct PaymentElementView: UIViewRepresentable {
         return CGSize(width: width, height: fitting.height)
     }
 
-    /// The height a host explicitly asked for, or `nil` for the partner view's own.
-    ///
-    /// The partner's view is pinned to all four container edges, so it stretches to fill. Apple Pay
-    /// and PayPal have different intrinsic heights (~30pt and ~43pt), so an express row stacking
-    /// both would otherwise get two button heights. An unspecified, infinite or non-positive
-    /// proposal means "size yourself".
+    /// The height a host explicitly asked for, or `nil` for the partner view's own. The partner view
+    /// fills the container, and Apple Pay and PayPal have different intrinsic heights (~30pt vs
+    /// ~43pt), so an express row stacking both would otherwise get two button heights.
     static func explicitHeight(_ proposal: ProposedViewSize) -> CGFloat? {
         guard let height = proposal.height, height.isFinite, height > 0 else { return nil }
         return height

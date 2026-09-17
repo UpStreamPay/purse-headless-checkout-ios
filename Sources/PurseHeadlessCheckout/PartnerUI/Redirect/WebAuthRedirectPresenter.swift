@@ -1,6 +1,6 @@
 // Web: none — web navigates the page itself.
 // Same: —
-// Differs: two paths. ASWebAuthenticationSession for a GET (a real browser, so ACS providers that refuse embedded web views still render); WKWebView for the POST cases, because no system browser can POST — the same constraint Android hit.
+// Differs: ASWebAuthenticationSession for a GET (a real browser, so ACS providers that refuse embedded web views still render); WKWebView for the POST cases, since no system browser can POST.
 
 import AuthenticationServices
 import Foundation
@@ -16,8 +16,7 @@ public final class WebAuthRedirectPresenter: NSObject, RedirectPresenter {
     private let prefersInAppWebView: Bool
     private var session: ASWebAuthenticationSession?
 
-    /// - Parameters: - policy: where the redirect may go, and what counts as coming back. -
-    /// presentingViewController: used for the POST cases, which are presented modally. The GET case
+    /// `presentingViewController` is used for the POST cases, presented modally; the GET case
     /// anchors on the app's key window.
     public init(
         policy: RedirectPolicy,
@@ -50,8 +49,7 @@ public final class WebAuthRedirectPresenter: NSObject, RedirectPresenter {
         }
     }
 
-    /// Whether `ASWebAuthenticationSession` can see this policy's return destination. A custom
-    /// scheme it can always match.
+    /// Whether `ASWebAuthenticationSession` can see this policy's return destination.
     private var browserCanObserveReturn: Bool {
         switch policy.returnDestination {
         case .customScheme:
@@ -79,9 +77,8 @@ public final class WebAuthRedirectPresenter: NSObject, RedirectPresenter {
                         }
                         return
                     }
-                    // Reaching the callback means the shopper came back. It does **not** mean the
-                    // payment succeeded: confirm against the session. The URL travels with it
-                    // because it carries the reported status.
+                    // Coming back does **not** mean the payment succeeded: confirm against the
+                    // session. The URL travels along because it carries the reported status.
                     continuation.resume(returning: .returned(url: callbackURL))
                 }
             }
@@ -94,8 +91,8 @@ public final class WebAuthRedirectPresenter: NSObject, RedirectPresenter {
                     completionHandler: completion
                 )
             } else {
-                // A custom scheme — the only destination this initialiser can match, and the only
-                // policy routed here at all (see `browserCanObserveReturn`).
+                // A custom scheme is the only destination this initialiser can match, and the only
+                // policy routed here (see `browserCanObserveReturn`).
                 session = ASWebAuthenticationSession(
                     url: url,
                     callbackURLScheme: policy.callbackScheme,
@@ -131,11 +128,11 @@ public final class WebAuthRedirectPresenter: NSObject, RedirectPresenter {
             let navigation = UINavigationController(rootViewController: controller)
             navigation.modalPresentationStyle = .formSheet
             // A `.formSheet` is interactively dismissible: dragging it down tears the navigation
-            // controller off screen without `cancelTapped` and without any delegate callback, so
-            // the continuation below would never resume — the caller awaits forever on a payment
+            // controller off screen with no delegate callback, so the continuation would never
+            // resume and the caller would await forever on a payment.
             navigation.isModalInPresentation = true
-            // Belt and braces: if the gesture is ever re-enabled, or the system dismisses the sheet
-            // for its own reasons, this reports it as a cancel rather than leaving a suspended task.
+            // If the system dismisses the sheet anyway, report a cancel rather than leaving a
+            // suspended task.
             navigation.presentationController?.delegate = controller
             presenter.present(navigation, animated: true)
         }
@@ -155,7 +152,7 @@ extension WebAuthRedirectPresenter: ASWebAuthenticationPresentationContextProvid
     }
 }
 
-/// Hosts the POST cases. Navigation is gated by the same ``RedirectPolicy`` as the GET case.
+/// Hosts the POST cases, gated by the same ``RedirectPolicy`` as the GET case.
 @MainActor
 final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
     UIAdaptivePresentationControllerDelegate {
@@ -169,7 +166,6 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
 
     private var configuration: WKWebViewConfiguration {
         let configuration = WKWebViewConfiguration()
-        // Nothing in a challenge chain needs to read local files.
         configuration.preferences.isTextInteractionEnabled = true
         configuration.websiteDataStore = .nonPersistent()
         return configuration
@@ -209,9 +205,7 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
         load()
     }
 
-    /// What the first navigation should be. Pulled out of ``load()`` so it can be tested without a
-    /// view lifecycle: the `.get` case was unreachable and answered "a GET redirect belongs in the
-    /// browser, not this view" until `prefersInAppWebView` started routing here, and nothing could
+    /// Pulled out of ``load()`` so it can be tested without a view lifecycle.
     enum FirstLoad: Equatable {
         case request(URL)
         case html(String, baseURL: URL?)
@@ -240,9 +234,8 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
             return .html(html, baseURL: nil)
 
         case let .get(url, _):
-            // Reached when the host set `prefersInAppWebView`, which is what Android does for every
-            // case. Policy is re-checked here because this is the only gate on the first
-            // navigation — the delegate below sees every hop after it, not this one.
+            // Reached when the host set `prefersInAppWebView`. Policy is re-checked because this is
+            // the only gate on the first navigation — the delegate sees every hop after it, not it.
             guard let url = allowed(url) else { return .refused(action.targetURL ?? "") }
             return .request(url)
         }
@@ -259,16 +252,13 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
         }
     }
 
-    /// Whether reaching `url` ends the flow. Three ways, and the second is the common one: a PSP
-    /// usually redirects to the merchant's configured return page rather than straight to the app's
-    /// scheme.
+    /// Whether reaching `url` ends the flow.
     static func isReturn(_ url: URL, action: RedirectAction, policy: RedirectPolicy) -> Bool {
         returnKind(url, action: action, policy: policy) != .notReturn
     }
 
-    /// What reaching `url` means for the flow.
     enum ReturnKind: Equatable {
-        /// A return carrying `purse-redirection-data`: the outcome is in the URL. Finish here.
+        /// Carries `purse-redirection-data`: the outcome is in the URL. Finish here.
         case reported
         /// A return with nothing to report yet. The token usually arrives one hop later, so keep
         /// loading and settle for this only if none ever does.
@@ -292,7 +282,7 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
     }
 
     /// The sheet went away without Cancel being tapped. Report a cancel rather than leaving the
-    /// caller suspended: the view is already gone, so there is nothing left to dismiss.
+    /// caller suspended.
     func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
         guard let completion else { return }
         self.completion = nil
@@ -316,9 +306,9 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
             decisionHandler(.cancel)
             finish(.success(.returned(url: url)))
         case .bare:
-            // Let it load. The status token usually arrives on the next hop, and closing on the
-            // first return-shaped URL throws away the only report of the outcome this client ever
-            // gets. `didFinish` settles for this one if nothing more comes.
+            // The status token usually arrives on the next hop, and closing on the first
+            // return-shaped URL throws away the only report of the outcome this client gets.
+            // `didFinish` settles for this one if nothing more comes.
             bareReturn = url
             decisionHandler(.allow)
         case .notReturn:
@@ -326,8 +316,8 @@ final class RedirectWebViewController: UIViewController, WKNavigationDelegate,
         }
     }
 
-    /// The return page finished loading and no `purse-redirection-data` ever appeared. Report the
-    /// return anyway — the shopper is plainly back — rather than leaving them on the page.
+    /// No `purse-redirection-data` ever appeared. Report the return anyway rather than leaving the
+    /// shopper on the page.
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         guard let url = bareReturn else { return }
         finish(.success(.returned(url: url)))

@@ -1,16 +1,14 @@
 // Web: packages/headless-checkout `mapPluginResultToSimulation`
 // Same: field names; counts and amounts only (no per-instalment dates on web either).
-// Differs: `totalAmount` = initial + (n − 2) recurring + final. Web adds (n − 1) recurring on top of initial and final, which counts one instalment twice when `instalment_number` is the total — Android's fix (see the web↔Android↔iOS map), which iOS also takes.
+// Differs: `totalAmount` = initial + (n − 2) recurring + final. Web adds (n − 1) recurring, double-counting one instalment when `instalment_number` is the total; iOS takes Android's fix.
 
 import Foundation
 
-/// What a BNPL partner needs to quote an instalment schedule — web sdk's `LoanProduct`. Serialized
-/// as `{"amount": <number>, "currency_code": "EUR"}` for `POST
-/// /simulation/{entityId}/{partner}/{method}`.
+/// Web sdk's `LoanProduct` — what a BNPL partner needs to quote an instalment schedule.
 public struct LoanProduct: Sendable {
-    /// Amount to finance, in major currency units.
+    /// In major currency units.
     public let amount: Decimal
-    /// ISO-4217 code, e.g. `"EUR"`.
+    /// ISO-4217, e.g. `"EUR"`.
     public let currencyCode: String
 
     public init(amount: Decimal, currencyCode: String) {
@@ -23,26 +21,23 @@ public struct LoanProduct: Sendable {
     }
 }
 
-/// One BNPL instalment schedule — web sdk's `LoanSimulation`, mapped from the simulation API's
-/// `plugin_result` exactly as `mapPluginResultToSimulation` does. Amounts are in major currency
-/// units.
+/// Web sdk's `LoanSimulation`, mapped from a `plugin_result`. Amounts are in major currency units.
 public struct LoanSimulation: Sendable, Equatable {
-    /// First instalment — `initial_instalment_amount`.
+    /// `initial_instalment_amount`.
     public let initialInstallmentAmount: Decimal
-    /// Last instalment — `final_instalment_amount`.
+    /// `final_instalment_amount`.
     public let finalInstallmentAmount: Decimal
     /// Each recurring instalment in between — `instalment_amount`.
     public let installmentAmount: Decimal
-    /// Number of instalments — `instalment_number`.
+    /// `instalment_number`.
     public let installmentCount: Int
-    /// Cost of the loan, excluding the financed amount — `total_cost`.
+    /// `total_cost` — excludes the financed amount.
     public let totalCost: Decimal
-    /// Everything the shopper pays: `initial + (count − 2) × installmentAmount + final`, rounded to
-    /// two decimals.
+    /// `initial + (count − 2) × installmentAmount + final`, rounded to two decimals.
     public let totalAmount: Decimal
-    /// Legal wording some partners require next to the offer — `legal_text`.
+    /// `legal_text`.
     public let legalText: String?
-    /// Annual percentage rate — `annual_nominal_rate`, else `effective_annual_percentage_rate`.
+    /// `annual_nominal_rate`, else `effective_annual_percentage_rate`.
     public let aprc: Decimal?
 
     public init(
@@ -65,22 +60,20 @@ public struct LoanSimulation: Sendable, Equatable {
         self.aprc = aprc
     }
 
-    /// The simulation carried by a `/simulation` response, or `nil` when it has no `plugin_result`
-    /// (web throws `INVALID_LOAN_SIMULATION` for that; the multi variant skips such candidates
-    /// instead of failing the whole call).
+    /// `nil` when the response has no `plugin_result` — the single variant throws
+    /// `INVALID_LOAN_SIMULATION` for that, the multi variant skips the candidate.
     static func fromResponse(_ response: JSONValue) -> LoanSimulation? {
         response["plugin_result"].map(fromPluginResult)
     }
 
-    /// Map a `plugin_result` block — web's `mapPluginResultToSimulation`.
+    /// Web's `mapPluginResultToSimulation`.
     static func fromPluginResult(_ result: JSONValue) -> LoanSimulation {
         let initial = result["initial_instalment_amount"]?.asDecimal ?? 0
         let final = result["final_instalment_amount"]?.asDecimal ?? 0
         let recurring = result["instalment_amount"]?.asDecimal ?? 0
         let count = result["instalment_number"]?.intValue ?? 0
 
-        // `instalment_number` counts every instalment: the initial one, the recurring ones and the
-        // final one. A single instalment is just the initial amount.
+        // `instalment_number` counts the initial and final instalments too.
         let rawTotal: Decimal = count <= 1 ? initial : initial + recurring * Decimal(count - 2) + final
 
         return LoanSimulation(
@@ -97,8 +90,8 @@ public struct LoanSimulation: Sendable, Equatable {
 }
 
 private extension Decimal {
-    /// `RoundingMode.HALF_UP` — `.plain` rounds a tie away from zero, the same behaviour for the
-    /// non-negative amounts a loan simulation carries.
+    /// Android's `RoundingMode.HALF_UP`: `.plain` rounds ties away from zero, which matches for the
+    /// non-negative amounts a simulation carries.
     func rounded(scale: Int) -> Decimal {
         var result = Decimal()
         var value = self

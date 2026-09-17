@@ -4,9 +4,8 @@
 
 import Foundation
 
-/// A single item in a Payment API `/init` or `/validate` request. The stable envelope (`partner`,
-/// `method`, `amount`, `step_id`) is modelled; the partner-specific bodies stay free-form
-/// ``JSONValue`` since only a plugin knows their shape — JSON stays at the edges.
+/// One item of a `/init` or `/validate` request. The envelope is modelled; partner-specific bodies
+/// stay free-form ``JSONValue``, since only a plugin knows their shape.
 public struct ItemPayload: Sendable, Equatable {
     public let partner: Partner
     public let method: PaymentMethod
@@ -37,8 +36,7 @@ public struct ItemPayload: Sendable, Equatable {
         self.paymentPreferences = paymentPreferences
     }
 
-    /// Serializes to the wire shape. `payment_data.vault_vendor` defaults to `"none"` when the
-    /// plugin did not set it — mirroring web's `normalizePaymentData`.
+    /// `payment_data.vault_vendor` defaults to `"none"` — web's `normalizePaymentData`.
     public func toJSON() -> JSONValue {
         var normalizedPaymentData = paymentData
         if normalizedPaymentData["vault_vendor"] == nil {
@@ -61,5 +59,5 @@ public struct ItemPayload: Sendable, Equatable {
     }
 }
 
-/// The `/validate` body is a JSON array of these — same shape as ``ItemPayload``, as in web.
+/// The `/validate` body is a JSON array of these — same shape, as in web.
 public typealias ValidateItemPayload = ItemPayload

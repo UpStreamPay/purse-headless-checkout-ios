@@ -4,8 +4,7 @@ import Testing
 @testable import PurseHeadlessCheckout
 
 /// The payment element: what it resolves to, and the one outcome each attempt produces. Its own
-/// host and session id — `StubURLProtocol` keys handlers by host and `InitGuard.shared` is process-
-/// wide, so a suite sharing either with another would read the other's answers.
+/// host and session id, since `StubURLProtocol` keys by host and `InitGuard.shared` is process-wide.
 @MainActor
 @Suite(.serialized)
 struct PaymentElementTests {
@@ -77,8 +76,7 @@ struct PaymentElementTests {
         try #require(checkout.paymentMethods.first { $0.id == "purse-creditcard" })
     }
 
-    /// Selecting is the host's job, never the element's — so every flow test does it first, exactly
-    /// as a screen would.
+    /// Selecting is the host's job, never the element's, so every flow test does it first.
     @discardableResult
     private func selectCard(_ checkout: PurseHeadlessCheckout) throws -> PaymentItem {
         let item = try cardItem(checkout)
@@ -101,8 +99,7 @@ struct PaymentElementTests {
 
     // MARK: Resolution
 
-    /// `host(for:)` takes a `PrimarySource`, and a secondary is not one — a branch Android has no
-    /// peer for, because Kotlin lets it fail at runtime instead.
+    /// `host(for:)` takes a `PrimarySource`, and a secondary is not one.
     @Test func aSecondaryItemRefusesInsteadOfRendering() async throws {
         stubValidate(Self.success)
         let checkout = try makeCheckout()
@@ -285,8 +282,7 @@ struct PaymentElementTests {
 
     // MARK: Re-entrancy
 
-    /// Two taps in the same turn, the way a double tap on a wallet button arrives — not two
-    /// sequential `await`s, which serialise and would pass against the bug.
+    /// Two taps in the same turn: sequential `await`s serialise and would pass against the bug.
     @Test func aDoubleTapPostsValidateOnce() async throws {
         stubValidate(Self.success)
         let checkout = try makeCheckout()
@@ -308,14 +304,12 @@ struct PaymentElementTests {
 @Suite
 struct PaymentElementSizingTests {
 
-    /// Apple Pay and PayPal have different intrinsic heights; an express row that stacks both needs
-    /// one height, and asking for it must win over either.
+    /// An express row stacking Apple Pay and PayPal needs one height, overriding both intrinsics.
     @Test func anExplicitHeightIsHonoured() {
         #expect(PaymentElementView.explicitHeight(ProposedViewSize(width: 320, height: 48)) == 48)
     }
 
-    /// "Size yourself" in its three spellings. Each must fall through to the partner view's own
-    /// height — returning 0 or infinity here would collapse or explode the row.
+    /// "Size yourself" in its three spellings: returning 0 or infinity collapses or explodes the row.
     @Test func anUnspecifiedHeightFallsBackToTheIntrinsicOne() {
         #expect(PaymentElementView.explicitHeight(ProposedViewSize(width: 320, height: nil)) == nil)
         #expect(PaymentElementView.explicitHeight(ProposedViewSize(width: 320, height: .infinity)) == nil)

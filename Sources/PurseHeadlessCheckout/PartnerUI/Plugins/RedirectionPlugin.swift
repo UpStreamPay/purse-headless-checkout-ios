@@ -1,10 +1,10 @@
 // Web: packages/partner-ui/src/plugins/generics/redirection/index.ts
 // Same: /init at render, step_id + browser into /validate, token patched in.
-// Differs: partner and method come from the session, never hardcoded; the redirect is followed by the presenter after submit, not inside postValidation (there is no `window.location`).
+// Differs: partner and method come from the session; the redirect is followed by the presenter after submit, not inside postValidation (there is no `window.location`).
 
 import Foundation
 
-/// The **generic redirection** plugin — the protocol half, pure JSON, no UI types.
+/// The generic redirection plugin — the protocol half, no UI types.
 public struct RedirectionPlugin: PartnerUIPlugin {
 
     /// The `configurations.template` value this plugin is registered under.
@@ -18,9 +18,8 @@ public struct RedirectionPlugin: PartnerUIPlugin {
         self.method = method
     }
 
-    /// `POST /init` → the `step_id` the `/validate` payload carries back, then the item payload.
-    /// Web additionally runs an optional per-partner fingerprinting script here; its only entry is
-    /// PayPal's Fraudnet, a browser-`<script>` mechanism with no native equivalent.
+    /// Web also runs a per-partner fingerprinting script here; its only entry is PayPal's Fraudnet,
+    /// a browser-`<script>` mechanism with no native equivalent.
     public func preValidation(_ context: PartnerUIContext) async throws -> ValidateItemPayload {
         let initResponse = try await context.api.initPayment([
             "partner": .string(partner.wireValue),
@@ -47,7 +46,7 @@ public struct RedirectionPlugin: PartnerUIPlugin {
     }
 }
 
-/// Registers the generic redirection template. Built in — a merchant never installs this one.
+/// Built in — a merchant never installs this one.
 struct RedirectionModule: PartnerModule {
     let id = "purse.redirection"
 
@@ -59,8 +58,8 @@ struct RedirectionModule: PartnerModule {
 
     @MainActor func renders(_ plugin: any PartnerUIPlugin) -> Bool { plugin is RedirectionPlugin }
 
-    /// Nothing to show: the PSP's own hosted page is the payment step. `/init` runs inside
-    /// `preValidation`, so there is nothing to prepare either — it is ready as soon as it exists.
+    /// Nothing to show: the PSP's hosted page is the payment step, and `/init` runs inside
+    /// `preValidation`, so there is nothing to prepare either.
     @MainActor func surface(for plugin: any PartnerUIPlugin, request: SurfaceRequest) -> PaymentSurface? {
         PaymentSurface.headless(
             prepare: { request.listener.onReady(true) },

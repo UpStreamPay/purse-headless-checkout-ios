@@ -1,6 +1,6 @@
 // Web: packages/partner-ui/src/plugins/partners/klarna-installments/index.ts
 // Same: /init → widget (client token) → shopper interacts → /validate → Klarna's own authorize() only after /validate succeeds. One submit therefore both pays and opens Klarna's step.
-// Differs: native `KlarnaPaymentView` instead of the Klarna JS SDK; `loadPaymentReview()` is never called (US-only API); the host app supplies its own return URL — see `returnURL` below.
+// Differs: native `KlarnaPaymentView`, not the JS SDK; `loadPaymentReview()` is never called (US-only); the host app supplies the return URL.
 
 import Foundation
 import KlarnaCore
@@ -8,9 +8,8 @@ import KlarnaPayments
 import PurseHeadlessCheckout
 import UIKit
 
-/// Klarna's interactive half: ``prepare(into:returnURL:)`` runs `/init` and inflates the native
-/// widget into a container view, waiting for it to finish loading;
-/// ``KlarnaPlugin/postValidation(_:context:)`` then calls the widget's `authorize()` through the
+/// Klarna's interactive half: ``prepare(into:returnURL:)`` runs `/init` and loads the native widget,
+/// and ``KlarnaPlugin/postValidation(_:context:)`` later calls its `authorize()` via the registry.
 @MainActor
 public final class KlarnaCoordinator: NSObject {
 
@@ -23,9 +22,8 @@ public final class KlarnaCoordinator: NSObject {
         self.host = host
     }
 
-    /// `/init` for a client token, inflate the widget into `container`, and wait for it to finish
-    /// loading. On success the step id and an authorize token are stashed on the checkout, ready
-    /// for the next submit.
+    /// `/init` for a client token, inflate the widget into `container`, wait for it to load. On
+    /// success the step id and an authorize token are stashed on the checkout.
     public func prepare(into container: UIView, returnURL: URL) async throws {
         let context = host.buildContext()
         let initResponse = try await context.api.initPayment(
@@ -58,8 +56,7 @@ public final class KlarnaCoordinator: NSObject {
             return try await self.authorizeWidget()
         }
 
-        // One widget load at a time; a second `prepare()` would overwrite this continuation and
-        // strand the first caller.
+        // One at a time: a second `prepare()` would overwrite the continuation and strand the first.
         guard pendingReady == nil else {
             throw PartnerUIError("a Klarna widget is already being prepared")
         }
@@ -70,8 +67,7 @@ public final class KlarnaCoordinator: NSObject {
                 paymentView.initialize(clientToken: config.clientToken)
             }
         } catch {
-            // The registration above happens before the widget is known to work; drop it rather
-            // than leave a closure keyed by a token nothing will ever present.
+            // Registered before the widget was known to work; drop it rather than leak the closure.
             await KlarnaAuthorizationRegistry.shared.remove(token)
             throw error
         }
@@ -109,9 +105,8 @@ public final class KlarnaCoordinator: NSObject {
 
 extension KlarnaCoordinator: KlarnaPaymentEventListener {
 
-    // Klarna's own interface documents no delivery thread for these callbacks, and unlike Secure
-    // Fields' source, there is no way to read the binary's actual behavior — hop explicitly rather
-    // than assume, the same rule PayPal's and Apple Pay's bridges follow.
+    // Klarna documents no delivery thread for these callbacks and ships as a binary, so every one
+    // hops explicitly rather than assume.
 
     public nonisolated func klarnaInitialized(paymentView: KlarnaPaymentView) {
         Task { @MainActor in paymentView.load(jsonData: nil) }
@@ -148,8 +143,7 @@ extension KlarnaCoordinator: KlarnaPaymentEventListener {
     public nonisolated func klarnaResized(paymentView: KlarnaPaymentView, to newHeight: CGFloat) {}
 
     public nonisolated func klarnaFailed(inPaymentView paymentView: KlarnaPaymentView, withError error: KlarnaPaymentError) {
-        // KlarnaError is a plain NSObject with no Sendable annotation — take only what's needed
-        // before crossing to the main actor.
+        // KlarnaError is a plain NSObject with no Sendable annotation: read the message out here.
         let message = error.message
         Task { @MainActor in
             if let pending = self.pendingAuthorize {
@@ -159,8 +153,7 @@ extension KlarnaCoordinator: KlarnaPaymentEventListener {
                 self.pendingReady = nil
                 pending.resume(throwing: PartnerUIError("Klarna widget failed to load: \(message)"))
             } else {
-                // No pending call to fail — the widget is already up. Clear fulfilment so the
-                // merchant's UI reflects that this item can no longer be submitted as-is.
+                // Nothing pending: the widget is already up, so just clear fulfilment.
                 self.host.setFulfilled(false)
             }
         }

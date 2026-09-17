@@ -2,8 +2,7 @@ import Foundation
 import Testing
 @testable import PurseHeadlessCheckout
 
-/// Badge URL resolution. No network: these are string builders, and the point of testing them is
-/// that a wrong path 404s silently in a merchant's UI rather than failing anything here.
+/// Badge URL resolution: pure string builders, where a wrong path 404s silently in a merchant's UI.
 @Suite
 struct PurseAssetsTests {
 
@@ -54,8 +53,7 @@ struct PurseAssetsTests {
         #expect(secondary.hasSuffix("/giftcard2.svg"))
     }
 
-    /// A known partner's own default wins over the secondary fallback — easy2play is a real gift
-    /// card issuer, and its voucher method has its own badge.
+    /// A known partner's own default wins over the secondary fallback.
     @Test func aKnownSecondaryPartnerUsesItsOwnBadges() {
         let voucher = PurseAssets.resolveIconURL(
             partner: .other("easy2play"), method: .other("voucher"), isSecondary: true, environment: .sandbox

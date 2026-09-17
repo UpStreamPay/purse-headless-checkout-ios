@@ -2,8 +2,7 @@ import PurseHeadlessCheckout
 import SwiftUI
 import WebKit
 
-/// The pay screen a shopper would actually see. Same SDK calls as `PayScreen`, none of the
-/// developer chrome: no session refresh, no event log, no raw method ids.
+/// The pay screen a shopper would actually see: same SDK calls as `PayScreen`, no developer chrome.
 struct CheckoutPayScreen: View {
     @ObservedObject var controller: DemoController
 
@@ -41,9 +40,8 @@ struct CheckoutPayScreen: View {
 
                     if !controller.expressMethods.isEmpty {
                         PurseSectionTitle("Express checkout")
-                        // No cards: these ship their own styled button, and boxing one draws a
-                        // frame around a frame. Klarna is absent on purpose — its surface here is an
-                        // inline `KlarnaPaymentView` paying through the shared Pay button.
+                        // No cards: these ship their own styled button. Klarna is absent on purpose
+                        // — its surface pays through the shared Pay button, not its own.
                         ForEach(controller.expressMethods, id: \.id) { item in
                             PaymentElementView(controller.element(for: item))
                                 .frame(height: 48)
@@ -94,7 +92,6 @@ struct CheckoutPayScreen: View {
     }
 }
 
-/// A selectable method, shopper-side: badge, name, and only the detail a shopper needs.
 private struct ShopperRow: View {
     @ObservedObject var controller: DemoController
     let item: PaymentItem
@@ -107,7 +104,6 @@ private struct ShopperRow: View {
                 controller.select(selected ? nil : item)
             } label: {
                 HStack(spacing: PurseDS.Space.m) {
-                    // Peppermint marks the selection — identity colour, selected state.
                     PurseIcon(selected ? "circle-dot" : "circle", size: 20)
                         .foregroundStyle(selected ? PurseDS.accent : PurseDS.textSubtle)
                     MethodBadge(url: controller.iconURL(for: item))
@@ -169,9 +165,8 @@ private struct ShopperElementBody: View {
         }
     }
 
-    /// Whether ``body`` would draw anything. A saved wallet token needing no security code hits
-    /// every empty branch, and an empty container still costs the card its spacing — the row grew
-    /// for nothing. Kept beside `body`: the two must agree.
+    /// Whether ``body`` would draw anything: an empty container still costs the card its spacing,
+    /// so the row grows for nothing. Kept beside `body` — the two must agree.
     static func hasContent(_ element: PaymentElement, _ item: PaymentItem) -> Bool {
         if helperText(element, item) != nil { return true }
         if element.hasUI { return true }
@@ -191,11 +186,9 @@ private struct ShopperElementBody: View {
     }
 }
 
-/// The CDN badge from `iconURL(for:)`, in a `WKWebView` because the badges are **SVG** and neither
-/// `UIImage` nor `AsyncImage` decodes that — an `AsyncImage` here shows an empty placeholder
-/// forever. (The Lucide icons dodge it by living in the asset catalogue, rasterised at build time.)
-/// WebKit is already linked for redirects, so this adds no dependency; a real merchant would add an
-/// SVG library rather than a web view per row.
+/// The CDN badge, in a `WKWebView` because the badges are **SVG** and neither `UIImage` nor
+/// `AsyncImage` decodes that — `AsyncImage` shows an empty placeholder forever. WebKit is already
+/// linked for redirects; a real merchant would add an SVG library rather than a web view per row.
 private struct MethodBadge: UIViewRepresentable {
     let url: String
 
@@ -262,8 +255,7 @@ private struct SavedGiftCard: View {
     }
 }
 
-/// Gift cards, shopper-side. Same SDK calls as the playground's row, without the registration
-/// controls a shopper would not recognise mid-payment.
+/// Gift cards, shopper-side: the playground's row without the registration controls.
 private struct ShopperGiftCardRow: View {
     @ObservedObject var controller: DemoController
     let method: SecondaryMethod
@@ -339,7 +331,6 @@ private struct ShopperGiftCardRow: View {
     }
 }
 
-/// Blocks the screen while a payment is in flight.
 private struct CheckoutBusyOverlay: View {
     var body: some View {
         ZStack {

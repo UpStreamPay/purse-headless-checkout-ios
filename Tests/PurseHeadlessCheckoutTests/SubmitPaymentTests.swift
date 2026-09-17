@@ -2,9 +2,8 @@ import Foundation
 import Testing
 @testable import PurseHeadlessCheckout
 
-/// The create-payment pipeline and the latch that guards it. Serialized: `StubURLProtocol` keys its
-/// handlers globally, and swift-testing runs tests in parallel by default, so unserialized cases
-/// here would hand each other the wrong response.
+/// The create-payment pipeline and the latch that guards it. Serialized because `StubURLProtocol`
+/// keys its handlers globally, so parallel cases would hand each other the wrong response.
 @MainActor
 @Suite(.serialized)
 struct SubmitPaymentTests {
@@ -60,8 +59,8 @@ struct SubmitPaymentTests {
     /// The host the sandbox session's API root resolves to — this suite's slice of the shared stub.
     private static let host = "api.purse-sandbox.com"
 
-    /// A plugin whose `postValidation` throws — Klarna's does exactly this on a declined
-    /// authorization, *after* `/validate` has already charged the payment.
+    /// Throws in `postValidation`, as Klarna's does on a declined authorization — *after*
+    /// `/validate` has already charged the payment.
     private struct ThrowingPostValidationPlugin: PartnerUIPlugin {
         let partner: Partner
         let method: PaymentMethod
@@ -114,8 +113,7 @@ struct SubmitPaymentTests {
 
     // MARK: The latch
 
-    /// A second submit is refused with a code, not silently ignored — Android's deliberate
-    /// divergence from web, because a merchant needs something to react to (SDK-12218).
+    /// Deliberate divergence from web: a merchant needs a code to react to.
     @Test func aSecondSubmitIsRefusedWithACode() async throws {
         StubURLProtocol.reset(host: Self.host)
         StubURLProtocol.set("/validate", .ok(Self.successBody), host: Self.host)
@@ -132,15 +130,8 @@ struct SubmitPaymentTests {
         }
     }
 
-    /// Two taps in the same turn, not two sequential `await`s: sequential calls serialize and pass
-    /// even when the latch is broken. `acquireSubmitLock` suspends on the server clock — an actor
-    /// hop — between reading `sessionState` and claiming it, so both callers used to get through.
-    ///
-    /// The clock is deliberately slow. Without it the hop is too brief for the runtime to schedule
-    /// the second task inside the window, and the test passes against the broken latch too — which
-    /// it did, before the sleep was added. The 50 ms is what makes this a real regression guard:
-    /// the first caller holds `ServerDatetimeChecker` long enough for the second to run on the main
-    /// actor, which is exactly what a contended clock does on a real device at launch.
+    /// Two taps in the same turn: sequential calls serialize and pass even against a broken latch.
+    /// The clock sleeps 50 ms to widen the actor hop, so the second tap lands inside the window.
     @Test func twoConcurrentSubmitsSendOneValidate() async throws {
         StubURLProtocol.reset(host: Self.host)
         StubURLProtocol.set("/validate", .ok(Self.successBody), host: Self.host)
@@ -163,10 +154,8 @@ struct SubmitPaymentTests {
             return nil
         }.first
         #expect(refusal?.code == .submitBlocked)
-        // `.submitting`, not `.submitted`. A pair that never actually overlapped also yields one
-        // `/validate`, one success and a `.submitBlocked` code — the second call just arrives after
-        // `validationConsumed` is set, and reports `.submitted`. Only the state tells the two apart,
-        // so without this the test can silently stop guarding the latch it exists for.
+        // `.submitting`, not `.submitted`: a pair that never overlapped produces the same counts and
+        // the same code, so only the state proves the two taps really raced.
         guard case let .submitBlocked(state) = refusal else {
             Issue.record("expected submitBlocked, got \(String(describing: refusal))")
             return
@@ -174,7 +163,6 @@ struct SubmitPaymentTests {
         #expect(state == .submitting)
     }
 
-    /// A declined payment spends the session exactly as a successful one does.
     @Test func aDeclinedPaymentStillSpendsTheSession() async throws {
         StubURLProtocol.reset(host: Self.host)
         StubURLProtocol.set("/validate", .ok(#"{"global_status":"FAILED","results":[]}"#), host: Self.host)
@@ -242,8 +230,7 @@ struct SubmitPaymentTests {
     /// Retrying here is what double-charges people.
     @Test func anUnknownOutcomeSpendsTheSessionRatherThanInvitingARetry() async throws {
         StubURLProtocol.reset(host: Self.host)
-        // No handler registered for /validate → the stub fails the request with a transport error,
-        // which is exactly the "no HTTP status came back" shape.
+        // No handler for /validate: the stub fails with a transport error, the "no HTTP status" shape.
         let checkout = try makeCheckout()
         try selectCard(checkout)
 
@@ -327,8 +314,8 @@ struct SubmitPaymentTests {
     /// A method whose partner product was never installed names itself, rather than failing opaquely.
     @Test func aMissingPluginIsNamed() async throws {
         StubURLProtocol.reset(host: Self.host)
-        // Strip the built-ins so the card method genuinely resolves to nothing — the shape a
-        // merchant hits when a session offers PayPal but they never linked the PayPal product.
+        // Built-ins stripped so the method resolves to nothing, as when a merchant never links the
+        // partner product a session offers.
         let empty = PluginRegistry()
         empty.reset()
         let checkout = try PurseHeadlessCheckout(
@@ -351,9 +338,8 @@ struct SubmitPaymentTests {
 
     // MARK: Session-spending correctness
 
-    /// `/validate` answered — the payment exists — and a plugin then threw. The session is spent
-    /// either way; treating this as "the submit failed" would let the next submit send a second
-    /// `/validate` for an already-charged session.
+    /// `/validate` answered, then a plugin threw. Treating that as "the submit failed" would send a
+    /// second `/validate` for an already-charged session.
     @Test func aPostValidationFailureStillSpendsTheSession() async throws {
         StubURLProtocol.reset(host: Self.host)
         StubURLProtocol.set("/validate", .ok(Self.successBody), host: Self.host)
@@ -388,8 +374,7 @@ struct SubmitPaymentTests {
     }
 
     /// A terminal API answer (already submitted / expired / gone) ends the session rather than
-    /// leaving it looking submittable. The error arrives wrapped in `validateFailed`, so matching it
-    /// means walking the chain, not casting the top-level error.
+    /// leaving it looking submittable.
     @Test func aTerminalValidateAnswerTerminatesTheSession() async throws {
         StubURLProtocol.reset(host: Self.host)
         StubURLProtocol.set("/validate", .failure(409, #"{"error":"SESSION_ALREADY_SUBMITTED_ERROR"}"#), host: Self.host)
@@ -433,14 +418,11 @@ struct SubmitPaymentTests {
         #expect(checkout.currentSessionId == "session-1")
     }
 
-    /// Expiry is checked against the **server** clock. `ServerDatetimeChecker` existed and was
-    /// never consulted: nothing called `sync()` and nothing called `isExpiredForServer`, so a device
-    /// clock running slow would submit an expired session.
+    /// A device clock running slow must not be able to submit an expired session.
     @Test func expiryIsCheckedAgainstTheServerClockNotTheDevices() async throws {
         StubURLProtocol.reset(host: Self.host)
         StubURLProtocol.set("/validate", .ok(Self.successBody), host: Self.host)
-        // The server is a year ahead of this device: a session that still has an hour left *by the
-        // device clock* expired long ago as far as the server is concerned.
+        // Server a year ahead: an hour of life by the device clock, long expired by the server's.
         let formatter = ISO8601DateFormatter()
         let serverNow = Date().addingTimeInterval(365 * 24 * 3600)
         StubURLProtocol.set("/datetime", .ok(#"{"iso":"\#(formatter.string(from: serverNow))"}"#), host: Self.host)
@@ -467,8 +449,8 @@ struct SubmitPaymentTests {
 @Suite(.serialized)
 struct RedirectHandoffTests {
 
-    /// A different tier from SubmitPaymentTests on purpose: the stub is keyed by host, and the two
-    /// suites run in parallel, so sharing a host means sharing handlers.
+    /// A different tier from SubmitPaymentTests on purpose: the stub is keyed by host and the two
+    /// suites run in parallel.
     private static let host = "api.purse-test.com"
 
     private struct StubCardPlugin: PartnerUIPlugin {
@@ -537,7 +519,6 @@ struct RedirectHandoffTests {
         #expect(presenter.presented == [.get(url: "https://acs.bank.example/3ds")])
     }
 
-    /// No redirect is the common case, and is not an error.
     @Test func presentsNothingWhenNoRedirectIsAskedFor() async throws {
         stubValidate(#"{"global_status":"SUCCESS","results":[]}"#)
         let checkout = try checkout()
@@ -564,7 +545,6 @@ struct RedirectHandoffTests {
         #expect(presenter.presented.isEmpty)
     }
 
-    /// Returning `false` lets the SDK proceed.
     @Test func theMerchantHookCanDeclineToTakeItOver() async throws {
         stubValidate(Self.withRedirect)
         let hooks = PurseCheckoutHooks(onRedirection: { _ in false })

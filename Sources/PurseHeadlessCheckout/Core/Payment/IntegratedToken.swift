@@ -4,17 +4,15 @@
 
 import Foundation
 
-/// A saved instrument (card-on-file) carried by the session under
-/// `protocols.{partner}.{method}.integrated_tokens[]`.
+/// A saved instrument under `protocols.{partner}.{method}.integrated_tokens[]`.
 public struct IntegratedToken: Sendable, Equatable {
     public let id: String
-    /// The opaque value `/validate` pays with (`payment_data.token`).
+    /// What `/validate` pays with (`payment_data.token`).
     public let value: String
     public let uniquenessToken: String?
-    /// `pin_code` — the saved instrument's security code, when the partner stores one (gift cards).
-    /// Together with ``uniquenessToken`` it is what re-initialises a saved secondary token's balance.
+    /// Stored security code (gift cards). With ``uniquenessToken`` it re-initialises a saved
+    /// secondary token's balance.
     public let pinCode: String?
-    /// ISO expiration of the underlying card, as the session carries it.
     public let expirationDate: String?
     public let favorite: Bool
     public let name: String?
@@ -60,7 +58,7 @@ public struct IntegratedToken: Sendable, Equatable {
     }
 }
 
-/// Where a saved token lives — web's `IntegratedToken.source`.
+/// Web's `IntegratedToken.source`.
 public enum TokenSource: String, Sendable, CaseIterable {
     case merchant = "MERCHANT"
     case sharedWallet = "SHARED_WALLET"

@@ -18,9 +18,8 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) private static var requestedPaths: [String] = []
     nonisolated(unsafe) private static var bodies: [String: Data] = [:]
 
-    /// Handlers are keyed by **host** as well as path suffix. swift-testing runs suites in
-    /// parallel and this state is global, so two suites pointing at different API roots would
-    /// otherwise hand each other the wrong response — which is exactly what happened.
+    /// Keyed by **host** as well as path suffix: this state is global and suites run in parallel,
+    /// so two suites on different API roots would otherwise share handlers.
     static func set(_ suffix: String, _ response: Response, host: String) {
         lock.lock(); defer { lock.unlock() }
         handlers[key(host, suffix)] = response

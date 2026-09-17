@@ -58,9 +58,8 @@ struct MonitoringPrivacyTests {
         return found
     }
 
-    /// A freshly typed secondary's id is `"{method}-{pan.suffix(4)}"`, so emitting it handed the
-    /// collector the card's last four digits — sixteen lines below `applySecondary`'s own comment
-    /// saying it sends "whether the shopper chose the slice, never how much it is".
+    /// A freshly typed secondary's id is `"{method}-{pan.suffix(4)}"`, so emitting it would hand
+    /// the collector the card's last four digits.
     @Test func removingAGiftCardNeverEmitsItsPANDigits() async throws {
         StubURLProtocol.reset(host: Self.monitoringHost)
         StubURLProtocol.reset(host: Self.paymentHost)
@@ -92,8 +91,8 @@ struct MonitoringPrivacyTests {
     }
 
     /// `DisabledState.message` quotes amounts; only the stable `code` may travel. Driven through a
-    /// real suspension rather than a hand-built payload: a gift card covering all but 5 of a 100
-    /// order pushes the card method's rest-to-pay below its own `payment_min_amount`.
+    /// real suspension: a gift card covering all but 5 of a 100 order pushes the card method's
+    /// rest-to-pay under its own `payment_min_amount`.
     @Test func aDisabledMethodEmitsItsCodeAndNotItsMessage() async throws {
         StubURLProtocol.reset(host: Self.monitoringHost)
         StubURLProtocol.reset(host: Self.paymentHost)

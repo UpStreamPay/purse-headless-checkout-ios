@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// The checkout mode's frame, on the Purse styling reference. Same bones as `DemoScreen`, minus the
-/// wizard: a shopper is not on "step 2 of 3", they are on a page called Payment.
+/// The checkout mode's frame: `DemoScreen`'s bones on the Purse styling reference, minus the wizard.
 struct CheckoutScreen<Content: View, Action: View>: View {
     let title: String
     var subtitle: String?
@@ -23,7 +22,6 @@ struct CheckoutScreen<Content: View, Action: View>: View {
                 .padding(.top, PurseDS.Space.m)
                 .padding(.bottom, PurseDS.Space.s)
                 .background(PurseDS.surface)
-                // A bottom bar lifts off the page rather than sitting behind a divider.
                 .shadow(color: PurseDS.sheetShadow, radius: 24, x: 0, y: -8)
         }
         .background(PurseDS.surfaceMuted)
@@ -64,15 +62,13 @@ struct CheckoutHeader: View {
     }
 }
 
-/// One line of the basket.
 struct LineItemRow: View {
     let item: CartItem
     let currency: String
 
     var body: some View {
         HStack(alignment: .center, spacing: PurseDS.Space.m) {
-            // No product photography ships with this demo, so the placeholder is honest about it
-            // rather than pulling an image off the network.
+            // No product photography ships with this demo; nothing is fetched off the network.
             RoundedRectangle(cornerRadius: PurseDS.Radius.control)
                 .fill(PurseDS.surfaceMuted)
                 .frame(width: 48, height: 48)
@@ -94,12 +90,10 @@ struct LineItemRow: View {
     }
 }
 
-/// Subtotal, shipping, total. The total is the one a shopper checks against their bank app, so it
-/// is the largest thing on the card.
 struct OrderSummary: View {
     let subtotal: Decimal
     let currency: String
-    /// The session's amount once one exists — the authority, whatever the basket adds up to.
+    /// The authority once one exists, whatever the basket adds up to.
     var sessionAmount: Decimal?
 
     var body: some View {
@@ -118,8 +112,6 @@ struct OrderSummary: View {
                     .foregroundStyle(PurseDS.ink)
             }
             if let sessionAmount, sessionAmount != subtotal {
-                // The basket is a fixed prop; the amount that will actually be charged comes from
-                // the session alfred minted. When they disagree, the session wins and says so.
                 Text("The charged amount comes from the payment session, not this basket.")
                     .font(PurseDS.regular(PurseDS.Size.caption))
                     .foregroundStyle(PurseDS.textSubtle)
@@ -143,8 +135,7 @@ private struct SummaryLine: View {
     }
 }
 
-/// A fixed basket. No quantity editing, no persistence — it exists to give the payment an origin a
-/// shopper recognises, not to be a store.
+/// A fixed prop basket: no quantity editing, no persistence.
 struct CartItem: Identifiable {
     let id = UUID()
     let name: String

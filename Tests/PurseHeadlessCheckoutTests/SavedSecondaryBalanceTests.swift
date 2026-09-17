@@ -2,8 +2,7 @@ import Foundation
 import Testing
 @testable import PurseHeadlessCheckout
 
-/// Background `/init` resolution for saved gift cards — sequential, per Android's
-/// `InitGuard`-coalescing lesson (`AGENTS.md`).
+/// Background `/init` resolution for saved gift cards — sequential, per `AGENTS.md`.
 @MainActor
 @Suite(.serialized)
 struct SavedSecondaryBalanceTests {
@@ -83,9 +82,8 @@ struct SavedSecondaryBalanceTests {
 
         let saved = try #require(checkout.savedSecondaryTokens.first)
         #expect(saved.disabled == .tokenInitFailed)
-        // Specifically no `/init`. Creating a checkout does make one unrelated call — the server
-        // clock sync — so asserting on an empty path list would pin something this test never
-        // meant to be about.
+        // Specifically no `/init`: a checkout always makes one unrelated call, the server clock
+        // sync, so an empty path list would pin the wrong thing.
         #expect(!StubURLProtocol.paths(host: Self.host).contains { $0.hasSuffix("/init") })
     }
 
@@ -106,9 +104,8 @@ struct SavedSecondaryBalanceTests {
 
     // MARK: A terminal /init failure ends the whole session
 
-    /// `InitGuard.shared` remembers a terminal failure under its key indefinitely (`spent`, never
-    /// evicted on failure) — reset it around this test so the poisoned key cannot fast-reject a
-    /// later test that happens to build the same `(sessionId, partner, method, amount)` key.
+    /// `InitGuard.shared` never evicts a terminal failure, so reset it around this test or the
+    /// poisoned key fast-rejects any later test building the same key.
     @Test func aTerminalInitFailureTerminatesTheSession() async throws {
         StubURLProtocol.reset(host: Self.host)
         await InitGuard.shared.reset()
@@ -153,8 +150,7 @@ struct SavedSecondaryBalanceTests {
                 paymentSession: TestSessions.paymentSession(id: "session-2", amount: 100, protocols: illicadoProtocols())
             )
         )
-        // A rebuilt saved token starts unresolved again — the old balance cannot carry over, it was
-        // learned against the previous session.
+        // A rebuilt token starts unresolved: the old balance was learned against the old session.
         #expect(checkout.savedSecondaryTokens.first?.balanceResolved == false)
 
         await checkout.pendingSecondaryBalanceResolution?.value
@@ -163,8 +159,7 @@ struct SavedSecondaryBalanceTests {
 
     // MARK: Applying one
 
-    /// A saved card starts at `balance = 0, balanceResolved = false` until the background `/init`
-    /// answers.
+    /// A saved card reads `balance = 0` until the background `/init` answers.
     @Test func applyingASavedCardBeforeItsBalanceResolvedIsRefused() async throws {
         StubURLProtocol.reset(host: Self.host)
         // No /init handler: resolution cannot complete, so the balance stays unresolved.
@@ -181,8 +176,7 @@ struct SavedSecondaryBalanceTests {
         #expect(checkout.remainingAmountToPay == 100)
     }
 
-    /// The checkout's own copy wins over the caller's. A merchant holding the value type from
-    /// before resolution would otherwise apply a stale zero balance.
+    /// A merchant holding the value type from before resolution must not apply a stale zero.
     @Test func applyingUsesTheCheckoutsCurrentCopyNotTheCallers() async throws {
         StubURLProtocol.reset(host: Self.host)
         StubURLProtocol.set(

@@ -3,9 +3,8 @@ import Testing
 @testable import PurseCheckoutPayPal
 @testable import PurseHeadlessCheckout
 
-/// PayPal's `/init` shape and what reaches `/validate`. The approval flow itself needs a real
-/// device and a configured merchant client id, so it is not unit tested — the same gap Card and
-/// Apple Pay have.
+/// PayPal's `/init` shape and what reaches `/validate`. The approval flow needs a real device and
+/// a configured merchant client id, so it is not unit tested.
 @Suite(.serialized)
 @MainActor
 struct PayPalTests {
@@ -89,8 +88,7 @@ struct PayPalTests {
         #expect(try PayPalRequestBuilder.parseStepId(response) == 9)
     }
 
-    /// The saved-token init creates no order to approve, so it carries no order_id — only the
-    /// status is checked there, never the order_id.
+    /// The saved-token init creates no order, so only its status is checked, never an order_id.
     @Test func aTokenInitWithNoOrderIdStillReportsSuccess() throws {
         let response = JSONValue.object(["status": .object(["state": "SUCCESS"])])
         #expect(try PayPalRequestBuilder.parseStepId(response) == nil)
@@ -106,8 +104,8 @@ struct PayPalTests {
         #expect(payload.method == .wallet)
     }
 
-    /// Nothing the buyer produced is sent — approval is recorded against the order on PayPal's own
-    /// side; the SDK's orderId/payerId are diagnostics, not payload fields.
+    /// PayPal records approval against the order itself, so orderId/payerId are diagnostics here
+    /// and must not reach the payload.
     @Test func noBuyerDataIsSentForAFreshPayment() async throws {
         let payload = try await PayPalPlugin(partner: .paypal).preValidation(context(collected: [
             PayPalPlugin.Collected.stepId: .number("7"),

@@ -1,6 +1,6 @@
 // Web: none — web navigates the page and never sees the answer come back.
 // Same: `/validate`, then web's `manageRedirection` on the answer.
-// Differs: far smaller than Android's `PaymentCoordinator.capture`. `presentRedirectIfNeeded` already runs the resolver, the `onRedirection` hook and PayPal's approval-echo suppression, so Android's `RedirectDispatcher`/`shouldFollow` have no peer here.
+// Differs: smaller than Android's `PaymentCoordinator.capture` — `presentRedirectIfNeeded` already does what Android's `RedirectDispatcher`/`shouldFollow` do.
 
 import Foundation
 

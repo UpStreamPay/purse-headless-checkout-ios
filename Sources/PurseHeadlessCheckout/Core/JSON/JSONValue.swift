@@ -4,9 +4,8 @@
 
 import Foundation
 
-/// A free-form JSON value. The Payment API's partner-specific bodies (`payment_data`,
-/// `partner_data`, `order`, `payment_preferences`) have no fixed shape — only a plugin knows what
-/// goes in them — so they stay untyped, exactly as they do on web and Android.
+/// A free-form JSON value, for the Payment API's partner-specific bodies (`payment_data`,
+/// `partner_data`, `order`, `payment_preferences`), which have no fixed shape.
 public enum JSONValue: Sendable, Hashable {
     case null
     case bool(Bool)
@@ -50,8 +49,7 @@ public extension JSONValue {
         return nil
     }
 
-    /// Member lookup that yields `nil` for both "absent" and "explicitly null", the distinction
-    /// callers almost never want. Use `objectValue` directly when it matters.
+    /// `nil` for both "absent" and "explicitly null". Use `objectValue` when the difference matters.
     subscript(key: String) -> JSONValue? {
         guard case let .object(members) = self, let value = members[key], value != .null else { return nil }
         return value
@@ -68,8 +66,8 @@ extension JSONValue: Codable {
         } else if let value = try? container.decode(Bool.self) {
             self = .bool(value)
         } else if let value = try? container.decode(Decimal.self) {
-            // `Decimal`'s description is the shortest exact form of the literal, so `0.01` stays
-            // `0.01` rather than becoming `0.010000000000000000208…` via `Double`.
+            // `Decimal.description` is the shortest exact form, so `0.01` stays `0.01` rather than
+            // becoming `0.010000000000000000208…` via `Double`.
             self = .number(value.description)
         } else if let value = try? container.decode(String.self) {
             self = .string(value)
@@ -90,8 +88,8 @@ extension JSONValue: Codable {
         case let .bool(value):
             try container.encode(value)
         case let .number(text):
-            // Re-encode as a number, not a string. A literal we could not parse back into `Decimal`
-            // would silently become a quoted string on the wire, so fail loudly instead.
+            // A literal that will not parse back into `Decimal` would silently become a quoted
+            // string on the wire, so fail loudly instead.
             guard let value = Decimal(string: text) else {
                 throw EncodingError.invalidValue(
                     text,

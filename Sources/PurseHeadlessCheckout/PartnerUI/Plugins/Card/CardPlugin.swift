@@ -7,8 +7,8 @@ import Foundation
 import PurseSecureFields
 import UIKit
 
-/// The `purse`-vendor vault-backed card plugin — the protocol half, with no Secure Fields types in
-/// sight. The interactive half (the form, tokenization) lives in ``CardCoordinator``.
+/// The protocol half of the `purse`-vendor card plugin. The form and tokenization live in
+/// ``CardCoordinator``.
 public struct CardPlugin: PartnerUIPlugin {
 
     /// Keys ``CardCoordinator`` uses when handing its result back to the checkout.
@@ -27,9 +27,8 @@ public struct CardPlugin: PartnerUIPlugin {
         self.partner = partner
     }
 
-    /// The headless half of web's `validateUi`. The form itself lives in the coordinator, which
-    /// refuses to tokenize an invalid one, so all this can check is the outcome: a vault token
-    /// means the form was submitted successfully.
+    /// The headless half of web's `validateUi`. The coordinator refuses to tokenize an invalid
+    /// form, so a vault token is proof enough.
     public func validateUI(_ context: PartnerUIContext) async throws -> Bool {
         if let token = context.token, !token.requiresCVV { return true }
         return context.collected[Collected.token]?.stringValue != nil
@@ -46,8 +45,6 @@ public struct CardPlugin: PartnerUIPlugin {
         ])
         let stepId = try parseInit(initResponse)
 
-        // A saved card: the opaque token value plus its metadata travels straight into
-        // payment_data.
         if let token = context.token {
             var paymentData = token.patch()
             paymentData["vault_vendor"] = .string(Self.vaultVendor)
@@ -74,8 +71,8 @@ public struct CardPlugin: PartnerUIPlugin {
             throw PartnerUIError("card vault token missing — tokenize with Secure Fields before submitting")
         }
 
-        // `vault_vendor_token_id` is a **top-level field, not nested under `card`**. `card` carries
-        // only the non-sensitive metadata the vault echoed back.
+        // `vault_vendor_token_id` is top-level, **not** nested under `card`; `card` carries only the
+        // non-sensitive metadata the vault echoed back.
         var card: [String: JSONValue] = [:]
         if let bin = context.collected[Collected.bin]?.stringValue?.nonBlank {
             card["bin"] = .string(bin)
@@ -97,7 +94,7 @@ public struct CardPlugin: PartnerUIPlugin {
         )
     }
 
-    /// `/init`'s `step_id`, or a thrown error when the init itself was refused.
+    /// `/init`'s `step_id`, or a throw when the init was refused.
     private func parseInit(_ response: JSONValue) throws -> Int? {
         let status = response["status"]
         if let state = status?["state"]?.stringValue, !state.isEmpty, state != "SUCCESS" {
@@ -112,7 +109,6 @@ public struct CardPlugin: PartnerUIPlugin {
     }
 }
 
-/// Registers the Purse-vault card plugin for every method whose `vault.vendor` is `purse`.
 /// Built in — a merchant never installs this one.
 struct CardModule: PartnerModule {
     let id = "purse.card"
@@ -133,8 +129,6 @@ struct CardModule: PartnerModule {
             options: context.options
         )
         let listener = request.listener
-        // A form gates on its own validity; a no-CVV token has nothing to fill in, so it is ready
-        // as soon as it exists.
         let observer = CardReadinessObserver(coordinator: coordinator, listener: listener)
 
         return PaymentSurface(
@@ -165,17 +159,16 @@ struct CardModule: PartnerModule {
 }
 
 extension CardModule {
-    /// The four field views do not arrive alike: `SecurePANContainer` ships its own chrome — a 48pt
-    /// rounded `.secondarySystemBackground` box holding the PAN field and the brand selector —
-    /// while the CVV, expiry and holder-name views are bare fields with no height and no background
+    /// `SecurePANContainer` ships its own 48pt rounded box; the CVV, expiry and holder-name views
+    /// are bare fields with no height and no background, so they get a matching one here.
     @MainActor
     static func matchingPAN(_ view: UIView, theme: PurseTheme.Resolved) -> UIView {
         guard !(view is SecurePANContainer) else { return view }
 
         view.translatesAutoresizingMaskIntoConstraints = false
         let box = UIView()
-        // `PurseTheme.default` sets `input.backgroundColor` to `.clear`, which is an instruction to
-        // the *field* to paint nothing — not a colour for the box around it.
+        // `PurseTheme.default`'s `.clear` tells the *field* to paint nothing; it is not a colour for
+        // the box around it.
         let themed = theme.input.backgroundColor
         box.backgroundColor = (themed?.cgColor.alpha ?? 0) > 0 ? themed : .secondarySystemBackground
         box.layer.cornerRadius = 10

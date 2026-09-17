@@ -60,9 +60,8 @@ struct PartnerSurfaceTests {
         return error.message
     }
 
-    /// Apple Pay's merchant id is entitlement-bound and appears in no session, so a module installed
-    /// without one still registers the plugin — a host driving `ApplePayCoordinator` itself is
-    /// unaffected — and only the element refuses.
+    /// Apple Pay's merchant id is entitlement-bound and in no session, so a module installed
+    /// without one still registers the plugin; only the element refuses.
     @Test func applePayWithoutAMerchantIdRefusesAndSaysWhy() async throws {
         StubURLProtocol.reset(host: Self.host)
         let checkout = try makeCheckout([ApplePayModule()])
@@ -80,8 +79,7 @@ struct PartnerSurfaceTests {
     /// applicationId to build one from, so an absent URL is reported rather than guessed.
     @Test func klarnaWithoutAReturnURLRefusesAndSaysWhy() async throws {
         StubURLProtocol.reset(host: Self.host)
-        // Klarna serves `(klarna, installments)`, which this session does not offer, so the module
-        // is driven directly rather than through a method the resolver would never route here.
+        // This session does not offer `(klarna, installments)`, so drive the module directly.
         let checkout = try makeCheckout([KlarnaModule()])
         let spy = Spy()
         let host = try checkout.host(for: {

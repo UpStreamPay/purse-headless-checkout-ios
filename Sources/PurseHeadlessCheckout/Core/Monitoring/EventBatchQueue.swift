@@ -4,9 +4,8 @@
 
 import Foundation
 
-/// A batching queue — flushes as soon as `batchSize` items are queued, otherwise
-/// `flushAfterSeconds` after the first queued item (one timer at a time), and flushes early when
-/// the queued payload would exceed `maxBytes`.
+/// Flushes at `batchSize` items, `flushAfterSeconds` after the first queued item, or early when the
+/// queued payload would exceed `maxBytes`.
 actor EventBatchQueue<Item: Sendable> {
     private let batchSize: Int
     private let flushAfterNanoseconds: UInt64
@@ -31,7 +30,6 @@ actor EventBatchQueue<Item: Sendable> {
         self.byteSizer = byteSizer
     }
 
-    /// Route flushed batches somewhere — the `MonitoringAPIClient`.
     func setProcessor(_ processor: @escaping @Sendable ([Item]) async -> Void) {
         self.processor = processor
     }
@@ -60,9 +58,8 @@ actor EventBatchQueue<Item: Sendable> {
         await flushNow()
     }
 
-    /// The timer's own entry point, and the reason it cannot call ``flush()`` directly.
-    /// ``flushNow()`` starts by cancelling `pendingFlush` — which, on this path, is *the task
-    /// currently executing*.
+    /// The timer cannot call ``flush()``: ``flushNow()`` cancels `pendingFlush`, which on this path
+    /// is the task currently executing.
     private func timerFired() async {
         pendingFlush = nil
         await flushNow()
@@ -75,8 +72,7 @@ actor EventBatchQueue<Item: Sendable> {
         pendingFlush = nil
         guard !items.isEmpty else { return }
         guard let processor else {
-            // No processor wired yet — matches the caller always installing one before the first
-            // `post()`, same discipline Android's default no-op processor relies on.
+            // No processor wired yet: the caller always installs one before the first `post()`.
             items.removeAll()
             queuedBytes = 0
             return
@@ -84,7 +80,6 @@ actor EventBatchQueue<Item: Sendable> {
         while !items.isEmpty {
             let batch = Array(items.prefix(batchSize))
             items.removeFirst(batch.count)
-            // Subtract what this batch accounted for, rather than zeroing after the loop.
             queuedBytes = max(0, queuedBytes - batch.reduce(0) { $0 + byteSizer($1) })
             await processor(batch)
         }

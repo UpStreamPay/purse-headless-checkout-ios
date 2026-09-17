@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import PurseHeadlessCheckout
 
-/// `MonitoringAPIClient`'s own contract: the envelope shape, and the no-op-without-an-api-key rule
-/// that keeps a misconfigured or monitoring-disabled checkout fully usable.
+/// The envelope shape, and the no-op-without-an-api-key rule that keeps a monitoring-disabled
+/// checkout fully usable.
 @Suite(.serialized)
 struct MonitoringAPIClientTests {
 

@@ -1,12 +1,12 @@
 // Web: packages/partner-ui/src/commons/PartnerUI/theming
 // Same: scopes global / input / label / helperText with :focus :invalid :valid, the fallback chain (scope variant → scope → global variant → global).
-// Differs: native UIColor/UIFont at the public surface rather than CSS-like strings — Android needs a string parser because Compose has no CSS-string reader of its own; iOS has no such gap, and `input`'s resolved values map directly onto Secure Fields' own `SecureFieldsStyle`. Values reach `CardCoordinator` there; `label`/`helperText` have no rendering surface yet (Secure Fields has no label/helper-text views of its own) — see AGENTS.md.
+// Differs: native UIColor/UIFont, not CSS-like strings; `input` maps straight onto `SecureFieldsStyle`, while `label`/`helperText` have no rendering surface yet — see AGENTS.md.
 
 import UIKit
 
 /// Styling for the surfaces the SDK renders itself.
 public struct PurseTheme: Sendable {
-    /// Typography for a text scope (web's `ThemeScope<'label' | 'helperText' | 'global'>`).
+    /// Web's `ThemeScope<'label' | 'helperText' | 'global'>`.
     public struct Text: Sendable {
         public var color: UIColor?
         public var font: UIFont?
@@ -21,7 +21,7 @@ public struct PurseTheme: Sendable {
         }
     }
 
-    /// Styling for a secure input field — shaped to what `SecureFieldsStyle` can apply.
+    /// Shaped to what `SecureFieldsStyle` can apply.
     public struct FieldStyle: Sendable {
         public var color: UIColor?
         public var placeholderColor: UIColor?
@@ -50,8 +50,7 @@ public struct PurseTheme: Sendable {
         }
     }
 
-    /// Every scope fully resolved — no `nil` left for the keys ``default`` defines. This is what
-    /// ``CardCoordinator`` consumes to build Secure Fields' own style.
+    /// Every scope resolved — no `nil` left for the keys ``default`` defines.
     public struct Resolved: Sendable {
         public let input: FieldStyle
         public let inputFocus: FieldStyle
@@ -65,8 +64,7 @@ public struct PurseTheme: Sendable {
         public let gap: CGFloat
     }
 
-    /// Base values every scope falls back to (web `global`): colour, font, and the ``gap`` between
-    /// fields.
+    /// What every scope falls back to (web `global`).
     public var global: Text?
     public var globalInvalid: Text?
     public var globalValid: Text?
@@ -75,14 +73,13 @@ public struct PurseTheme: Sendable {
     public var inputFocus: FieldStyle?
     public var inputInvalid: FieldStyle?
     public var inputValid: FieldStyle?
-    /// Field labels rendered above each secure field (web `label`).
+    /// Labels above each secure field (web `label`).
     public var label: Text?
     public var labelInvalid: Text?
     public var labelValid: Text?
-    /// Help text under a field, and the error message shown in its place (web `helperText`).
+    /// Help text under a field, and the error shown in its place (web `helperText`).
     public var helperText: Text?
     public var helperTextInvalid: Text?
-    /// Spacing between fields (web `global.gap`).
     public var gap: CGFloat?
 
     public init(
@@ -125,8 +122,8 @@ public struct PurseTheme: Sendable {
         gap: 8
     )
 
-    /// Merge this theme over `base` and apply the fallback chain — web's `Theme.build()`: a key is
-    /// read from the scope variant, then the scope, then the global variant, then global.
+    /// Web's `Theme.build()`: a key is read from the scope variant, then the scope, then the global
+    /// variant, then global.
     public func resolve() -> Resolved {
         let merged = mergeOver(Self.default)
         let global = merged.global ?? Text()
@@ -163,7 +160,7 @@ public struct PurseTheme: Sendable {
         )
     }
 
-    /// Key-by-key merge — `self` wins wherever it sets a value, `base` fills the rest.
+    /// `self` wins wherever it sets a value, `base` fills the rest.
     private func mergeOver(_ base: PurseTheme) -> PurseTheme {
         PurseTheme(
             global: global?.over(base.global) ?? base.global,
@@ -183,8 +180,7 @@ public struct PurseTheme: Sendable {
     }
 }
 
-/// Overridable copy for the card form — the card subset of web's `HostedFormUIOptions`, one
-/// ``FieldTexts`` per secure field. `nil` falls back to the SDK's own default wording.
+/// The card subset of web's `HostedFormUIOptions`. `nil` falls back to the SDK's own wording.
 public struct CardFormTexts: Sendable {
     public var cardNumber: FieldTexts
     public var expDate: FieldTexts
@@ -203,9 +199,8 @@ public struct CardFormTexts: Sendable {
         self.holderName = holderName
     }
 
-    /// The five texts a secure field can show: its `label` above the field, the `placeholder`
-    /// inside it, the `helperText` under it, and the two messages that replace the helper text when
-    /// the field is invalid — `requiredError` for an empty field the shopper left, `formatError`
+    /// The texts one secure field can show. `requiredError` and `formatError` replace the helper
+    /// text when the field is invalid.
     public struct FieldTexts: Sendable {
         public var label: String?
         public var placeholder: String?

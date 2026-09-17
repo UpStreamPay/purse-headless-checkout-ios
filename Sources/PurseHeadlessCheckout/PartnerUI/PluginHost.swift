@@ -4,8 +4,8 @@
 
 import Foundation
 
-/// Everything a coordinator needs from the checkout for one payment item. One shape for every
-/// plugin; a coordinator only calls the members its flow uses.
+/// What a coordinator needs from the checkout for one payment item. A coordinator only calls the
+/// members its flow uses.
 @MainActor
 public protocol PluginHost: AnyObject {
     var environment: PurseEnvironment { get }
@@ -14,7 +14,6 @@ public protocol PluginHost: AnyObject {
     /// session recognizes reaching it as completion. Never auto-followed.
     var redirectionReturnURL: String? { get }
 
-    /// The context for this item against the current split.
     func buildContext() -> PartnerUIContext
 
     /// Stash what the native step produced (a sheet token, a `/init` step id, a vault token) for the
@@ -25,9 +24,8 @@ public protocol PluginHost: AnyObject {
     /// is the shopper choosing the method, and a cancelled sheet leaves the split untouched.
     func setAsPrimary() throws
 
-    /// Report whether this item's own form is complete and valid; gates fulfilment.
+    /// Whether this item's own form is complete and valid; gates fulfilment.
     func setFulfilled(_ fulfilled: Bool)
 
-    /// Run the plugin-driven `/validate` pipeline over the current split.
     func submitPayment() async throws -> ValidationResult
 }

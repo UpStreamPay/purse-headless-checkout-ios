@@ -1,14 +1,13 @@
 // Web: packages/partner-ui/src/plugins/partners/klarna-installments/index.ts
-// Same: /init; /validate carries only the step_id; Klarna's own authorize() runs in postValidation, only after /validate succeeds — one submit both pays and opens Klarna's step.
-// Differs: the live authorize callback can't travel through `collected` (wire-safe JSONValue only, no closures, unlike Android's untyped `collected: Map<String, Any>`). KlarnaCoordinator registers the closure in KlarnaAuthorizationRegistry, keyed by a token stashed in `collected` instead of the closure itself.
+// Same: /init; /validate carries only the step_id; authorize() runs in postValidation after /validate succeeds, so one submit both pays and opens Klarna's step.
+// Differs: `collected` is wire-safe JSONValue only, so the live authorize callback can't travel through it as it does on Android — KlarnaCoordinator registers the closure in KlarnaAuthorizationRegistry under a token stashed in `collected` instead.
 
 import Foundation
 import UIKit
 import PurseHeadlessCheckout
 
-/// Thrown by ``KlarnaPlugin/postValidation(_:context:)`` when the shopper declined Klarna's own
-/// authorization — distinct from ``PartnerUIError`` so ``KlarnaCoordinator`` can report it as a
-/// cancellation rather than a failure, the same distinction Android's `KlarnaAuthorizationDeclined`
+/// The shopper declined Klarna's own authorization. Distinct from ``PartnerUIError`` so it can be
+/// reported as a cancellation, not a failure — Android's `KlarnaAuthorizationDeclined`.
 public struct KlarnaAuthorizationDeclined: PurseError {
     public var code: PurseErrorCode { .partnerUIError }
     public var message: String { "Klarna declined to authorize" }
@@ -16,13 +15,13 @@ public struct KlarnaAuthorizationDeclined: PurseError {
     public init() {}
 }
 
-/// The Klarna [PartnerUiPlugin] — the protocol half (pure, no Klarna SDK types).
+/// The Klarna plugin — the protocol half, no Klarna SDK types.
 public struct KlarnaPlugin: PartnerUIPlugin {
 
     /// Keys ``KlarnaCoordinator`` uses in `setCollected`.
     public enum Collected {
-        /// The `/init` step id — threaded through to `/validate` unconditionally, same as Android
-        /// (a missing one is the API's problem to reject, not this plugin's to guard).
+        /// Threaded through to `/validate` unconditionally, as on Android — a missing one is the
+        /// API's to reject, not this plugin's to guard.
         public static let stepId = "klarnaStepId"
         /// The token ``KlarnaAuthorizationRegistry`` uses to look up the live authorize callback.
         public static let authorizeToken = "klarnaAuthorizeToken"
@@ -44,8 +43,7 @@ public struct KlarnaPlugin: PartnerUIPlugin {
         )
     }
 
-    /// Runs only once `/validate` itself succeeded (mirrors web's `executePayment`, which only
-    /// calls `postValidateItems` when `global_status === SUCCESS`).
+    /// Runs only once `/validate` itself succeeded, as web's `executePayment` does.
     public func postValidation(_ result: ValidationResult, context: PartnerUIContext) async throws {
         guard result.isSuccess else { return }
         guard let token = context.collected[Collected.authorizeToken]?.stringValue,
@@ -57,8 +55,8 @@ public struct KlarnaPlugin: PartnerUIPlugin {
     }
 }
 
-/// Builds the `/init` request body for a Klarna (`installments`) payment and parses its response —
-/// ports web's dedicated `klarna-installments` plugin. Pure JSON — no Klarna SDK types here.
+/// Builds and parses `/init` for a Klarna (`installments`) payment, porting web's
+/// `klarna-installments` plugin. Pure JSON — no Klarna SDK types.
 enum KlarnaRequestBuilder {
 
     /// `KlarnaPaymentView`'s `category` — the only category this plugin renders (web's `'klarna'`).
@@ -75,8 +73,7 @@ enum KlarnaRequestBuilder {
         ]
     }
 
-    /// Parse the `/init` response into a ``KlarnaConfig`` — just the `klarna_client_token` off
-    /// `plugin_result.logs`.
+    /// Just the `klarna_client_token` off `plugin_result.logs`.
     static func parseInitConfig(_ response: JSONValue) throws -> KlarnaConfig {
         let state = response["status"]?["state"]?.stringValue ?? ""
         guard state.isEmpty || state == "SUCCESS" else {
@@ -106,7 +103,7 @@ struct KlarnaConfig {
     let clientToken: String
 }
 
-/// Registers the Klarna installments plugin. Install this to offer Klarna:
+/// Install this to offer Klarna.
 public struct KlarnaModule: PartnerModule {
     public let id = "purse.klarna"
 
@@ -123,9 +120,8 @@ public struct KlarnaModule: PartnerModule {
         request: SurfaceRequest
     ) -> PaymentSurface? {
         let listener = request.listener
-        // Klarna opens external banking and ID apps and returns through a deep link. Android
-        // defaults it to `"{packageName}.klarna://return"`; iOS has no applicationId to build one
-        // from, so an absent URL is reported rather than guessed.
+        // Klarna returns from external banking and ID apps through a deep link. Android defaults
+        // it from the package name; iOS has nothing to build one from, so it must be supplied.
         guard let returnURL = request.appReturnURL else {
             return .headless(submit: {
                 listener.onOutcome(.failed(PartnerUIError(
@@ -150,8 +146,7 @@ public struct KlarnaModule: PartnerModule {
                     listener.onOutcome(.failed(error.asPurseError()))
                 }
             },
-            // Klarna authorizes inside `postValidation`, so one `/validate` both pays and opens
-            // Klarna's own step — there is no separate native call to make first.
+            // Klarna authorizes inside `postValidation`: no separate native call to make first.
             submit: { await request.captureNow() }
         )
     }

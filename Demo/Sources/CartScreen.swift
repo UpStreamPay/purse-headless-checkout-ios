@@ -1,14 +1,12 @@
 import SwiftUI
 
-/// Where the checkout flow starts. A shopper sees a basket and a checkout button; the session is
-/// minted behind it, so alfred never appears on screen.
+/// Where the checkout flow starts: the session is minted behind the button, so alfred never shows.
 struct CartScreen: View {
     @ObservedObject var controller: DemoController
 
     private let items = CartItem.sample
     private var subtotal: Decimal { CartItem.sampleSubtotal }
-    /// Before a session exists there is nothing to read a currency off, and the basket is priced in
-    /// euros to match alfred's fixture order.
+    /// Before a session exists there is no currency to read; the basket matches alfred's fixture.
     private var currency: String { controller.checkout?.currency ?? "EUR" }
 
     var body: some View {

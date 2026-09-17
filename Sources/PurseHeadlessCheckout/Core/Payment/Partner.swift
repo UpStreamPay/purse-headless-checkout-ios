@@ -1,11 +1,11 @@
 // Web: packages/sdk/src/types.ts (`Partner` union)
 // Same: known wire values.
-// Differs: enum with `.other(String)`. Android needs a `by lazy` list to dodge a sealed-object init-order NPE; a Swift enum has no such hazard, so the lookup is a plain switch.
+// Differs: enum with `.other(String)`; a plain switch, since Swift has none of the sealed-object init-order hazard Android's `by lazy` list works around.
 
 import Foundation
 
-/// A PSP — or, for ``Partner/purse``, Purse's own vault — behind a `protocols` entry. Web's
-/// `Partner` union has ~38 members; only the ones this SDK targets get a named case.
+/// A PSP behind a `protocols` entry. Web's `Partner` union has ~38 members; only the ones this SDK
+/// targets get a named case.
 public enum Partner: Sendable, Hashable {
     /// Purse's own card vault.
     case purse

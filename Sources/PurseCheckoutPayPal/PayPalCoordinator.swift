@@ -1,15 +1,14 @@
 // Web: packages/partner-ui/src/plugins/partners/paypal/wallet/index.ts (button, createOrder, onApprove)
 // Same: /init creates the order, the buyer approves, /validate captures with the step_id.
-// Differs: the PayPal iOS SDK's own browser-switch client instead of a JS popup; /init runs on the tap, not at render, so there's no orphan order; the approval URL echoed by /validate is suppressed centrally (see RedirectAction.isPayPalApprovalEcho) rather than per-plugin.
+// Differs: PayPal's browser-switch client, not a JS popup; /init runs on the tap so there is no orphan order; /validate's echoed approval URL is suppressed centrally (RedirectAction.isPayPalApprovalEcho).
 
 import CorePayments
 import Foundation
 import PayPalWebPayments
 import PurseHeadlessCheckout
 
-/// Drives PayPal's approval for one payment item. A saved PayPal token needs no approval at all —
-/// ``authorize()`` short-circuits to marking the item fulfilled, since `preValidation` will `/init`
-/// and patch the token itself.
+/// Drives PayPal's approval for one payment item. A saved token needs no approval — ``authorize()``
+/// just marks it fulfilled, since `preValidation` will `/init` and patch the token itself.
 @MainActor
 public final class PayPalCoordinator: NSObject {
 
@@ -21,20 +20,17 @@ public final class PayPalCoordinator: NSObject {
         self.host = host
     }
 
-    /// `/init` for an order, then present PayPal's approval flow and wait for the buyer. On success
-    /// the step id (and PayPal's diagnostic order/payer ids) are stashed on the checkout, ready for
-    /// the next submit.
+    /// `/init` for an order, then present PayPal's approval and wait; on success the step id and
+    /// PayPal's diagnostic ids are stashed on the checkout.
     public func authorize() async throws {
         let context = host.buildContext()
 
-        // A saved token has already been approved when it was vaulted — nothing to do here.
         if context.token != nil {
             host.setFulfilled(true)
             return
         }
 
-        // Read the client id BEFORE /init: without it the approval can never open, and failing
-        // first leaves no orphan PayPal order behind.
+        // Read the client id BEFORE /init: failing first leaves no orphan PayPal order behind.
         guard let clientId = context.configuration?.settings.merchantClientId?.nonBlank else {
             throw PartnerUIError(
                 "the session carries no merchant_specifics.client_id for "
@@ -54,8 +50,7 @@ public final class PayPalCoordinator: NSObject {
         client.delegate = self
         self.client = client
 
-        // One approval at a time: a second call would overwrite the continuation and strand the
-        // first caller for the life of the process.
+        // One at a time: a second call would overwrite the continuation and strand the first caller.
         guard pending == nil else {
             throw PartnerUIError("a PayPal approval is already in progress")
         }
@@ -73,15 +68,13 @@ public final class PayPalCoordinator: NSObject {
 
 extension PayPalCoordinator: PayPalWebCheckoutDelegate {
 
-    // Delegate callbacks are not documented as arriving on a particular thread, but the SDK's own
-    // ASWebAuthenticationSession completion runs on the main queue in practice (it's the same
-    // mechanism WebAuthRedirectPresenter uses directly).
+    // Delegate callbacks document no delivery thread, so every one hops explicitly.
     public nonisolated func payPal(
         _ payPalClient: PayPalWebCheckoutClient,
         didFinishWithResult result: PayPalWebCheckoutResult
     ) {
-        // Convert to Sendable values *here*, before crossing to the main actor — CoreSDKError and
-        // PayPalWebCheckoutResult are not Sendable (Swift 5.9 module, no annotations).
+        // `PayPalWebCheckoutResult` is not Sendable (Swift 5.9 module, no annotations): read the
+        // values out here, before crossing.
         let orderId = result.orderID
         let payerId = result.payerID
         Task { @MainActor in
@@ -90,9 +83,8 @@ extension PayPalCoordinator: PayPalWebCheckoutDelegate {
                 PayPalPlugin.Collected.payerId: .string(payerId),
             ])
             self.host.setFulfilled(true)
-            // The approval *is* the shopper choosing PayPal — `PluginHost.setAsPrimary`'s contract
-            // for a self-submitting flow, and what Android's `selectAndCapture` does here. Without
-            // it an approved order can leave the split's primary unset and the submit is refused.
+            // The approval *is* the shopper choosing PayPal — `setAsPrimary`'s contract for a
+            // self-submitting flow. Without it the split's primary stays unset and submit refuses.
             do {
                 try self.host.setAsPrimary()
             } catch {
@@ -124,9 +116,7 @@ extension PayPalCoordinator: PayPalWebCheckoutDelegate {
 }
 
 private extension PurseEnvironment {
-    /// Purse's environment tiers do not line up one-to-one with PayPal's two: only sandbox and live
-    /// exist on PayPal's side, so every non-production tier maps to sandbox — the same rule Apple
-    /// Pay's vault-environment mapping uses.
+    /// PayPal has only sandbox and live, so every non-production Purse tier maps to sandbox.
     var payPalEnvironment: CorePayments.Environment {
         switch self {
         case .production: .live

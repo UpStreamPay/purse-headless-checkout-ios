@@ -4,8 +4,8 @@
 
 import Foundation
 
-/// Parses `payment_session` into ``LegacyPaymentSession``. The only structural validation performed
-/// — `id` and `expiration_date` must be present — mirrors web's `checkSessionFormat` intentionally.
+/// Parses `payment_session`. Validating only `id` and `expiration_date` is deliberate — it mirrors
+/// web's `checkSessionFormat`, so a backend rollout cannot break a shipped app.
 enum LegacyPaymentSessionParser {
 
     static func parse(_ json: JSONValue) throws -> LegacyPaymentSession {
@@ -45,9 +45,8 @@ enum LegacyPaymentSessionParser {
 
             var methods: [PaymentMethod: MethodEntry] = [:]
             for (methodKey, entryNode) in methodsObject {
-                // Must be an *object*, not merely present. A string or number here would subscript
-                // to `nil` for every field and register the method with a fully-defaulted
-                // configuration — no min/max amount, no usage limit, i.e.
+                // Must be an *object*, not merely present: a string or number would subscript to
+                // `nil` for every field and register the method with no min/max amount or limit.
                 guard let configNode = entryNode["configurations"], configNode.objectValue != nil else { continue }
                 methods[.fromWire(methodKey)] = MethodEntry(
                     configurations: parseMethodConfiguration(configNode),
@@ -60,9 +59,9 @@ enum LegacyPaymentSessionParser {
     }
 
     private static func parseMethodConfiguration(_ json: JSONValue) -> MethodConfiguration {
-        // `.map` on the optional would fire for *any* non-null value, so `"vault": "purse"` would
-        // build a `VaultInfo(vendor: .unknown)` instead of `nil` — and two call sites branch on
-        // exactly that: `PaymentItem.isVaultedCard` would report a card-on-file needing a CVV form
+        // `flatMap`, not `.map`: `.map` fires for any non-null value, so `"vault": "purse"` would
+        // build a `VaultInfo(vendor: .unknown)` instead of `nil`, and `PaymentItem.isVaultedCard`
+        // branches on exactly that.
         let vault = json["vault"].flatMap { node -> VaultInfo? in
             guard node.objectValue != nil else { return nil }
             return VaultInfo(
@@ -107,8 +106,8 @@ enum LegacyPaymentSessionParser {
         guard let nodes = json?.arrayValue else { return [] }
 
         return nodes.compactMap { node in
-            // A token without an id or a value cannot be paid with — skip it rather than fail the
-            // whole session decode, matching Android.
+            // A token without an id or value cannot be paid with — skip it rather than fail the
+            // whole decode, matching Android.
             guard let id = node["id"]?.stringValue, let value = node["value"]?.stringValue else { return nil }
             let description = node["description"]
             return IntegratedToken(
@@ -141,9 +140,8 @@ enum LegacyPaymentSessionParser {
     }
 }
 
-/// ISO-8601 instants as the Payment API writes them. `ISO8601DateFormatter` is not one formatter
-/// but two: the API sends fractional seconds on some fields and not others, and a formatter
-/// configured for one rejects the other outright.
+/// Two formatters, not one: the API sends fractional seconds on some fields and not others, and a
+/// formatter configured for one rejects the other outright.
 enum ISO8601Date {
     static func parse(_ value: String) -> Date? {
         let withFractionalSeconds = ISO8601DateFormatter()

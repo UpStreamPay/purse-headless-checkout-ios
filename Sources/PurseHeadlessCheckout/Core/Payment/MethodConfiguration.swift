@@ -29,8 +29,7 @@ public struct MethodConfiguration: Sendable, Equatable {
         self.settings = settings
     }
 
-    /// A method is secondary iff its `labels` contains the literal string `"secondary"` — not a
-    /// `template` or partner check.
+    /// Secondary iff `labels` contains `"secondary"` — not a `template` or partner check.
     public var isSecondary: Bool { labels.contains(Self.secondaryLabel) }
 
     public static let secondaryLabel = "secondary"
@@ -62,9 +61,9 @@ public struct MethodSettings: Sendable, Equatable {
     public let integrationMode: IntegrationMode?
     /// `merchant_specifics.client_id` — the PSP's client-side SDK id (e.g. PayPal's REST client id).
     public let merchantClientId: String?
-    /// `merchant_specifics.pay_token_no_cvv` — pay a saved token without collecting the CVV.
+    /// `merchant_specifics.pay_token_no_cvv`.
     public let payTokenNoCVV: Bool
-    /// `settings.network_token` — enables the network-token no-CVV path when a token carries one.
+    /// `settings.network_token` — the network-token no-CVV path.
     public let networkToken: Bool
 
     public init(

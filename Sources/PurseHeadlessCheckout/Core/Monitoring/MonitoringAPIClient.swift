@@ -4,9 +4,8 @@
 
 import Foundation
 
-/// Ships monitoring event batches to `POST {root}?api-key=…`. Each event is wrapped in the same
-/// message envelope web uses: `{event, instanceId, entityId?, paymentSessionId?, walletSessionId?,
-/// version?, wrapper?, env, platform}` — plus the `platform` the native vault SDKs already send.
+/// Ships monitoring event batches to `POST {root}?api-key=…`, in web's message envelope plus the
+/// `platform` the native vault SDKs already send.
 public struct MonitoringAPIClient: Sendable {
     private let apiKey: String
     private let root: String
@@ -28,8 +27,6 @@ public struct MonitoringAPIClient: Sendable {
         self.session = session
     }
 
-    /// Queue `events` (each already serialized) for an async POST, stamped with `instanceId` and
-    /// whatever `extras` the checkout has patched on (entity id, session ids, version, wrapper).
     public func sendLogs(_ events: [JSONValue], instanceId: String, extras: [String: JSONValue]) async {
         guard !apiKey.isEmpty, !events.isEmpty else { return }
 

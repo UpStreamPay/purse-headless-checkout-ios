@@ -7,9 +7,8 @@ import Testing
 @Suite(.serialized)
 struct PaymentSessionStatusTests {
 
-    /// Its own host and session id: `StubURLProtocol`'s state is global and swift-testing runs
-    /// suites in parallel, so sharing a host with `SubmitPaymentTests` had each suite's `reset`
-    /// wiping the other's handlers.
+    /// Its own host and session id: `StubURLProtocol`'s state is global and suites run in
+    /// parallel, so a shared host means each suite's `reset` wiping the other's handlers.
     private static let host = "api.purse-confirmation.example"
     private static let sessionId = "confirmation-suite-session"
 
@@ -59,9 +58,8 @@ struct PaymentSessionStatusTests {
         #expect(status.operations.first?.partnerReference == "ref-t1")
     }
 
-    /// Payment API v2 splits an auto-captured payment into `AUTHORIZE` plus `CAPTURE`, where v1
-    /// sends one aggregate row. Both must read as one confirmed payment — which is why the
-    /// classifier asks "any successful money operation?" rather than counting rows.
+    /// v2 splits an auto-captured payment into `AUTHORIZE` plus `CAPTURE` where v1 sends one row;
+    /// both must read as one confirmed payment, so the classifier cannot count rows.
     @Test func aV2AuthorizeAndCapturePairIsOnePayment() async throws {
         stub(row("AUTHORIZE", "SUCCESS", id: "auth"), row("CAPTURE", "SUCCESS", id: "cap", parent: "auth"))
         let status = try await status()
@@ -82,9 +80,8 @@ struct PaymentSessionStatusTests {
         #expect(try await status().verdict == "confirmed")
     }
 
-    /// `WAITING` and `UNCERTAIN` have not settled; reading either as failed would tell a shopper
-    /// their paid order did not go through. An init-only session is pending for the same reason:
-    /// a method that would not start has not spent the session.
+    /// Reading `WAITING`, `UNCERTAIN` or an init-only session as failed would tell a shopper their
+    /// paid order did not go through.
     @Test func unsettledAndInitOnlySessionsArePending() async throws {
         stub(row("INIT", "SUCCESS"))
         #expect(try await status().verdict == "pending")

@@ -1,6 +1,6 @@
 // Web: packages/partner-ui `appendTo` — a plugin renders into a container the host hands it.
 // Same: a plugin is both a protocol and something rendered.
-// Differs: Android returns a `@Composable`; here it is a `UIView` factory, the only view currency the partner halves share (Secure Fields returns `[UIView]`, Klarna wants a container, PassKit and PayPal each ship a button).
+// Differs: Android returns a `@Composable`; here a `UIView` factory, the only currency the partner halves share (Secure Fields returns `[UIView]`, Klarna wants a container, PassKit and PayPal ship buttons).
 
 import Foundation
 import UIKit
@@ -9,13 +9,12 @@ import UIKit
 @MainActor
 public struct PaymentSurface {
 
-    /// `false` renders nothing — web's `hasUI()`. A no-CVV saved card and a redirection method.
+    /// Web's `hasUI()`. `false` for a no-CVV saved card and a redirection method.
     public let hasUI: Bool
 
     /// Apple Pay and PayPal pay from their own button. Do not offer a Pay button for one of these.
     public let selfSubmitting: Bool
 
-    /// The view to place, or `nil` when there is nothing to show.
     let makeView: () -> UIView?
 
     /// The partner's own setup — Klarna's widget load, Apple Pay's `/init`. Reports on the listener.
@@ -60,7 +59,6 @@ public struct SurfaceRequest {
     /// `"{itemId}:{generation}"` — changes when the element must rebuild.
     public let key: String
 
-    /// Where the surface reports readiness and outcomes.
     public let listener: any PaymentElementListener
 
     /// Klarna's app-return deep link. `nil` means none was given; say so on the listener rather
@@ -70,7 +68,7 @@ public struct SurfaceRequest {
     /// Where a redirect is presented. `nil` means the host follows redirects itself.
     public let redirectPresenter: (any RedirectPresenter)?
 
-    /// `/validate` through ``host``, then any redirect, then one outcome. See ``ElementFlow``.
+    /// See ``ElementFlow``.
     let capture: () async -> Void
 
     init(
@@ -91,9 +89,8 @@ public struct SurfaceRequest {
         self.capture = capture
     }
 
-    /// `setAsPrimary()` then ``captureNow()`` — for self-submitting flows, which select at the
-    /// moment their own button is tapped. A refusal ends the attempt here rather than escaping
-    /// into a partner SDK's completion handler where nothing would catch it.
+    /// `setAsPrimary()` then ``captureNow()``, for self-submitting flows. A refusal ends the attempt
+    /// here rather than escaping into a partner SDK's completion handler that would not catch it.
     public func selectAndCapture() async {
         do {
             try host.setAsPrimary()
@@ -111,8 +108,7 @@ public struct SurfaceRequest {
 }
 
 public extension Error {
-    /// Itself when already a ``PurseError``, wrapped as a partner failure otherwise. Public because
-    /// each partner product builds its own surface and reports its own failures.
+    /// Public because each partner product builds its own surface and reports its own failures.
     func asPurseError() -> any PurseError {
         (self as? any PurseError) ?? PartnerUIError(localizedDescription, underlying: self)
     }

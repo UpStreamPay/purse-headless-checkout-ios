@@ -84,13 +84,11 @@ struct RedirectionResolverTests {
         #expect(resolve(response(redirection: ["url": .string(url)])) == nil)
     }
 
-    /// Suppression works even with no session return URL to compare against.
     @Test func suppressionDoesNotDependOnTheSessionReturnURL() {
         let url = "https://anything.example/x?purse-redirection-data=abc"
         #expect(resolve(response(redirection: ["url": .string(url)]), sessionReturnURL: nil) == nil)
     }
 
-    /// A target that is just the session's own return URL is not a redirect either.
     @Test func theSessionsOwnReturnURLIsSuppressed() {
         let action = resolve(
             response(redirection: ["url": "https://shop.example/return?x=1"]),
@@ -147,7 +145,6 @@ struct RedirectionResolverTests {
         #expect(id == "pay_123")
     }
 
-    /// A percent-encoded JWT is the same JWT.
     @Test func readsThePaymentIdWhenTheJWTIsPercentEncoded() {
         let encoded = Self.confirmationJWT.replacingOccurrences(of: ".", with: "%2E")
         let url = "https://shop.example/confirmation?purse-redirection-data=\(encoded)"
@@ -186,8 +183,7 @@ struct RedirectionResolverTests {
     }
 }
 
-/// The `purse-redirection-data` JWT's claims. It is how a redirect return reports the payment's
-/// status, and it is read unsigned — the suite exists to pin the shape, not to bless the trust.
+/// The `purse-redirection-data` JWT's claims — read unsigned, so this pins the shape only.
 @Suite struct WidgetRedirectionDataTests {
 
     private func url(_ payload: String) -> String {

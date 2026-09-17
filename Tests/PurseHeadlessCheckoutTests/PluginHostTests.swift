@@ -2,9 +2,8 @@ import Foundation
 import Testing
 @testable import PurseHeadlessCheckout
 
-/// `PurseHeadlessCheckout.host(for:)` — the concrete `PluginHost` every coordinator
-/// (`CardCoordinator`, `ApplePayCoordinator`, `PayPalCoordinator`, `KlarnaCoordinator`) is built
-/// against, but which had no implementation anywhere in the repo until now.
+/// `PurseHeadlessCheckout.host(for:)` — the concrete `PluginHost` every coordinator is built
+/// against.
 @MainActor
 @Suite(.serialized)
 struct PluginHostTests {
@@ -131,9 +130,7 @@ struct PluginHostTests {
         #expect(await plugin.sessionSetCount == 1)
     }
 
-    /// Not "onSessionSet fires again for the same item" — Android never re-fires it for a
-    /// *surviving* item either, since a survivor's configuration is unchanged by definition
-    /// (nothing to refresh).
+    /// A survivor's configuration is unchanged by definition, so there is nothing to refresh.
     @Test func rearmsTrackingForAnIdADroppedItemOnceHeld() async throws {
         let (checkout, plugin) = try checkoutAndPlugin()
         let method = try primaryMethod(checkout)
@@ -141,8 +138,7 @@ struct PluginHostTests {
         await checkout.pendingSessionSet[method.id]?.value
         #expect(await plugin.sessionSetCount == 1)
 
-        // A different `labels` set makes this a different configuration under the same id — not a
-        // survivor.
+        // A different `labels` set is a different configuration under the same id, not a survivor.
         try checkout.setSession(TestSessions.widgetData(
             paymentSession: TestSessions.paymentSession(
                 id: "session-2",
@@ -176,9 +172,7 @@ struct PluginHostTests {
         let method = try primaryMethod(checkout)
         let host = try checkout.host(for: method)
 
-        // Nothing was selected as primary and no form was marked fulfilled — the same refusal
-        // `checkout.submitPayment()` itself would give, proving the host doesn't reimplement the
-        // submit path, just forwards to it.
+        // The same refusal `checkout.submitPayment()` gives: the host forwards, never reimplements.
         do {
             _ = try await host.submitPayment()
             Issue.record("expected submitPayment to be refused")

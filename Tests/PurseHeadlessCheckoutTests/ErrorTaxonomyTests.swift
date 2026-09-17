@@ -4,9 +4,8 @@ import Testing
 
 struct ErrorTaxonomyTests {
 
-    /// `outcomeUnknown` is the load-bearing one: it means the `/validate` may have reached the
-    /// server, so the payment may exist. Reporting that as a failure double-charges a shopper who
-    /// retries.
+    /// `outcomeUnknown` means the payment may exist; reporting it as a failure double-charges a
+    /// shopper who retries.
     @Test func transportFailureLeavesTheOutcomeUnknown() {
         let error = PaymentAPIError("boom", path: "/validate")
         #expect(error.outcomeUnknown)
@@ -45,8 +44,7 @@ struct ErrorTaxonomyTests {
         #expect(PurseSessionError.sessionMalformed("nope").documentationLink.hasSuffix("#session_malformed"))
     }
 
-    /// Codes are a shared vocabulary with web — a rename is a breaking change for a merchant
-    /// handling both platforms, so the raw values are pinned here.
+    /// A rename is a breaking change for a merchant handling both platforms.
     @Test func codeWireValuesArePinned() {
         #expect(PurseErrorCode.submitBlocked.rawValue == "SUBMIT_BLOCKED")
         #expect(PurseErrorCode.checkoutTornDown.rawValue == "CHECKOUT_TORN_DOWN")
@@ -55,9 +53,8 @@ struct ErrorTaxonomyTests {
         #expect(PurseErrorCode.partnerUIError.rawValue == "PARTNER_UI_ERROR")
     }
 
-    /// The code vocabulary is shared with web and Android. A code added on one platform and not the
-    /// others is exactly the drift this test exists to catch, so the whole set is pinned — not just
-    /// its size, which would not notice a rename.
+    /// The vocabulary is shared with web and Android, so the whole set is pinned — a size check
+    /// would not notice a rename.
     @Test func theCodeSetMatchesAndroid() {
         let android: Set<String> = [
             "EXPIRED_SESSION", "SESSION_MALFORMED", "SUBMIT_BLOCKED", "CHECKOUT_TORN_DOWN",
@@ -75,9 +72,8 @@ struct ErrorTaxonomyTests {
         #expect(Set(PurseErrorCode.allCases.map(\.rawValue)) == android)
     }
 
-    /// A request that never left the device cannot have created a payment, so it must not claim
-    /// `outcomeUnknown` — the caller acts on that by spending the session. It is deterministic, so
-    /// it is not worth retrying either.
+    /// A request that never left the device created no payment, so it must not claim
+    /// `outcomeUnknown` — the caller acts on that by spending the session.
     @Test func anErrorRaisedBeforeTheRequestWasSentIsNeitherUnknownNorRetryable() {
         let neverSent = PaymentAPIError("unusable URL", path: "/validate", requestSent: false)
         #expect(!neverSent.outcomeUnknown)

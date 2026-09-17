@@ -45,8 +45,7 @@ struct PurseThemeTests {
         // No `label` and no `labelInvalid` set — falls all the way to `globalInvalid`.
         #expect(theme.resolve().labelInvalid.color == globalInvalid)
 
-        // `label` set, `labelInvalid` not — the scope (`label`) is more specific than the global
-        // variant, so it wins: scope variant → **scope** → global variant → global.
+        // `label` set, `labelInvalid` not: the scope beats the global variant.
         let withLabel = PurseTheme(global: .init(color: .black), globalInvalid: .init(color: globalInvalid), label: .init(color: .systemBlue))
         #expect(withLabel.resolve().labelInvalid.color == .systemBlue)
     }

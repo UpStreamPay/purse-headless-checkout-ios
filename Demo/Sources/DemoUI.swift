@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Fixed header, scrolling body, pinned bottom action.
 struct DemoScreen<Content: View, Action: View>: View {
     let step: Int
     let title: String
@@ -66,7 +65,7 @@ struct DemoCard<Content: View>: View {
             .background(tinted ? DemoTheme.accentTint.opacity(0.08) : DemoTheme.surface)
             .clipShape(RoundedRectangle(cornerRadius: 20))
             // An outline, never a tint: a selected row's body hosts a partner's own UI, whose
-            // colours this demo does not control and cannot safely put on a coloured surface.
+            // colours this demo does not control.
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
                     .strokeBorder(DemoTheme.accentTint, lineWidth: selected ? 2 : 0)
@@ -196,7 +195,6 @@ struct EventLog: View {
     }
 }
 
-/// Blocks the whole screen while a payment is in flight.
 struct BusyOverlay: View {
     var body: some View {
         ZStack {

@@ -1,8 +1,7 @@
 import PurseHeadlessCheckout
 import SwiftUI
 
-/// The BNPL instalment schedule, rendered by the **host** — the SDK returns the numbers, not a view.
-/// Re-quoted whenever the remaining amount moves.
+/// The BNPL instalment schedule, rendered by the **host** — the SDK returns numbers, not a view.
 struct SimulationPreview: View {
     @ObservedObject var controller: DemoController
     let method: PrimaryMethod

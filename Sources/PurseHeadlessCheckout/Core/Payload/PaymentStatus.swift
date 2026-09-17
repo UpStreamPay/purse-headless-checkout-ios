@@ -6,18 +6,14 @@ import Foundation
 
 /// The Payment API's `global_status` of a `/validate` answer — web's `StatusState`.
 public enum PaymentStatus: String, Sendable, CaseIterable {
-    /// The payment is authorized (or captured): show the shopper a success.
     case success = "SUCCESS"
-    /// The payment was refused.
     case failed = "FAILED"
-    /// The API could not process the request.
     case error = "ERROR"
-    /// The outcome is not known yet; confirm against the session.
+    /// Outcome not known yet; confirm against the session.
     case uncertain = "UNCERTAIN"
-    /// The payment waits on a later step (an asynchronous partner).
+    /// Waiting on a later step (an asynchronous partner).
     case waiting = "WAITING"
-    /// A value this SDK version does not know; the raw string stays on
-    /// ``ValidationResult/globalStatus``.
+    /// Unknown to this SDK version; the raw string stays on ``ValidationResult/globalStatus``.
     case unknown = ""
 
     public var wireValue: String { rawValue }

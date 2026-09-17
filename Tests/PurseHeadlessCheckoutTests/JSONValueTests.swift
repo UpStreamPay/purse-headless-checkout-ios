@@ -8,8 +8,7 @@ struct JSONValueTests {
         try JSONDecoder().decode(JSONValue.self, from: Data(text.utf8))
     }
 
-    /// The whole reason numbers are kept as text. Money that goes through a `Double` comes back
-    /// wrong, and a splitter working on wrong cents is a wrong payment.
+    /// Why numbers are kept as text: money through a `Double` comes back as a wrong payment.
     @Test(arguments: ["0.01", "42.50", "1000.00", "0.07", "19.99"])
     func decimalsSurviveTheRoundTripExactly(_ literal: String) throws {
         let decoded = try roundTrip("{\"amount\":\(literal)}")

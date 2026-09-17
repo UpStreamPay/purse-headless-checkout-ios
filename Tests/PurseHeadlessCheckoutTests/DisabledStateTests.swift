@@ -5,9 +5,8 @@ import Testing
 /// The suspension model. Ported from Android's `DisabledState.kt` / `MethodAvailabilityTest.kt`.
 struct DisabledStateTests {
 
-    /// The code set is shared with Android. A code added on one platform and not the other is
-    /// exactly the drift this pins — and note SDK-12263's AC says fourteen, which is web's count,
-    /// not Android's. The AC needs amending; the code here is deliberate.
+    /// The code set is shared with Android; this pins the drift. Web counts fourteen, three of them
+    /// DOM-only, so eleven here is deliberate rather than a gap.
     @Test func theCodeSetMatchesAndroid() {
         let android: Set<String> = [
             "METHOD_UNSTABLE", "AMOUNT_CONDITION_UNREACHABLE", "PAYMENT_FULFILLED",
@@ -34,8 +33,7 @@ struct DisabledStateTests {
         ])
     }
 
-    /// A recoverable partner failure keeps its UI mounted — it is deliberately absent from the
-    /// technically-disabled and clear-UI sets, so the shopper can use it again when it comes back.
+    /// A recoverable partner failure keeps its UI mounted, so the shopper can use it again.
     @Test func aRecoverablePartnerErrorKeepsItsUIMounted() {
         let state = DisabledState.partnerUIRecoverableError(reason: "timeout")
         #expect(state.isRecoverable)

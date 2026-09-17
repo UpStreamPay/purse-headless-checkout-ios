@@ -75,7 +75,6 @@ private struct ModePicker: View {
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: PurseDS.Space.s) {
-                // The logo mark is the other place Peppermint belongs.
                 HStack(spacing: PurseDS.Space.s) {
                     Circle().fill(PurseDS.accent).frame(width: 10, height: 10)
                     Text("Purse")

@@ -1,20 +1,16 @@
 import PurseHeadlessCheckout
 import SwiftUI
 
-/// The order-confirmation page, and the demo's proof that a merchant can resolve a payment with the
-/// SDK alone.
-///
-/// The playground's result screen asks **alfred** what happened. A real merchant has no alfred, so
-/// this screen asks the session instead, through `awaitPaymentOutcome()`. That is the whole point of
-/// this mode: the path here is one a merchant can actually ship.
+/// The order-confirmation page. Where the playground's result screen asks **alfred** what happened,
+/// this asks the session through `awaitPaymentOutcome()` — the path a merchant can actually ship.
 struct ConfirmationScreen: View {
     @ObservedObject var controller: DemoController
 
     var body: some View {
         CheckoutScreen(title: heading, subtitle: "Order \(controller.orderReference)") {
             PurseCard(padding: PurseDS.Space.xl) {
-                // The status mark is the one large accent on the page. Peppermint stays out of it:
-                // a green tick and a red cross carry meaning the identity colour would muddy.
+                // Peppermint stays out of the status mark: a green tick and a red cross carry
+                // meaning the identity colour would muddy.
                 ZStack {
                     Circle().fill(accent.opacity(0.12)).frame(width: 64, height: 64)
                     PurseIcon(symbol, size: 28).foregroundStyle(accent)
@@ -60,12 +56,10 @@ struct ConfirmationScreen: View {
         } bottomAction: {
             PurseButton(title: "Back to shop") { controller.backToShop() }
         }
-        // Asked once when the screen appears, exactly as a merchant's own confirmation page would.
         .task { controller.confirmPayment() }
     }
 
-    /// The session's own verdict wins once there is one; until then the screen shows what the
-    /// payment attempt itself reported.
+    /// The session's verdict wins once there is one; until then, what the attempt itself reported.
     private var kind: DemoResult.Kind {
         switch controller.confirmedStatus {
         case .confirmed: return .authorized

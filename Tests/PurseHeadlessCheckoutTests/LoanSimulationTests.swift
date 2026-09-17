@@ -8,8 +8,7 @@ import Testing
 @Suite(.serialized)
 struct LoanSimulationTests {
 
-    /// Its own fictional root — `PaymentAPIClient` takes any `apiRoot` string directly, so this
-    /// suite never needs a real `PurseEnvironment` tier (all four are already claimed; see AGENTS.md).
+    /// A fictional root: `PaymentAPIClient` takes any `apiRoot`, and all four tiers are claimed.
     private static let host = "api.simulationtest.example"
 
     private func api() -> PaymentAPIClient {
@@ -30,9 +29,8 @@ struct LoanSimulationTests {
         #expect(simulation.totalAmount == 100)
     }
 
-    /// `instalment_number` counts every instalment: the initial one, the recurring ones and the
-    /// final one — `initial + (count − 2) × recurring + final`, not web's `(count − 1) × recurring`
-    /// on top of both, which double-counts one instalment.
+    /// `instalment_number` counts every instalment, so the total is
+    /// `initial + (count − 2) × recurring + final` — web's formula double-counts one.
     @Test func multipleInstallmentsUseTheCorrectedTotal() {
         let result = JSONValue.object([
             "initial_instalment_amount": .number("30"),
