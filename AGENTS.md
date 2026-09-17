@@ -215,7 +215,7 @@ after), do the same three checks that caught real problems with Secure Fields an
 
 1. **Does the package actually resolve?** `swift package resolve` against the real dependency URL,
    in a throwaway scratch package — not a search result, not the vendor's own docs. Secure Fields'
-   tagged releases do not resolve at all (see the README); PayPal's do.
+   tags once resolved for nobody, because the release assets behind its binary target 404'd.
 2. **Which products does it actually export, and from where?** Don't assume `import Foo` gives you
    everything the vendor's own sample code imports. PayPal's `CoreConfig`/`Environment` live in
    `CorePayments`, a separate product from `PayPalWebPayments` that is not re-exported — this only
@@ -403,23 +403,9 @@ risks blocking every future PR on an unknown volume of pre-existing violations. 
 when the tools are available: install both, run against the full tree, fix or explicitly baseline
 what they flag, *then* wire the CI step — not the other way around.
 
-**Why CI was red on every PR once `purse-securefields-ios` entered the graph — and what fixed it.**
-`Package.swift` took `purse-securefields-ios` over **ssh** (`git@github.com:…`), and every run
-failed identically with `git@github.com: Permission denied (publickey)` while resolving that one
-dependency. PRs #1–#3 passed only because they predate the dependency entering the graph.
-
-It looked like a private-repo problem and was not. **SSH authenticates regardless of repository
-visibility**, so an SSH URL needs a key whether or not the repo is public — and a CI runner has
-none. Making `purse-securefields-ios` public was therefore necessary but not sufficient; the fix
-was switching the URL to `https://`, which needs no credentials for a public repo. An earlier
-version of this note predicted the opposite ("CI goes green with no workflow change needed once the
-repo is public"), which was wrong.
-
-Going public did remove the *other* blocker: the tags' `.binaryTarget` release assets now answer
-`200` unauthenticated, so the revision pin is gone and `Package.swift` takes a real version range.
-
-**When an artifact looks broken, wipe DerivedData first.** Switching between the source pin and the
-binary artifact leaves a stale `PurseSecureFields.framework` behind, and the mismatch surfaces as
-`Undefined symbol: PurseSecureFields.SecureFieldsStyle.default.unsafeMutableAddressor` on *every*
-tag — indistinguishable from a genuinely broken release. It cost one confident wrong diagnosis here;
-both tags build fine from clean.
+**Two dependency gotchas, both resolved but easy to reintroduce.** Take a package over `https://`,
+never `git@github.com:` — SSH authenticates regardless of repository visibility, so an SSH URL needs
+a key a CI runner does not have. And wipe DerivedData when an artifact looks broken: switching
+between a source pin and a binary artifact leaves a stale framework behind, and the mismatch
+surfaces as `Undefined symbol: …unsafeMutableAddressor` on every tag, indistinguishable from a
+genuinely broken release.
