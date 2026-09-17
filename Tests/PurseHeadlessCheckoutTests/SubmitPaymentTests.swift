@@ -32,7 +32,8 @@ struct SubmitPaymentTests {
 
     private func makeCheckout(
         hooks: PurseCheckoutHooks? = nil,
-        expirationDate: String = "2099-01-01T00:00:00Z"
+        expirationDate: String = "2099-01-01T00:00:00Z",
+        serverClock: ServerDatetimeChecker? = nil
     ) throws -> PurseHeadlessCheckout {
         let registry = PluginRegistry()
         registry.install(StubModule())
@@ -42,7 +43,8 @@ struct SubmitPaymentTests {
             ),
             hooks: hooks,
             registry: registry,
-            urlSession: StubURLProtocol.session()
+            urlSession: StubURLProtocol.session(),
+            serverClockOverride: serverClock
         )
     }
 
@@ -128,6 +130,48 @@ struct SubmitPaymentTests {
         } catch let error as PurseCheckoutError {
             #expect(error.code == .submitBlocked)
         }
+    }
+
+    /// Two taps in the same turn, not two sequential `await`s: sequential calls serialize and pass
+    /// even when the latch is broken. `acquireSubmitLock` suspends on the server clock — an actor
+    /// hop — between reading `sessionState` and claiming it, so both callers used to get through.
+    ///
+    /// The clock is deliberately slow. Without it the hop is too brief for the runtime to schedule
+    /// the second task inside the window, and the test passes against the broken latch too — which
+    /// it did, before the sleep was added. The 50 ms is what makes this a real regression guard:
+    /// the first caller holds `ServerDatetimeChecker` long enough for the second to run on the main
+    /// actor, which is exactly what a contended clock does on a real device at launch.
+    @Test func twoConcurrentSubmitsSendOneValidate() async throws {
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/validate", .ok(Self.successBody), host: Self.host)
+
+        let slowClock = ServerDatetimeChecker(
+            fetchServerTime: { Date() },
+            clock: { Thread.sleep(forTimeInterval: 0.05); return Date() }
+        )
+        let checkout = try makeCheckout(serverClock: slowClock)
+        try selectCard(checkout)
+
+        let first = Task { try await checkout.submitPayment() }
+        let second = Task { try await checkout.submitPayment() }
+        let outcomes = await [first.result, second.result]
+
+        #expect(StubURLProtocol.paths(host: Self.host).filter { $0.hasSuffix("/validate") }.count == 1)
+        #expect(outcomes.filter { (try? $0.get()) != nil }.count == 1)
+        let refusal = outcomes.compactMap { result -> PurseCheckoutError? in
+            if case let .failure(error) = result { return error as? PurseCheckoutError }
+            return nil
+        }.first
+        #expect(refusal?.code == .submitBlocked)
+        // `.submitting`, not `.submitted`. A pair that never actually overlapped also yields one
+        // `/validate`, one success and a `.submitBlocked` code — the second call just arrives after
+        // `validationConsumed` is set, and reports `.submitted`. Only the state tells the two apart,
+        // so without this the test can silently stop guarding the latch it exists for.
+        guard case let .submitBlocked(state) = refusal else {
+            Issue.record("expected submitBlocked, got \(String(describing: refusal))")
+            return
+        }
+        #expect(state == .submitting)
     }
 
     /// A declined payment spends the session exactly as a successful one does.

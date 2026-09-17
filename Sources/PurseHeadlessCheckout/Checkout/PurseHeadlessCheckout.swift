@@ -122,7 +122,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
     /// - Parameters: - widgetData: the base64 `widget.data` string from your backend's Client
     /// Session response. - lockedEnvironment: overrides whatever `widgetData` declares.
-    public init(
+    public convenience init(
         widgetData: String,
         lockedEnvironment: PurseEnvironment? = nil,
         disabledMethods: Set<MethodKey> = [],
@@ -134,6 +134,40 @@ public final class PurseHeadlessCheckout: ObservableObject {
         walletAPIRootOverride: String? = nil,
         monitoringAPIRootOverride: String? = nil,
         restored: Bool = false
+    ) throws {
+        try self.init(
+            widgetData: widgetData,
+            lockedEnvironment: lockedEnvironment,
+            disabledMethods: disabledMethods,
+            hooks: hooks,
+            registry: registry,
+            secondaryConfigs: secondaryConfigs,
+            instanceId: instanceId,
+            urlSession: urlSession,
+            walletAPIRootOverride: walletAPIRootOverride,
+            monitoringAPIRootOverride: monitoringAPIRootOverride,
+            restored: restored,
+            serverClockOverride: nil
+        )
+    }
+
+    /// The designated initialiser. **Internal**, because `serverClockOverride` is a test seam with
+    /// no production caller: a merchant can plausibly want to pass a configured `URLSession`, but
+    /// nobody outside this package has a reason to supply a clock. Keeping it off the public surface
+    /// keeps it out of the SDK's semver contract.
+    init(
+        widgetData: String,
+        lockedEnvironment: PurseEnvironment? = nil,
+        disabledMethods: Set<MethodKey> = [],
+        hooks: PurseCheckoutHooks? = nil,
+        registry: PluginRegistry = .shared,
+        secondaryConfigs: SecondaryConfigs = .shared,
+        instanceId: String = UUID().uuidString,
+        urlSession: URLSession = .shared,
+        walletAPIRootOverride: String? = nil,
+        monitoringAPIRootOverride: String? = nil,
+        restored: Bool = false,
+        serverClockOverride: ServerDatetimeChecker?
     ) throws {
         let params = try SessionCodec.decode(widgetData)
         self.params = params
@@ -154,7 +188,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
             datetimeAPIRoot: environment.datetimeAPIRoot,
             session: urlSession
         )
-        self.serverClock = ServerDatetimeChecker(fetchServerTime: { try await datetimeAPI.datetime() })
+        // Injectable only so a test can hold the clock long enough to observe the submit latch's
+        // suspension window. Production callers never pass it.
+        self.serverClock = serverClockOverride
+            ?? ServerDatetimeChecker(fetchServerTime: { try await datetimeAPI.datetime() })
 
         let built = PaymentSessionBuilder.build(
             params.paymentSession,
@@ -452,6 +489,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
             postMonitoring(.submitBlocked, .warning, monitoringPayload(["state": .string(sessionState.rawValue)]))
             throw PurseCheckoutError.submitBlocked(state: sessionState)
         }
+        // Claimed before the `await` below, not after. `@MainActor` serialises synchronous regions,
+        // not whole `async` functions: a suspension ends one region, so a second caller would run
+        // during the hop, read `.ready`, and clear the same guard. Two taps, two `/validate`s.
+        sessionState = .submitting
         // Against the **server** clock, not the device's. A device running ten minutes slow would
         // otherwise submit an expired session, and one running fast would refuse a valid one — and
         // the shopper cannot fix either.
@@ -460,7 +501,6 @@ public final class PurseHeadlessCheckout: ObservableObject {
             postMonitoring(.expiredSession, .warning, monitoringPayload(["paymentSessionId": .string(session.id)]))
             throw PurseCheckoutError.sessionExpired(sessionId: session.id)
         }
-        sessionState = .submitting
     }
 
     /// Stash what an item's native step produced, for its next `/validate` payload.
@@ -1295,6 +1335,72 @@ public final class PurseHeadlessCheckout: ObservableObject {
         transform(&token)
         meansOfPayment[index] = .paymentToken(token)
         refresh()
+    }
+
+    // MARK: Badges
+
+    /// The CDN badge for one item, resolved for this session's environment.
+    ///
+    /// Returns a URL string; loading and rendering it is yours. The SDK ships no images.
+    public func iconURL(for item: PaymentItem) -> String {
+        PurseAssets.resolveIconURL(
+            partner: item.partner,
+            method: item.method,
+            isSecondary: item.isSecondary,
+            environment: environment
+        )
+    }
+
+    /// The card-scheme badges a method accepts, for the row that offers it. A brand with no badge
+    /// is left out rather than pointed at a URL that would 404.
+    public func schemeAssets(for method: PrimaryMethod) -> [PurseAssets.CardSchemeAsset] {
+        PurseAssets.buildCardSchemeAssets(brands: method.supportedBrands, environment: environment)
+    }
+
+    // MARK: Confirming the payment
+
+    /// Every transaction made so far against this session, raw.
+    ///
+    /// Prefer ``paymentStatus()`` unless you need the untouched rows.
+    ///
+    /// This goes to the Payment API under the **same** session id as `/init` and `/validate`, which
+    /// is `payment_session.id` from `widget.data`. Do not confuse it with
+    /// `legacy_payment_session_id`, a different id in a different service's key space: the two are
+    /// not interchangeable, and the Demo's alfred lookup deliberately uses the other one.
+    public func sessionTransactions() async throws -> [JSONValue] {
+        try await api.getSession()
+    }
+
+    /// What the session's transactions say about the payment, right now.
+    ///
+    /// This is the answer ``PaymentOutcome/returnedFromRedirect(url:)`` is not: a shopper returning
+    /// from a 3-D Secure or PSP page tells you they came back, nothing more. Ask the session.
+    public func paymentStatus() async throws -> PaymentSessionStatus {
+        PaymentSessionStatus.from(try await sessionTransactions())
+    }
+
+    /// Poll ``paymentStatus()`` until it settles, or until `timeout` elapses.
+    ///
+    /// Returns the last status on timeout or cancellation rather than throwing — a caller that has
+    /// just taken a shopper's money needs something to show them. Only a transport or teardown
+    /// failure throws. Defaults match Android's 60 s / 3 s.
+    public func awaitPaymentOutcome(
+        timeout: Duration = .seconds(60),
+        pollInterval: Duration = .seconds(3)
+    ) async throws -> PaymentSessionStatus {
+        let deadline = ContinuousClock.now + timeout
+        var latest = try await paymentStatus()
+        while case .pending = latest, ContinuousClock.now < deadline {
+            do {
+                try await Task.sleep(for: pollInterval)
+            } catch {
+                // Cancelled mid-poll — the caller's screen went away. Hand back what is known
+                // rather than throwing at someone who has just taken a shopper's money.
+                return latest
+            }
+            latest = try await paymentStatus()
+        }
+        return latest
     }
 
     // MARK: Loan simulation
