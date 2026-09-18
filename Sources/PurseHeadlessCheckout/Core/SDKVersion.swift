@@ -5,5 +5,5 @@ import Foundation
 
 /// The SDK version this app was built against, stamped on every monitoring event.
 public enum SDKVersion {
-    public static let value = "0.0.0" // x-release-please-version
+    public static let value = "1.0.0" // x-release-please-version
 }
