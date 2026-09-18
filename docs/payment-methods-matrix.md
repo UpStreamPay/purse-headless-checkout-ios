@@ -25,9 +25,10 @@ the platform.
 | 4 | exact `(partner, method)` | 17 partners (table below) | `(klarna, installments)`, `(paypal, wallet)`, `(ingenico, googlepay)` | `(klarna, installments)`, `(paypal, wallet)` |
 | 5 | method fallback | none | `googlepay` → `GooglePayPlugin` (any partner) | none |
 
-Apple Pay has no pair/fallback step at all — it is resolved by `PaymentMethod.applePay`, one wire
-value, configured per PSP variant (adyen/ingenico/default) from `/init` rather than by a
-`(partner, method)` pair. See `ApplePayVariant` and the Apple Pay row below.
+Apple Pay is resolved at step 5, the method fallback: `ApplePayModule` registers
+`registerFallback(method: .applePay)`, so the session's partner decides which PSP handles it. It is
+configured per PSP variant (adyen/ingenico/default) from `/init` rather than by a `(partner, method)`
+pair. See `ApplePayVariant` and the Apple Pay row below.
 
 ## Primary methods
 

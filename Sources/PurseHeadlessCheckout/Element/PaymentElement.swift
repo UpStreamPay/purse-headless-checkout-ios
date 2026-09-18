@@ -6,8 +6,8 @@ import Foundation
 import UIKit
 
 /// One rendered payment method or saved token. Build it when the shopper *selects* the item, not
-/// for every row — building runs the partner's `prepare`, which for Klarna and redirection is a
-/// `POST /init`.
+/// for every row — building runs the partner's `prepare`, which for Klarna and Apple Pay is a
+/// `POST /init`. A redirection method's `/init` runs later, in `preValidation`.
 @MainActor
 public final class PaymentElement: ObservableObject {
 

@@ -23,6 +23,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// Methods this app build opts out of, whatever the session offers. Re-applied by ``setSession(_:)``.
     public let disabledMethods: Set<MethodKey>
 
+    /// Locale, theme and card-form texts handed to every plugin this checkout builds. Android's
+    /// `options`; without it a merchant's `PurseTheme` cannot reach the card form.
+    public let options: PluginOptions
+
     /// Resolved Payment API root; calls go to `{root}/{entityId}/sessions/{sessionId}/…`.
     ///
     /// Re-resolved by ``setSession(_:)``, since the new blob may name a different host.
@@ -131,7 +135,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
         urlSession: URLSession = .shared,
         walletAPIRootOverride: String? = nil,
         monitoringAPIRootOverride: String? = nil,
-        restored: Bool = false
+        restored: Bool = false,
+        options: PluginOptions = PluginOptions()
     ) throws {
         try self.init(
             widgetData: widgetData,
@@ -145,6 +150,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
             walletAPIRootOverride: walletAPIRootOverride,
             monitoringAPIRootOverride: monitoringAPIRootOverride,
             restored: restored,
+            options: options,
             serverClockOverride: nil
         )
     }
@@ -163,6 +169,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
         walletAPIRootOverride: String? = nil,
         monitoringAPIRootOverride: String? = nil,
         restored: Bool = false,
+        options: PluginOptions = PluginOptions(),
         serverClockOverride: ServerDatetimeChecker?
     ) throws {
         let params = try SessionCodec.decode(widgetData)
@@ -173,6 +180,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
         self.environment = environment
         self.paymentAPIRoot = Self.resolveAPIRoot(params, locked: lockedEnvironment, environment: environment)
         self.disabledMethods = disabledMethods
+        self.options = options
         self.hooks = hooks
         self.registry = registry
         self.configs = secondaryConfigs
@@ -773,7 +781,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
             api: apiClient,
             register: registration,
             token: token,
-            collected: collectedByItem[item.id] ?? [:]
+            collected: collectedByItem[item.id] ?? [:],
+            options: options
         )
     }
 
@@ -1481,7 +1490,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
         hooks: PurseCheckoutHooks? = nil,
         registry: PluginRegistry = .shared,
         secondaryConfigs: SecondaryConfigs = .shared,
-        urlSession: URLSession = .shared
+        urlSession: URLSession = .shared,
+        options: PluginOptions = PluginOptions()
     ) throws -> PurseHeadlessCheckout {
         let checkout = try PurseHeadlessCheckout(
             widgetData: state.widgetData,
@@ -1491,7 +1501,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
             registry: registry,
             secondaryConfigs: secondaryConfigs,
             instanceId: state.instanceId,
-            urlSession: urlSession
+            urlSession: urlSession,
+            options: options
         )
         checkout.applySavedState(state)
         return checkout

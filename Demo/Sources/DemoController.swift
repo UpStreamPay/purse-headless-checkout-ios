@@ -345,7 +345,7 @@ final class DemoController: ObservableObject {
     }
 
     /// Selecting is what creates the element, and building one runs the partner's `prepare` — a
-    /// `POST /init` for Klarna and redirection methods. Nothing is prepared for an unselected row.
+    /// `POST /init` for Klarna and Apple Pay. Nothing is prepared for an unselected row.
     func select(_ item: PaymentItem?) {
         guard let checkout else { return }
         guard let item, item.id != selectedItemId else {

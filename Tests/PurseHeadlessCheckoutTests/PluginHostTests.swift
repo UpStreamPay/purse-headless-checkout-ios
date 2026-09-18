@@ -181,3 +181,54 @@ struct PluginHostTests {
         }
     }
 }
+
+/// A merchant's locale, theme and card-form texts reaching the plugins the checkout builds.
+///
+/// They did not: `pluginContext` omitted `options:` and every plugin saw `PluginOptions()`, so a
+/// configured `PurseTheme` could never reach the card form. Android threads its `options` through
+/// the same seam.
+@MainActor
+@Suite
+struct PluginOptionsTests {
+
+    private struct OptionsSpy: PartnerUIPlugin {
+        let partner: Partner
+        let method: PaymentMethod
+        let seen: Box
+
+        final class Box: @unchecked Sendable {
+            var options: PluginOptions?
+        }
+
+        func preValidation(_ context: PartnerUIContext) async throws -> ValidateItemPayload {
+            seen.options = context.options
+            return ItemPayload(partner: partner, method: method, amount: context.amount)
+        }
+    }
+
+    @Test func theCheckoutHandsItsOptionsToEveryPlugin() throws {
+        let box = OptionsSpy.Box()
+        let registry = PluginRegistry()
+        registry.registerVault(vendor: .purse) {
+            OptionsSpy(partner: $0.partner, method: $0.method, seen: box)
+        }
+        let options = PluginOptions(locale: "fr-FR", theme: PurseTheme())
+        let checkout = try PurseHeadlessCheckout(
+            widgetData: TestSessions.widgetData(
+                paymentSession: TestSessions.paymentSession(id: "plugin-options-session", amount: 100)
+            ),
+            registry: registry,
+            options: options
+        )
+
+        #expect(checkout.options.locale == "fr-FR")
+
+        let method = try #require(checkout.paymentMethods.compactMap { item -> PrimaryMethod? in
+            if case let .primaryMethod(method) = item { return method }
+            return nil
+        }.first)
+        let host = try checkout.host(for: method)
+        #expect(host.buildContext().options.locale == "fr-FR")
+        #expect(host.buildContext().options.theme != nil)
+    }
+}
