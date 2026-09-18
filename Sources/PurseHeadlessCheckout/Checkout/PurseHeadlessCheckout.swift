@@ -1370,15 +1370,25 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
     /// Poll ``paymentStatus()`` until it settles, or until `timeout` elapses.
     ///
-    /// Returns the last status on timeout or cancellation rather than throwing — a caller that has
-    /// just taken a shopper's money needs something to show them. Only a transport or teardown
-    /// failure throws. Defaults match Android's 60 s / 3 s.
+    /// Returns the last status on timeout, and on cancellation once it holds one — a caller that has
+    /// just taken a shopper's money needs something to show them. Cancelling before the first status
+    /// arrives throws `CancellationError`, never the transport error underneath it, which would read
+    /// as a network failure. A genuine transport or teardown failure still throws. Defaults match
+    /// Android's 60 s / 3 s.
     public func awaitPaymentOutcome(
         timeout: Duration = .seconds(60),
         pollInterval: Duration = .seconds(3)
     ) async throws -> PaymentSessionStatus {
         let deadline = ContinuousClock.now + timeout
-        var latest = try await paymentStatus()
+        var latest: PaymentSessionStatus
+        do {
+            latest = try await paymentStatus()
+        } catch {
+            // Cancelled before any status arrived: there is nothing to report, but the caller must
+            // still not be handed a transport error that reads as a network failure.
+            if Task.isCancelled { throw CancellationError() }
+            throw error
+        }
         while case .pending = latest, ContinuousClock.now < deadline {
             do {
                 try await Task.sleep(for: pollInterval)
