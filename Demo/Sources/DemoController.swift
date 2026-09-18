@@ -76,7 +76,7 @@ final class DemoController: ObservableObject {
         // No `ServiceLoader` here: partner products are installed explicitly, and Apple Pay's
         // merchant id is entitlement-bound so only the app can supply it.
         PluginRegistry.shared.install(ApplePayModule(configuration: ApplePayConfiguration(
-            merchantIdentifier: "merchant.eu.purse.demo",
+            merchantIdentifier: "merchant.com.adyen.Upstreampay871.test",
             merchantName: "Purse Demo"
         )))
         PluginRegistry.shared.install(PayPalModule())

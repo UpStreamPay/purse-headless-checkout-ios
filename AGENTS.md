@@ -331,7 +331,7 @@ Sources/PurseHeadlessCheckout/
   PartnerUI/   plugin contract, redirect machinery, card + redirection plugins   (Android: eu.purse.partnerui)
   Checkout/    PurseHeadlessCheckout, splitter, validate pipeline, elements      (Android: eu.purse.checkout)
 Tests/PurseHeadlessCheckoutTests/
-scripts/       generate-version.sh (git tag → SDKVersion.swift), load-env.sh
+scripts/       load-env.sh
 ```
 
 Dependency direction: `Checkout → {PartnerUI, Core}`, `PartnerUI → Core`, never back. `PartnerUI`
@@ -339,9 +339,13 @@ reaches the engine only through the `PluginHost` protocol.
 
 ## Versioning
 
-The version lives in the git tag and nowhere else. `scripts/generate-version.sh` stamps
-`SDKVersion.swift`; the checked-in value is `0.0.0-SNAPSHOT`. Releases are conventional-commit
-driven through release-please.
+Releases are conventional-commit driven through release-please, which owns the version in three
+places at once: the git tag, `.release-please-manifest.json` and the `x-release-please-version`
+annotation in `SDKVersion.swift`. All three move in the commit release-please merges, so the tagged
+commit already reports its own version.
+
+`SDKVersion.value` is not decoration — it is the `version` field on every monitoring event. A build
+that reports the wrong one makes it impossible to tell which SDK a payment problem came from.
 
 ## Privacy manifest and lint
 
