@@ -1382,12 +1382,15 @@ public final class PurseHeadlessCheckout: ObservableObject {
         while case .pending = latest, ContinuousClock.now < deadline {
             do {
                 try await Task.sleep(for: pollInterval)
+                latest = try await paymentStatus()
             } catch {
                 // Cancelled mid-poll — the caller's screen went away. Hand back what is known
-                // rather than throwing at someone who has just taken a shopper's money.
-                return latest
+                // rather than throwing at someone who has just taken a shopper's money. The sleep
+                // raises `CancellationError` but `URLSession` raises a transport error, so the
+                // task's own flag is the only signal that covers both.
+                if Task.isCancelled { return latest }
+                throw error
             }
-            latest = try await paymentStatus()
         }
         return latest
     }

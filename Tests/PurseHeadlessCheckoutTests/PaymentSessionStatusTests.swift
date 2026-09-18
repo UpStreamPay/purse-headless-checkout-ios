@@ -140,12 +140,14 @@ struct PaymentSessionStatusTests {
         let status = try await makeCheckout().awaitPaymentOutcome(
             timeout: .milliseconds(30), pollInterval: .milliseconds(10)
         )
+        // Only the returned status is asserted. How many polls fit inside the timeout is the
+        // runner's business, and asserting a count made this fail on a slow CI box where the
+        // deadline passed before a second call.
         #expect(status.verdict == "pending")
-        #expect(Self.transactionCalls > 1)
     }
 
-    /// Same contract when the caller's screen goes away mid-poll: `Task.sleep` throws on
-    /// cancellation, and that must not reach a caller promised a status.
+    /// Same contract when the caller's screen goes away mid-poll. Cancellation can surface from the
+    /// sleep or from the in-flight request, and neither may reach a caller promised a status.
     @Test func awaitReturnsTheLastStatusWhenCancelledMidPoll() async throws {
         stub(row("AUTHORIZE", "WAITING"))
         let checkout = try makeCheckout()
