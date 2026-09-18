@@ -106,10 +106,14 @@ Simulator shares the host's network stack. A physical device needs your machine'
 **There is no offline path.** Without alfred the demo mints nothing; paste a `widget.data` on screen
 1 instead. CI builds it in Debug and Release.
 
-**What still needs credentials this repo does not have.** Apple Pay's `/init` answers 400 without a
-real merchant id, and the sheet needs an entitlement — the button renders and the failure is
-reported, which is the honest result. Klarna needs a live client token. Everything else runs: the
-saved card, the redirection methods, gift-card split, loan simulation, `setSession`, teardown.
+**What the demo still cannot exercise.** Apple Pay needs the In-App Payments entitlement on the
+build alongside its merchant identifier, so it only works on a signed build and a real device; the
+button renders regardless and the failure is reported, which is the honest result.
+
+Everything else depends only on what the session offers: a method the Purse entity does not have
+activated simply is not in the list. Klarna needs nothing from the app — its client token comes back
+in the `/init` response (`plugin_result.logs.klarna_client_token`), so activating Klarna on the
+entity is all it takes.
 
 **Launch flags**, for smoke tests, never on by default. `-demo-autostart` mints a session and opens
 the playground's pay screen. `-demo-checkout` opens checkout mode at its basket; with
