@@ -18,8 +18,8 @@ public final class ApplePayCoordinator: NSObject {
     private var preparedAmount: Decimal?
     private var controller: PKPaymentAuthorizationController?
     private var pending: CheckedContinuation<Void, any Error>?
-    /// Set on authorization; distinguishes "the shopper cancelled" from "the sheet closed after
-    /// paying", which arrive through the same delegate callback.
+    /// Both cancelling and paying close the sheet through the same delegate callback; this tells
+    /// them apart.
     private var authorized = false
 
     public init(host: any PluginHost, configuration: ApplePayConfiguration) {
@@ -28,8 +28,7 @@ public final class ApplePayCoordinator: NSObject {
         self.variant = ApplePayVariant.of(host.buildContext().partner)
     }
 
-    /// Whether this device can pay at all. Hide the button when `false` — Apple requires it not be
-    /// shown to someone who cannot use it.
+    /// Whether this device can pay at all. Apple requires the button be hidden when `false`.
     public static var canPay: Bool {
         PKPaymentAuthorizationController.canMakePayments()
     }
@@ -41,7 +40,6 @@ public final class ApplePayCoordinator: NSObject {
     }
 
     /// `POST /init` for the sheet configuration.
-    ///
     /// - Throws: ``PartnerUIError`` when `/init` returns nothing usable.
     public func prepare() async throws {
         let context = host.buildContext()
@@ -62,14 +60,12 @@ public final class ApplePayCoordinator: NSObject {
         preparedAmount = context.amount
     }
 
-    /// Present the sheet and wait for the shopper. On success the authorized token is stashed on
-    /// the checkout, ready for the next submit.
+    /// Present the sheet and wait; on success the authorized token is stashed on the checkout.
     public func present() async throws {
         guard let request, let preparedAmount else {
             throw PartnerUIError("call prepare() before present() — the sheet has no configuration yet")
         }
-        // PassKit presents one sheet at a time; a second call would overwrite the continuation and
-        // strand the first caller for the life of the process.
+        // One at a time: a second call would overwrite the continuation and strand the first.
         guard pending == nil else {
             throw PartnerUIError("an Apple Pay sheet is already open")
         }
@@ -97,8 +93,7 @@ public final class ApplePayCoordinator: NSObject {
             controller.present { presented in
                 guard !presented else { return }
                 MainActor.assumeIsolated {
-                    // PassKit refuses to present without saying why, and the cause is almost always
-                    // the entitlement.
+                    // PassKit refuses to present without saying why; usually the entitlement.
                     self.resume(.failure(PartnerUIError(
                         """
                         the Apple Pay sheet could not be presented. The usual causes, in order:
@@ -122,8 +117,8 @@ public final class ApplePayCoordinator: NSObject {
     }
 }
 
-// PassKit does not document which queue it calls its delegate on, and the whole conformance
-// inherits `@MainActor` from the class while mutating `pending`, `authorized` and `controller`.
+// PassKit does not document which queue it calls its delegate on, and this conformance mutates
+// `@MainActor` state — hence the explicit hop in every callback.
 extension ApplePayCoordinator: PKPaymentAuthorizationControllerDelegate {
 
     public nonisolated func paymentAuthorizationController(
@@ -173,8 +168,8 @@ extension ApplePayCoordinator: PKPaymentAuthorizationControllerDelegate {
 
         host.setCollected(collected)
         host.setFulfilled(true)
-        // The tap *is* the shopper choosing this method — `PluginHost.setAsPrimary`'s own contract
-        // for a self-submitting flow, and what Android's `selectAndCapture` does.
+        // The tap *is* the shopper choosing this method — `setAsPrimary`'s contract for a
+        // self-submitting flow, matching Android's `selectAndCapture`.
         do {
             try host.setAsPrimary()
         } catch {
@@ -184,8 +179,7 @@ extension ApplePayCoordinator: PKPaymentAuthorizationControllerDelegate {
         }
         authorized = true
 
-        // The sheet is told the authorization succeeded — that is about Apple's UI, not the
-        // payment. The payment happens at /validate, which the merchant submits next.
+        // `.success` is about Apple's UI, not the payment: that happens at /validate, next.
         handler.callAsFunction(PKPaymentAuthorizationResult(status: .success, errors: nil))
     }
 

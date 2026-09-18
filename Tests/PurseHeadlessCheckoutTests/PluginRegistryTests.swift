@@ -14,8 +14,7 @@ struct PluginRegistryTests {
         }
     }
 
-    /// A registry with the built-ins (card + redirection), plus whatever the test registers on top.
-    /// Later registrations win, which is how a test substitutes a stub for a built-in.
+    /// Built-ins plus whatever the test adds; later registrations win, so a stub can replace one.
     private func registry(configuring: (PluginRegistry) -> Void = { _ in }) -> PluginRegistry {
         let registry = PluginRegistry()
         configuring(registry)

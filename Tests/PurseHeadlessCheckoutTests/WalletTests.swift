@@ -3,8 +3,7 @@ import Testing
 @testable import PurseHeadlessCheckout
 
 /// Wallet token management — rename, delete, favorite, delete-all — and the label rules that gate
-/// them. Uses its own fictional Wallet API root (`walletAPIRootOverride`), independent of the
-/// `PurseEnvironment` tier the session declares, so this suite claims no tier at all.
+/// them. Its own fictional root via `walletAPIRootOverride`, so this suite claims no tier.
 @MainActor
 @Suite(.serialized)
 struct WalletTests {
@@ -49,8 +48,7 @@ struct WalletTests {
         #expect(await client.getTokens().isEmpty)
     }
 
-    /// `URLSession` has no `HttpURLConnection`-style restriction against `PATCH` — a real one goes
-    /// on the wire, not `POST` + `X-HTTP-Method-Override` the way Android sends it.
+    /// A real `PATCH` goes on the wire, not Android's `POST` + `X-HTTP-Method-Override`.
     @Test func editTokenNameSendsARealPATCH() async throws {
         StubURLProtocol.reset(host: Self.host)
         StubURLProtocol.set("/tokens/tok-1/name", .ok("{}"), host: Self.host)

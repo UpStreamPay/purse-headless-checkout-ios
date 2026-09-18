@@ -1,7 +1,7 @@
 # Payment methods by platform — web vs Android vs iOS
 
-Source of truth, checked on 2026-09-14, against this SDK's own PRs #1–#13 and
-`purse-headless-checkout-android/docs/payment-methods-matrix.md`.
+Source of truth, checked on 2026-09-17 against `purse-headless-checkout-android/docs/payment-methods-matrix.md`
+and this SDK's own source.
 
 - **Web**: `usp-widget/packages/partner-ui/src/plugins/{vaults,generics,partners}/index.ts` and
   `packages/headless-checkout/src/session/payment/mops/secondaries/configs/configs.ts`.
@@ -25,9 +25,10 @@ the platform.
 | 4 | exact `(partner, method)` | 17 partners (table below) | `(klarna, installments)`, `(paypal, wallet)`, `(ingenico, googlepay)` | `(klarna, installments)`, `(paypal, wallet)` |
 | 5 | method fallback | none | `googlepay` → `GooglePayPlugin` (any partner) | none |
 
-Apple Pay has no pair/fallback step at all — it is resolved by `PaymentMethod.applePay`, one wire
-value, configured per PSP variant (adyen/ingenico/default) from `/init` rather than by a
-`(partner, method)` pair. See `ApplePayVariant` and the Apple Pay row below.
+Apple Pay is resolved at step 5, the method fallback: `ApplePayModule` registers
+`registerFallback(method: .applePay)`, so the session's partner decides which PSP handles it. It is
+configured per PSP variant (adyen/ingenico/default) from `/init` rather than by a `(partner, method)`
+pair. See `ApplePayVariant` and the Apple Pay row below.
 
 ## Primary methods
 
@@ -92,9 +93,9 @@ Same keys on all three platforms; each is a config, not a plugin.
 
 | Other secondaries behaviour | Web | Android | iOS |
 |---|---|---|---|
-| Saved gift cards (`integrated_tokens` on a secondary) | ✅ | ✅ | ✅ — background balance resolution, sequential per `/init` (PR #11) |
+| Saved gift cards (`integrated_tokens` on a secondary) | ✅ | ✅ | ✅ — background balance resolution, sequential per `/init` |
 | Keep a temporary gift card (registration) | ✅ | ✅ | ✅ |
-| Host-registered issuer config | — (static table) | ✅ `SecondaryConfigs.register` | ✅ `SecondaryConfigs.register` — same extension point on both native platforms, the literal SDK-12261 AC |
+| Host-registered issuer config | — (static table) | ✅ `SecondaryConfigs.register` | ✅ `SecondaryConfigs.register` — same extension point on both native platforms |
 | Splitter autofill middlewares (voucher → loyalty → primary) | ✅ | ❌ | ❌ |
 
 ## Reading the matrix
@@ -103,10 +104,14 @@ Same keys on all three platforms; each is a config, not a plugin.
   a redirection, and three native SDKs (Apple Pay in place of Google Pay, PayPal, Klarna).
   Everything else web supports is a PSP-hosted form living in the browser, with no native
   equivalent on either native platform, and not planned.
-- **SDK-12262 (saved methods, BNPL, theming) has landed**: saved-card wallet management, save-at-submit
+- **Saved methods, BNPL and theming have landed**: saved-card wallet management, save-at-submit
   registration and loan simulation all ported, plus `PurseTheme` (native `UIColor`/`UIFont`, mapped onto
   Secure Fields' own `SecureFieldsStyle` — no CSS-string parser, unlike Android's `ThemeValues`, since
   there is no cross-platform theme config to share).
+- **Every row's badge now resolves.** `PurseAssets` ports web's `@upstreampay/assets`, so a method or
+  card scheme has a CDN badge URL on all three platforms; rendering stays the integrator's job.
+- **Whatever the method, the outcome is confirmable.** `awaitPaymentOutcome()` reads the session's own
+  transactions, which is the only honest way to resolve a redirection method's return.
 - **The three gaps Android and iOS share**, worth a deliberate decision rather than silent scope
   creep: `pci_proxy` cards, `ancv-connect`, and the PayPal BNPL / vaulting pair. The rest of the ❌
   column is "works if the merchant switches the method to `redirection` mode".

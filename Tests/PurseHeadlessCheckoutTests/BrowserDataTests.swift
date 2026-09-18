@@ -2,14 +2,12 @@ import Foundation
 import Testing
 @testable import PurseHeadlessCheckout
 
-/// `partner_data.browser`'s property names are a wire contract: the Payment API validates them and
-/// rejects the whole `/init` with HTTP 400 on an unknown one. Two invented names — `language` and
-/// `timezone_offset` — shipped and broke every Apple Pay and redirection `/init`.
+/// `partner_data.browser`'s property names are a wire contract: the Payment API rejects the whole
+/// `/init` with HTTP 400 on an unknown one, so an invented name breaks every affected method.
 @MainActor
 struct BrowserDataTests {
 
-    /// Web's `getBrowserData` (packages/partner-ui/src/plugins/utils/index.ts) and Android's
-    /// `RedirectionMapper.browserData` agree on exactly these ten.
+    /// Web's `getBrowserData` and Android's `RedirectionMapper.browserData` agree on these ten.
     private static let expected: Set<String> = [
         "referrer", "user_agent", "accept_header", "color_depth", "java_enabled",
         "javascript_enabled", "locale", "screen_height", "screen_width", "utc_time_zone",

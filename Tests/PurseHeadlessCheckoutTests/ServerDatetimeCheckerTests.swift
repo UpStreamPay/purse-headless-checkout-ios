@@ -29,8 +29,7 @@ struct ServerDatetimeCheckerTests {
         #expect(await !checker.synced)
     }
 
-    /// Device clock an hour ahead: a session expiring in ten minutes of *server* time is not
-    /// expired, even though the device thinks that moment has passed.
+    /// Device clock an hour ahead: ten minutes of *server* life left is not expired.
     @Test func correctsAFastDeviceClock() async {
         let serverNow = now.addingTimeInterval(-3600)
         let checker = ServerDatetimeChecker(fetchServerTime: { serverNow }, clock: { self.now })

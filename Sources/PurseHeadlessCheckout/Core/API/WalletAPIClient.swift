@@ -1,14 +1,13 @@
 // Web: packages/sdk/src/API wallet client (`setWalletSession`, token edit/delete/favorite)
 // Same: same routes and headers.
-// Differs: a real `PATCH` — `URLSession` has no `HttpURLConnection`-style restriction against it, unlike Android, which sends `POST` + `X-HTTP-Method-Override`.
+// Differs: a real `PATCH` — `URLSession` has no `HttpURLConnection` restriction against it, unlike Android, which sends `POST` + `X-HTTP-Method-Override`.
 
 import Foundation
 
-/// Thin Wallet API v2 client — the Swift analog of web's `FetchWalletAPI`. URLs are
-/// `{walletApiRoot}/{ownerReference}/sessions/{walletSessionId}/…`, authenticated with both `x-api-
-/// key` and `x-merchant-id`.
+/// Web's `FetchWalletAPI`. URLs are `{walletApiRoot}/{ownerReference}/sessions/{walletSessionId}/…`,
+/// authenticated with `x-api-key` and `x-merchant-id`.
 public struct WalletAPIClient: Sendable {
-    /// One row of `GET /tokens` — web's `WalletItem`.
+    /// Web's `WalletItem`.
     public struct WalletToken: Sendable, Equatable {
         public let id: String
         public let name: String?
@@ -38,8 +37,8 @@ public struct WalletAPIClient: Sendable {
         self.session = session
     }
 
-    /// `GET /tokens?vault=…`. A non-2xx answer returns an empty list, matching web — wallet trouble
-    /// must never break the checkout.
+    /// A non-2xx answer returns an empty list, matching web: wallet trouble must never break the
+    /// checkout.
     public func getTokens(vault: Bool = true) async -> [WalletToken] {
         guard let body = try? await execute("GET", "/tokens?vault=\(vault)", body: nil) else { return [] }
         guard let array = (try? JSONDecoder().decode(JSONValue.self, from: body))?.arrayValue else { return [] }
@@ -49,23 +48,20 @@ public struct WalletAPIClient: Sendable {
         }
     }
 
-    /// `DELETE /tokens/{id}`.
     public func deleteToken(_ tokenId: String) async throws {
         _ = try await execute("DELETE", "/tokens/\(tokenId)", body: nil)
     }
 
-    /// `DELETE /tokens`.
     public func deleteAllTokens() async throws {
         _ = try await execute("DELETE", "/tokens", body: nil)
     }
 
-    /// `PATCH /tokens/{id}/name` with `{name, reason}`.
     public func editTokenName(_ tokenId: String, name: String, reason: String = "") async throws {
         let body = try JSONEncoder().encode(JSONValue.object(["name": .string(name), "reason": .string(reason)]))
         _ = try await execute("PATCH", "/tokens/\(tokenId)/name", body: body)
     }
 
-    /// `PATCH /token/{id}/favorite?favorite=…` — note web's singular `token` segment.
+    /// Note web's singular `token` segment here.
     public func setAsFavorite(_ tokenId: String, favorite: Bool) async throws {
         _ = try await execute("PATCH", "/token/\(tokenId)/favorite?favorite=\(favorite)", body: nil)
     }
@@ -100,9 +96,8 @@ public struct WalletAPIClient: Sendable {
 
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         if status >= 400 {
-            // The body stays **out** of the message, exactly as `PaymentAPIClient` keeps it out:
-            // `errorPayload` puts a `PurseError`'s message straight into the monitoring event, and
-            // a wallet 4xx body can carry a masked PAN or a holder name.
+            // The body stays out of the message: it reaches monitoring events, and a wallet 4xx body
+            // can carry a masked PAN or a holder name.
             let errorCode = (try? JSONDecoder().decode(JSONValue.self, from: data))?["error"]?.stringValue
             throw PaymentAPIError(
                 "Wallet API \(method) \(path) failed: HTTP \(status)" + (errorCode.map { " (\($0))" } ?? ""),

@@ -1,36 +1,32 @@
 // Web: packages/partner-ui hosted fields mount + submitForResult
-// Same: three modes (fresh card / saved card needing its CVV / saved card needing nothing), brand list from the token's own scheme then the vault's supported brands.
+// Same: three modes (fresh card / saved card needing its CVV / saved card needing nothing); brands from the token's own scheme, then the vault's supported brands.
 // Differs: Secure Fields is a Swift 5 module, so nothing it owns crosses an isolation boundary — see "Crossing the Swift 5 boundary" in AGENTS.md.
 
 import Foundation
 import PurseSecureFields
 import UIKit
 
-/// What a tokenization produced, as **our** `Sendable` type. Secure Fields' `TokenizationResult` is
-/// a public struct in a Swift 5 module, so it is not `Sendable` to us and cannot cross an isolation
-/// boundary — and a dependency's types have no business in our own surface regardless.
+/// A tokenization result as our own `Sendable` type — Secure Fields' `TokenizationResult` lives in
+/// a Swift 5 module and cannot cross an isolation boundary.
 public struct CardTokenization: Sendable, Equatable {
     public let vaultFormToken: String
-    /// Both `nil` after a CVV-only tokenization: the vault stored a cryptogram against a card it
-    /// already knows, so the response carries no `card` block.
+    /// Both `nil` after a CVV-only tokenization: the response carries no `card` block.
     public let bin: String?
     public let lastFourDigits: String?
-    /// The network actually submitted, in **Payment API** vocabulary; `nil` on a CVV-only form.
+    /// In **Payment API** vocabulary; `nil` on a CVV-only form.
     public let selectedNetwork: CardBrand?
 }
 
-/// Drives the Secure Fields card form for one payment item. Mount its ``fieldViews`` in your own
-/// layout, observe ``isFormValid``, and call ``submit()``.
+/// Drives the Secure Fields card form for one payment item. Mount its ``fieldViews``, observe
+/// ``isFormValid``, call ``submit()``.
 @MainActor
 public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDelegate {
 
     /// Which form a payment item needs, decided by the saved token behind it.
     public enum Mode: Sendable, Equatable {
-        /// PAN / expiry / CVV / holder, tokenized on submit.
         case freshCard
         /// A saved card whose PSP wants the cryptogram → a CVV-only form.
         case tokenCVV
-        /// A saved card that pays with no form at all.
         case tokenNoCVV
 
         public var rendersForm: Bool { self != .tokenNoCVV }
@@ -43,22 +39,17 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
 
     public let mode: Mode
 
-    /// `true` once the form is complete enough to submit. A form that renders nothing starts valid.
+    /// A form that renders nothing starts valid.
     @Published public private(set) var isFormValid: Bool
 
-    /// The card schemes the form offers.
     @Published public private(set) var detectedBrands: [CardBrand] = []
 
     private let manager: SecureFieldsManager?
-    /// Strong, like every other coordinator's: nothing else retains a `host(for:)`-produced
-    /// adapter, so a weak reference would go nil the moment the caller's local went out of
-    /// scope — silently turning `setCollected`/`setFulfilled` into no-ops right after `init`.
+    /// Strong: nothing else retains a `host(for:)`-produced adapter, so a weak reference would go
+    /// nil as soon as the caller's local did, silently no-oping `setCollected`/`setFulfilled`.
     private let host: any PluginHost
     private var pending: CheckedContinuation<CardTokenization, any Error>?
 
-    /// - Parameters: - host: the seam back to the checkout — where the vault token is stashed and
-    /// fulfilment reported. - tenantId: `vault.vendor_front_data.purse.tenant_id` from the session.
-    /// - supportedBrands: the method's `vault.supported_brands`.
     public init(
         host: any PluginHost,
         tenantId: String,
@@ -71,8 +62,7 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
         self.isFormValid = !mode.rendersForm
 
         if mode.rendersForm {
-            // A CVV-only form has no PAN to BIN-detect, so the saved token's own scheme comes first;
-            // then the method's supported brands; then a sane default.
+            // A CVV-only form has no PAN to BIN-detect, so the saved token's own scheme comes first.
             let brands: [CardBrand] = {
                 if let network = token?.selectedNetwork, let brand = CardBrand(rawValue: network) {
                     return [brand]
@@ -97,9 +87,9 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
                 environment: host.environment.vaultEnvironment,
                 brands: brands.compactMap(\.secureFieldsBrand),
                 style: style,
-                // Field subset *is* how CVV-only is expressed — there is no flag. With no PAN field
-                // mounted, Secure Fields omits the `card` object, which the Vault reads as a
-                // CVV-only submission (purse-securefields-ios >= 1.8.0).
+                // The field subset *is* how CVV-only is expressed — there is no flag. With no PAN
+                // mounted, Secure Fields omits the `card` object and the Vault reads a CVV-only
+                // submission (purse-securefields-ios >= 1.8.0).
                 fields: mode == .tokenCVV
                     ? SecureFieldsFieldsConfig(cvv: .init(placeholder: texts.cvv.placeholder))
                     : SecureFieldsFieldsConfig(
@@ -121,7 +111,7 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
         host.setFulfilled(!mode.rendersForm)
     }
 
-    /// The field views to mount, in display order. Empty when the mode renders no form.
+    /// In display order.
     public var fieldViews: [UIView] {
         guard let manager else { return [] }
         switch mode {
@@ -134,15 +124,13 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
         }
     }
 
-    /// Tokenize the form and stash the result on the checkout, ready for the next submit.
-    ///
-    /// A mode that renders no form has nothing to tokenize and returns immediately.
+    /// Tokenize the form and stash the result on the checkout. A mode that renders no form has
+    /// nothing to tokenize and returns immediately.
     @discardableResult
     public func submit(saveToken: Bool = false) async throws -> CardTokenization? {
         guard let manager, mode.rendersForm else { return nil }
-        // Secure Fields' own `submit()` opens with `guard !isSubmitting else { return }` and comes
-        // back with **no delegate callback at all**, so a second call that overwrote `pending`
-        // would strand the first continuation for the life of the process (`SWIFT TASK CONTINUATION
+        // Secure Fields' `submit()` returns early while already submitting, with no delegate
+        // callback, so a second call overwriting `pending` would strand the first continuation.
         guard pending == nil else {
             throw PartnerUIError("a card tokenization is already in flight")
         }
@@ -156,8 +144,7 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
         return tokenization
     }
 
-    /// What a successful tokenization does to the checkout: stash the vault token for `/validate`,
-    /// and **re-arm the fulfilment gate**.
+    /// Stash the vault token for `/validate` and re-arm the fulfilment gate.
     func apply(_ tokenization: CardTokenization) {
         var collected: [String: JSONValue] = [
             CardPlugin.Collected.token: .string(tokenization.vaultFormToken),
@@ -173,10 +160,9 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
 
     // MARK: SecureFieldsDelegate
     //
-    // Every callback arrives on the main thread: the SDK hops through `DispatchQueue.main.async`
-    // itself before touching the delegate, and the rest fire from UIKit event paths. That is what
-    // makes `assumeIsolated` an assertion of something true rather than a wish. Each one converts
-    // to our own types *here*, before anything crosses to the main actor.
+    // Every callback arrives on the main thread — the SDK hops through `DispatchQueue.main.async`
+    // itself, and the rest fire from UIKit event paths — which is what makes `assumeIsolated` sound.
+    // Each converts to our own types here, before anything crosses to the main actor.
 
     public nonisolated func secureFieldsDidTokenize(_ result: TokenizationResult) {
         let tokenization = CardTokenization(
@@ -212,9 +198,8 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
         pending = nil
     }
 
-    /// A resolved theme field style as one of Secure Fields' own state overrides — `nil` when the
-    /// theme leaves every one of that state's values at the base style, so Secure Fields' own
-    /// "inherit the base style" behaviour applies instead of an all-nil override object.
+    /// `nil` when the theme leaves that state at the base style, so Secure Fields' own inheritance
+    /// applies instead of an all-nil override object.
     private static func stateStyle(_ style: PurseTheme.FieldStyle) -> SecureFieldsStyle.StateStyle? {
         guard style.color != nil || style.backgroundColor != nil else { return nil }
         return SecureFieldsStyle.StateStyle(textColor: style.color, backgroundColor: style.backgroundColor)
@@ -224,9 +209,8 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
 // MARK: - Vocabulary mapping
 
 extension PurseEnvironment {
-    /// The vault tier for this Payment API tier. Development has no vault of its own. Each tier's
-    /// tenants exist only in its own vault, so a mismatch fails tokenization with "no tenant with
-    /// id was found" rather than anything that names the environment.
+    /// The vault tier for this Payment API tier (development has no vault of its own). A mismatch
+    /// fails tokenization with "no tenant with id was found", which names no environment.
     var vaultEnvironment: VaultEnvironment {
         switch self {
         case .production: .production
@@ -237,9 +221,8 @@ extension PurseEnvironment {
 }
 
 extension CardBrand {
-    /// Secure Fields' brand vocabulary is **not** the Payment API's: it says `AMEX` where the
-    /// session says `AMERICAN_EXPRESS`, and carries no `DISCOVER`/`UNIONPAY`/`JCB`. Mapping is
-    /// explicit in both directions, never a raw-value cast.
+    /// Secure Fields' vocabulary is not the Payment API's (`AMEX` vs `AMERICAN_EXPRESS`, no
+    /// `DISCOVER`/`UNIONPAY`/`JCB`), so the mapping is explicit, never a raw-value cast.
     var secureFieldsBrand: PurseSecureFields.CardBrand? {
         switch self {
         case .visa: .visa

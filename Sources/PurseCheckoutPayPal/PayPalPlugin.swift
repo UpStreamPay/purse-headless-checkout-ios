@@ -1,15 +1,14 @@
 // Web: packages/partner-ui/src/plugins/partners/paypal/wallet/index.ts
 // Same: /init creates the order, /validate captures; token mode patches payment_data.token.
-// Differs: no CVV path exists at all here (there never was one — a PayPal token carries no card).
+// Differs: no CVV path at all — a PayPal token carries no card.
 
 import Foundation
 import PaymentButtons
 import UIKit
 import PurseHeadlessCheckout
 
-/// The PayPal **wallet** (pay-now) plugin — the protocol half, no PayPal SDK types in sight. PayPal
-/// is the one method whose native step is a full round trip *out of the app and back*, and it
-/// happens **before** `/validate`:.
+/// The PayPal **wallet** (pay-now) plugin — the protocol half, no PayPal SDK types. Its native step
+/// leaves the app and comes back **before** `/validate`, where Klarna's authorize runs after it.
 public struct PayPalPlugin: PartnerUIPlugin {
 
     /// Keys ``PayPalCoordinator`` uses in `setCollected` for what the approval produced.
@@ -59,8 +58,8 @@ public struct PayPalPlugin: PartnerUIPlugin {
     }
 }
 
-/// Builds the `/init` body for a PayPal wallet payment and parses its response. Pure JSON + session
-/// data — no PayPal SDK types (those live in ``PayPalCoordinator``).
+/// Builds and parses `/init` for a PayPal wallet payment. Pure JSON — the SDK types live in
+/// ``PayPalCoordinator``.
 enum PayPalRequestBuilder {
 
     static func initPayload(amount: Decimal, partner: Partner) -> [String: JSONValue] {
@@ -74,7 +73,7 @@ enum PayPalRequestBuilder {
         ]
     }
 
-    /// The PayPal order id off `/init`'s response, with the flatter shapes it's also been seen in.
+    /// The order id off `/init`, with the flatter shapes it has also been seen in.
     static func parseOrderId(_ response: JSONValue) throws -> String {
         try ensureSucceeded(response)
         let pluginResult = response["plugin_result"]
@@ -90,9 +89,7 @@ enum PayPalRequestBuilder {
         return response["step_id"]?.intValue
     }
 
-    /// Fails on a `/init` whose `status.state` is anything but `SUCCESS` — the status half of
-    /// order-id parsing, on its own for the **saved-token** `/init`, which creates no order for the
-    /// buyer to approve and so carries no `order_id` to parse.
+    /// Split out for the **saved-token** `/init`, which creates no order and so has no `order_id`.
     static func ensureSucceeded(_ response: JSONValue) throws {
         let state = response["status"]?["state"]?.stringValue ?? ""
         guard state.isEmpty || state == "SUCCESS" else {
@@ -125,8 +122,7 @@ public struct PayPalModule: PartnerModule {
         let listener = request.listener
         let coordinator = PayPalCoordinator(host: request.host)
 
-        // A saved PayPal account needs no approval and no button — it pays from the host's own
-        // Pay button like any other no-form token.
+        // A saved PayPal account needs no approval and no button of its own.
         if request.isToken {
             return .headless(
                 prepare: { listener.onReady(true) },

@@ -30,8 +30,7 @@ struct FormRedirectHTMLTests {
         #expect(byName["card[last4]"] == "1111")
     }
 
-    /// Numbers survive exactly. A PSP's form fields can carry an amount, and a `Double` round trip
-    /// is precisely what the money rules forbid — `12345678901234567.89` through a `Double` comes
+    /// A PSP's form field can carry an amount, and `12345678901234567.89` through a `Double` comes
     /// back as `12345678901234568`.
     @Test func numbersSurviveWithoutGoingThroughADouble() {
         #expect(FormRedirectHTML.parseFormFields(#"{"amount":12345678901234567.89}"#)[0]

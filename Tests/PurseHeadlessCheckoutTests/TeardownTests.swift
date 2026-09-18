@@ -2,9 +2,8 @@ import Foundation
 import Testing
 @testable import PurseHeadlessCheckout
 
-/// `teardown()` / `isTornDown` — releasing resources and refusing further use. None of these tests
-/// touch the network (a non-simulable gate, or `requireOpen()` itself, refuses before any call is
-/// made), so this suite claims no `PurseEnvironment` tier.
+/// `teardown()` / `isTornDown` — releasing resources and refusing further use. Nothing here
+/// reaches the network, so this suite claims no `PurseEnvironment` tier.
 @MainActor
 struct TeardownTests {
 
@@ -78,8 +77,7 @@ struct TeardownTests {
         }
     }
 
-    /// Any in-flight background work started at construction is cancelled, not left to run against
-    /// a checkout nothing can observe any more.
+    /// Background work started at construction is cancelled, not left running unobserved.
     @Test func teardownCancelsPendingBackgroundWork() throws {
         let token: [String: Any] = ["id": "tok-1", "value": "v1", "uniqueness_token": "9250004781234567890", "pin_code": "123"]
         let protocols = ["illicado": ["giftcard": [

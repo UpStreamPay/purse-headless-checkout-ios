@@ -4,8 +4,7 @@
 
 import Foundation
 
-/// Machine-readable error codes for the SDK's error surface — the Swift analog of web's
-/// `PurseHeadlessCheckoutErrorCodes`.
+/// Web's `PurseHeadlessCheckoutErrorCodes`.
 public enum PurseErrorCode: String, Sendable, CaseIterable {
     // Session
     case expiredSession = "EXPIRED_SESSION"
@@ -25,8 +24,6 @@ public enum PurseErrorCode: String, Sendable, CaseIterable {
     case methodNotImplemented = "METHOD_NOT_IMPLEMENTED"
     /// Selecting a method (or saved token) whose `disabled` state is set.
     case methodDisabled = "METHOD_DISABLED"
-    /// A partner's native step failed: its SDK returned an error, a tokenization was refused, or a
-    /// coordinator was driven before `prepare`.
     case partnerUIError = "PARTNER_UI_ERROR"
 
     // Secondary methods
@@ -57,7 +54,7 @@ public enum PurseErrorCode: String, Sendable, CaseIterable {
     case apiError = "API_ERROR"
     case unknownError = "UNKNOWN_ERROR"
 
-    /// The shared error-codes documentation anchor for this code — web's `getErrorDocLink`.
+    /// Web's `getErrorDocLink`.
     public var documentationLink: String {
         "https://docs.purse.tech/docs/integrate/purse-checkout/headless-checkout/"
             + "error-handling/error-codes#\(rawValue.lowercased())"

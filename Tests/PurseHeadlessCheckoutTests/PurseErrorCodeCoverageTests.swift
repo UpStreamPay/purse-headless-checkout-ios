@@ -2,16 +2,14 @@ import Foundation
 import Testing
 @testable import PurseHeadlessCheckout
 
-/// Every ``PurseErrorCode`` the SDK can raise is produced by at least one ``PurseError`` value,
-/// each carrying its code, a non-blank message and the shared documentation link — Android's
-/// `PurseErrorCodeCoverageTest`.
+/// Every ``PurseErrorCode`` the SDK can raise is produced by at least one ``PurseError``, each
+/// carrying its code, a non-blank message and the shared documentation link.
 struct PurseErrorCodeCoverageTests {
 
     private struct Boom: Error {}
 
-    /// One `PurseError` per code, using whichever real case can carry it — several of
-    /// ``PurseCheckoutError``'s cases (`hookFailed`, `invalidTake`, `invalidSecondaryCard`,
-    /// `secondaryTokenizationFailed`, `walletOperationFailed`) take an explicit ``PurseErrorCode``,
+    /// One `PurseError` per code, using whichever real case can carry it — several
+    /// ``PurseCheckoutError`` cases take an explicit ``PurseErrorCode``.
     private func raised() -> [PurseErrorCode: any PurseError] {
         let boom = Boom()
         let values: [any PurseError] = [

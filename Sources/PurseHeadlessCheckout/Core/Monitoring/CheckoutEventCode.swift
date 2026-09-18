@@ -4,8 +4,7 @@
 
 import Foundation
 
-/// Every analytics event the checkout can emit — parity with web's
-/// `PurseHeadlessCheckoutEventPayload` keys and Android's `CheckoutEventCode`.
+/// Web's `PurseHeadlessCheckoutEventPayload` keys, and Android's `CheckoutEventCode`.
 public enum CheckoutEventCode: String, Sendable, CaseIterable {
     case clearPrimarySplit = "HEADLESS_CHECKOUT_CLEAR_PRIMARY_SPLIT"
     case clientHookError = "HEADLESS_CHECKOUT_CLIENT_HOOK_ERROR"
@@ -14,8 +13,6 @@ public enum CheckoutEventCode: String, Sendable, CaseIterable {
     case expiredSession = "HEADLESS_CHECKOUT_EXPIRED_SESSION"
     case methodGetPaymentElement = "HEADLESS_CHECKOUT_METHOD_GET_PAYMENT_ELEMENT"
     case methodGetHostedFields = "HEADLESS_CHECKOUT_METHOD_GET_HOSTED_FIELDS"
-    /// Every transition of a method into a `DisabledState` (a platform suspension, an amount rule,
-    /// a partner failure) as one event with the state's code.
     case methodDisabled = "HEADLESS_CHECKOUT_METHOD_DISABLED"
     case methodGetSecondaryToken = "HEADLESS_CHECKOUT_METHOD_GET_SECONDARY_TOKEN"
     case methodLoanSim = "HEADLESS_CHECKOUT_METHOD_LOAN_SIM"
@@ -56,7 +53,7 @@ public enum CheckoutEventCode: String, Sendable, CaseIterable {
     case onBeforeValidateHookFailed = "HEADLESS_CHECKOUT_ON_BEFORE_VALIDATE_HOOK_FAILED"
 }
 
-/// Event severity — web common's `EventType`.
+/// Web common's `EventType`.
 public enum EventLevel: String, Sendable {
     case debug = "DEBUG"
     case info = "INFO"
@@ -68,8 +65,7 @@ public enum EventLevel: String, Sendable {
     case network = "NETWORK"
 }
 
-/// One analytics event — code + level + free-form payload, stamped with the client's ISO datetime
-/// at construction.
+/// One analytics event, stamped with the client's ISO datetime at construction.
 public struct CheckoutMonitoringEvent: Sendable {
     public let code: CheckoutEventCode
     public let type: EventLevel

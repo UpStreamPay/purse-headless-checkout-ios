@@ -4,7 +4,7 @@
 
 import Foundation
 
-/// One payment method of a session: its ``partner`` and ``method`` — the pair every plugin is keyed on.
+/// The `(partner, method)` pair every plugin is keyed on.
 public struct MethodKey: Sendable, Hashable {
     public let partner: Partner
     public let method: PaymentMethod
@@ -17,8 +17,7 @@ public struct MethodKey: Sendable, Hashable {
     /// The item id the checkout gives this method (`"paypal-wallet"`).
     public var id: String { "\(partner.wireValue)-\(method.wireValue)" }
 
-    /// From the wire names the session uses (`"purse"`, `"creditcard"`), resolving known partners
-    /// and methods to their cases so the key equals what the session decodes to —
+    /// Resolves wire names to their cases, so the key equals what the session decodes to —
     /// `MethodKey(.other("purse"), …)` would not.
     public static func of(partner: String, method: String) -> MethodKey {
         MethodKey(partner: .fromWire(partner), method: .fromWire(method))

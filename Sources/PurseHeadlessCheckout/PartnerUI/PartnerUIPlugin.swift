@@ -10,19 +10,17 @@ public protocol PartnerUIPlugin: Sendable {
     var partner: Partner { get }
     var method: PaymentMethod { get }
 
-    /// A session has been attached (or refreshed) — create/refresh the vendor client.
+    /// A session was attached or refreshed — create/refresh the vendor client.
     func onSessionSet(_ context: PartnerUIContext) async throws
 
-    /// The amount this item must cover changed (the splitter moved).
+    /// The splitter moved.
     func onAmountUpdate(_ context: PartnerUIContext) async throws
 
     /// The payload this item contributes to `/validate`.
     func preValidation(_ context: PartnerUIContext) async throws -> ValidateItemPayload
 
-    /// The `/validate` outcome for this item — follow a redirect, confirm, or surface an error.
     func postValidation(_ result: ValidationResult, context: PartnerUIContext) async throws
 
-    /// Release the vendor client and any held resources.
     func destroyClient(_ context: PartnerUIContext) async throws
 
     /// Client-side check before ``preValidation(_:)``; `false` blocks the submit.
@@ -41,21 +39,20 @@ public extension PartnerUIPlugin {
     func ensureClientCompatibility(_ context: PartnerUIContext) async throws {}
 }
 
-/// The single object every ``PartnerUIPlugin`` hook receives. It is how a plugin reaches everything
-/// it needs without the host knowing anything PSP-specific.
+/// What every ``PartnerUIPlugin`` hook receives — how a plugin reaches what it needs without the
+/// host knowing anything PSP-specific.
 public struct PartnerUIContext: Sendable {
     public let partner: Partner
     public let method: PaymentMethod
     public let session: LegacyPaymentSession
-    /// The amount this item must cover, handed down from the splitter.
+    /// What this item must cover, handed down from the splitter.
     public let amount: Decimal
-    /// The client to call `/init` / `/validate` against the current session.
     public let api: PaymentAPIClient
     public let register: Bool
-    /// Set when this item pays with a saved instrument (card-on-file).
+    /// Set when this item pays with a saved instrument.
     public let token: PayToken?
-    /// Data an interactive plugin collected outside the headless flow (a wallet sheet token, a
-    /// `/init` step id, a vault token), threaded in so `preValidation` can build its payload.
+    /// What an interactive plugin collected outside the headless flow (a sheet token, a `/init` step
+    /// id, a vault token), so `preValidation` can build its payload.
     public let collected: [String: JSONValue]
     public let options: PluginOptions
 
@@ -81,7 +78,6 @@ public struct PartnerUIContext: Sendable {
         self.options = options
     }
 
-    /// This item's own configuration.
     public var configuration: MethodConfiguration? {
         session.protocols[partner]?[method]?.configurations
     }
@@ -96,9 +92,9 @@ public struct PartnerUIContext: Sendable {
 public struct PluginOptions: Sendable {
     /// BCP-47 locale (e.g. `"fr-FR"`); `nil` falls back to the device locale.
     public let locale: String?
-    /// Styling for partner-rendered fields (the Secure Fields card form). `nil` uses ``PurseTheme/default``.
+    /// `nil` uses ``PurseTheme/default``.
     public let theme: PurseTheme?
-    /// Text overrides for the card form — the card subset of web's `HostedFormUIOptions`.
+    /// The card subset of web's `HostedFormUIOptions`.
     public let cardFormTexts: CardFormTexts
 
     public init(locale: String? = nil, theme: PurseTheme? = nil, cardFormTexts: CardFormTexts = CardFormTexts()) {
@@ -111,14 +107,13 @@ public struct PluginOptions: Sendable {
 /// A saved instrument to pay with — the fields web's `patchItemPayloadWithToken` reads.
 public struct PayToken: Sendable, Equatable {
     public let value: String
-    /// ISO expiration of the underlying card; formatted to `yyyy-MM-dd` on the wire.
+    /// ISO; formatted to `yyyy-MM-dd` on the wire.
     public let expirationDate: String?
     public let holderName: String?
     /// The card scheme in session vocabulary (e.g. `VISA`), when known.
     public let selectedNetwork: String?
-    /// Whether paying with this token still needs the shopper's CVV. Only a **card** plugin ever
-    /// reads it: a CVV is a card-form concept, so a token whose method renders no card form is
-    /// always built with `false`.
+    /// Only a card plugin reads this: a token whose method renders no card form is always built
+    /// with `false`.
     public let requiresCVV: Bool
 
     public init(
@@ -135,9 +130,8 @@ public struct PayToken: Sendable, Equatable {
         self.requiresCVV = requiresCVV
     }
 
-    /// Patch `paymentData` the way web's `patchItemPayloadWithToken` does: the opaque value as
-    /// `payment_data.token`, the holder alongside, and card metadata under `card` — only when the
-    /// token carries any, so a PayPal token (no card behind it) patches `token` alone.
+    /// Web's `patchItemPayloadWithToken`. Card metadata goes under `card` only when the token
+    /// carries any, so a PayPal token patches `token` alone.
     public func patch(_ paymentData: [String: JSONValue] = [:]) -> [String: JSONValue] {
         var patched = paymentData
         patched["token"] = .string(value)
@@ -150,8 +144,7 @@ public struct PayToken: Sendable, Equatable {
         return patched
     }
 
-    /// `expiry_date` as the Payment API expects it — web's `formatUTCToExpiration` (`yyyy-MM-dd`),
-    /// or `nil` when the ISO value cannot be read.
+    /// Web's `formatUTCToExpiration` (`yyyy-MM-dd`), or `nil` when the value cannot be read.
     public var wireExpiryDate: String? {
         guard let expirationDate else { return nil }
         if let date = ISO8601Date.parse(expirationDate) {

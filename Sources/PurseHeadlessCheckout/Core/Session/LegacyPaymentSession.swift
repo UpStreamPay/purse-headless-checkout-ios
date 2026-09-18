@@ -44,7 +44,6 @@ public struct LegacyPaymentSession: Sendable, Equatable {
 
 public struct MethodEntry: Sendable, Equatable {
     public let configurations: MethodConfiguration
-    /// Saved instruments (card-on-file) this method carries — web's `integrated_tokens`.
     public let integratedTokens: [IntegratedToken]
 
     public init(configurations: MethodConfiguration, integratedTokens: [IntegratedToken] = []) {

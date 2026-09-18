@@ -4,8 +4,7 @@ import Testing
 @testable import PurseHeadlessCheckout
 
 /// Klarna's `/init` shape, what reaches `/validate`, and the authorize-callback handoff. The native
-/// widget itself needs a real device and a valid client token, so it is not unit tested — the same
-/// gap Card, Apple Pay and PayPal have.
+/// widget needs a real device and a valid client token, so it is not unit tested.
 @Suite(.serialized)
 @MainActor
 struct KlarnaTests {

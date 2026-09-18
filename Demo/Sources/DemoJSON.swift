@@ -1,8 +1,7 @@
 import Foundation
 
-/// A tiny JSON reader for alfred's responses. The SDK's own `JSONValue` is not reachable for the
-/// shapes here (merchant-backend payloads, not payment-session ones), and `Any` casting at every
-/// call site reads worse than one wrapper.
+/// A tiny JSON reader for alfred's merchant-backend responses; the SDK's `JSONValue` covers
+/// payment-session shapes only.
 @dynamicMemberLookup
 struct DemoJSON {
     let raw: Any
@@ -30,7 +29,6 @@ struct DemoJSON {
     var array: [DemoJSON]? { (raw as? [Any])?.map(DemoJSON.init(raw:)) }
     var rawObject: Any { raw }
 
-    /// Pretty-printed, for the raw-response blocks.
     var pretty: String {
         guard JSONSerialization.isValidJSONObject(raw),
               let data = try? JSONSerialization.data(withJSONObject: raw, options: [.prettyPrinted, .sortedKeys])

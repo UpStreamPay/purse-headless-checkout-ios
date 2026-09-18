@@ -4,8 +4,7 @@
 
 import Foundation
 
-/// Resolves what a `/validate` response is asking the client to do next, for genuine must-follow
-/// redirects (3-D Secure / ACS).
+/// What a `/validate` response asks the client to do next, for genuine must-follow redirects.
 public enum RedirectionResolver {
 
     public static func resolve(
@@ -45,9 +44,7 @@ public enum RedirectionResolver {
         return (isOwnReturn || isEcho) ? nil : action
     }
 
-    /// Best-effort `payment_id` off the widget-confirmation redirect — present whether or not
-    /// ``resolve(validateResponse:partner:method:sessionReturnURL:)`` suppressed that same redirect,
-    /// since this reads it off the response rather than by following anything.
+    /// Read off the response, so it is there even when `resolve` suppressed that same redirect.
     public static func widgetConfirmationPaymentId(
         validateResponse: JSONValue,
         partner: String = "",

@@ -11,7 +11,6 @@ public struct PurseSessionParams: Sendable, Equatable {
     public let environment: PurseEnvironment
     public let entityId: String
     public let paymentSession: LegacyPaymentSession
-    /// Present when the merchant backend attached a `wallet_session` (saved-card wallet access).
     public let walletSession: WalletSessionParams?
 
     public init(
@@ -31,8 +30,7 @@ public struct PurseSessionParams: Sendable, Equatable {
     }
 }
 
-/// The optional `wallet_session` object from `widget.data` — web sdk's `OnePayWalletSession`.
-/// Grants access to the shopper's saved-token wallet (Wallet API v2) for the checkout's lifetime.
+/// Web sdk's `OnePayWalletSession`: access to the shopper's saved-token wallet (Wallet API v2).
 public struct WalletSessionParams: Sendable, Equatable {
     public let sessionId: String
     public let ownerReference: String

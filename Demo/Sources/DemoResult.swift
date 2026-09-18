@@ -1,8 +1,8 @@
 import Foundation
 import PurseHeadlessCheckout
 
-/// What the result screen shows. Three states, not two: a redirect return is neither a success nor
-/// a failure until the session says so.
+/// Three states, not two: a redirect return is neither a success nor a failure until the session
+/// says so.
 struct DemoResult {
     enum Kind { case authorized, failed, unconfirmed }
 
@@ -35,8 +35,7 @@ struct DemoResult {
                 detail: "global_status = \(result.globalStatus)"
             )
         case let .returnedFromRedirect(url):
-            // The return URL's `purse-redirection-data` JWT reports the outcome, so the banner
-            // shows it rather than a shrug.
+            // The return URL's `purse-redirection-data` JWT reports the outcome.
             guard let status = url?.absoluteString.widgetRedirectionData?.authorizationStatus else {
                 return DemoResult(
                     kind: .unconfirmed,
@@ -52,9 +51,8 @@ struct DemoResult {
                     + "signature-checked here — fetch the transactions below to confirm it."
             )
         case let .failed(error):
-            // A `/validate` that left the device unanswered is not a failure: the payment may well
-            // exist. Showing it as one is the worst mistake this screen can make, so it goes to the
-            // transactions lookup like a redirect return does. Android does the same.
+            // A `/validate` that left the device unanswered is not a failure — the payment may well
+            // exist, so it goes to the transactions lookup instead. Android does the same.
             guard !outcomeUnknown(error) else {
                 return DemoResult(
                     kind: .unconfirmed,
@@ -70,9 +68,8 @@ struct DemoResult {
         }
     }
 
-    /// Whether this error, or anything it wraps, is a Payment API call that left the device with no
-    /// answer. Every layer wraps — `PaymentValidator` turns a `PaymentAPIError` into
-    /// `validateFailed` — so a cast at the top matches nothing and the chain has to be walked.
+    /// Whether this error, or anything it wraps, left the device with no answer. Every layer wraps
+    /// (`PaymentValidator` → `validateFailed`), so a cast at the top matches nothing.
     private static func outcomeUnknown(_ error: any PurseError) -> Bool {
         var current: (any Error)? = error
         while let error = current {
@@ -82,8 +79,8 @@ struct DemoResult {
         return false
     }
 
-    /// Promote to authorized when alfred's transactions say the payment really landed — the same
-    /// check Android's `confirmOutcomeFrom` makes, and the only honest way to resolve a redirect.
+    /// Promote to authorized when alfred's transactions say the payment landed — Android's
+    /// `confirmOutcomeFrom` check.
     func confirmed(by transactions: [DemoJSON]) -> DemoResult {
         let authorized = transactions.contains { transaction in
             let status = transaction["status"]

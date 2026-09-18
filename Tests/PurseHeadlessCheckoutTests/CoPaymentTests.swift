@@ -191,9 +191,7 @@ struct CoPaymentTests {
         #expect(body["amount"]?.decimalValue == 100)
     }
 
-    /// A terminal `/init` answer ends the whole session, not just this tokenization. The error is
-    /// wrapped on the way out, so recognising it means walking the cause chain rather than casting
-    /// the error the caller sees.
+    /// A terminal `/init` answer ends the whole session, not just this tokenization.
     @Test func aTerminalInitAnswerTerminatesTheSession() async throws {
         StubURLProtocol.reset(host: Self.host)
         StubURLProtocol.set("/init", .failure(409, #"{"error":"SESSION_ALREADY_SUBMITTED_ERROR"}"#), host: Self.host)

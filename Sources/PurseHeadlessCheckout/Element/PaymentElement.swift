@@ -5,27 +5,25 @@
 import Foundation
 import UIKit
 
-/// One rendered payment method or saved token: what it shows, whether it is ready, and a submit.
-/// Build it when the shopper *selects* the item, not for every row — building runs the partner's
-/// `prepare`, which for Klarna and redirection is a `POST /init`.
+/// One rendered payment method or saved token. Build it when the shopper *selects* the item, not
+/// for every row — building runs the partner's `prepare`, which for Klarna and Apple Pay is a
+/// `POST /init`. A redirection method's `/init` runs later, in `preValidation`.
 @MainActor
 public final class PaymentElement: ObservableObject {
 
-    /// The method this renders, or the saved token it pays with.
     public let item: PaymentItem
 
-    /// Whether there is anything to render — web's `hasUI()`.
+    /// Web's `hasUI()`.
     public let hasUI: Bool
 
     /// Apple Pay and PayPal pay from their own button; ``submit()`` is a no-op for them.
     public let selfSubmitting: Bool
 
-    /// A card form's validity, a prepared wallet or redirection flow. Gate your Pay button on it.
+    /// Gate your Pay button on this.
     @Published public private(set) var isReady = false
 
     private let surface: PaymentSurface
-    /// Held, not just wired: the surface's closures are the only other owner, and a surface that
-    /// stopped capturing it would silently lose `onReady`.
+    /// Held, not just wired: the surface's closures are the only other owner.
     private let listener: ElementListener
     private var inFlight: Task<Void, Never>?
     private var prepared = false
@@ -39,13 +37,11 @@ public final class PaymentElement: ObservableObject {
         listener.onReadyChange = { [weak self] ready in self?.isReady = ready }
     }
 
-    /// The view to place, or `nil` when ``hasUI`` is `false`.
     public func makeView() -> UIView? {
         hasUI ? surface.makeView() : nil
     }
 
-    /// The partner's own setup. Idempotent, so SwiftUI's `.task` re-running it costs nothing.
-    /// Failures land on the listener, never thrown.
+    /// Idempotent, so SwiftUI's `.task` re-running it costs nothing. Failures land on the listener.
     public func prepare() async {
         guard !prepared else { return }
         prepared = true
@@ -66,9 +62,8 @@ public final class PaymentElement: ObservableObject {
     }
 }
 
-/// The merchant's listener plus a tap on `onReady` driving ``PaymentElement/isReady``. Android does
-/// this with an object expression inside `rememberPaymentElement`; the indirection is needed for
-/// the same reason — the surface exists before the element that reads `hasUI` off it.
+/// The merchant's listener plus a tap on `onReady` driving ``PaymentElement/isReady``. The
+/// indirection exists because the surface is built before the element that reads `hasUI` off it.
 @MainActor
 final class ElementListener: PaymentElementListener {
     private let wrapped: any PaymentElementListener

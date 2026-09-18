@@ -1,21 +1,16 @@
 // Web: none — web navigates the page itself.
 // Same: —
-// Differs: a presenter the host drives. Android uses an in-app WebView for every case; iOS uses ASWebAuthenticationSession for the GET case, which is a real browser and so is not refused by ACS providers that detect embedded web views.
+// Differs: a presenter the host drives. Android uses an in-app WebView throughout; iOS uses ASWebAuthenticationSession for the GET case, a real browser ACS providers do not refuse.
 
 import Foundation
 
 /// How a presented redirect ended. Note what is **not** here: success.
 public enum RedirectOutcome: Sendable, Equatable {
-    /// The shopper reached the return destination, or came back to the app at all. `url` is what
-    /// they came back to, when the presenter could see it — the browser reports its callback and
-    /// the web view reports the navigation it stopped on.
+    /// The shopper came back. `url` is what they came back to, when the presenter could see it.
     case returned(url: URL?)
-    /// The shopper dismissed the flow.
     case canceled
 }
 
-/// Presents a ``RedirectAction`` and reports how it ended.
-///
 /// Implement this to take redirects over yourself; otherwise ``WebAuthRedirectPresenter`` is used.
 @MainActor
 public protocol RedirectPresenter {
@@ -27,17 +22,16 @@ public struct RedirectPolicy: Sendable {
 
     /// How the shopper gets back to the app.
     public enum Return: Sendable, Equatable {
-        /// A Universal Link your app claims, e.g. `checkout.example.com` + `/purse/return`.
-        /// Preferred: a Universal Link can only be claimed by the app that owns the domain, so
-        /// another app cannot fabricate a return.
+        /// Preferred: only the app owning the domain can claim it, so no other app can fabricate a
+        /// return.
         case universalLink(host: String, path: String)
-        /// A custom URL scheme, e.g. `myapp-purse`. Simpler to configure, but any app can register
-        /// the same scheme — which is why reaching it is still only ever *returned*, never approved.
+        /// Simpler to configure, but any app can register the same scheme — which is why reaching
+        /// it is still only ever *returned*, never approved.
         case customScheme(String)
     }
 
     public let returnDestination: Return
-    /// Extra hosts the redirect chain may visit, beyond the `https` rule below.
+    /// Extra hosts the redirect chain may visit, beyond the `https` rule.
     public let additionalAllowedHosts: Set<String>
 
     public init(returnDestination: Return, additionalAllowedHosts: Set<String> = []) {
@@ -54,7 +48,6 @@ public struct RedirectPolicy: Sendable {
         return additionalAllowedHosts.contains(host)
     }
 
-    /// Whether reaching this URL means the shopper came back.
     public func isReturn(_ url: URL) -> Bool {
         switch returnDestination {
         case let .universalLink(host, path):

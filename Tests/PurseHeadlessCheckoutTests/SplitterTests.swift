@@ -4,7 +4,7 @@ import Testing
 
 /// The money maths. Vectors are ported from web's own suite (`usp-widget/packages/headless-
 /// checkout/src/headless-checkout.splits.test.ts` and `.secondary-tokens.test.ts`) — same inputs
-/// must produce the same cents, which is the acceptance criterion of SDK-12260.
+/// must produce the same cents, which is the point of porting the vectors.
 struct SplitterTests {
 
     private func giftCard(

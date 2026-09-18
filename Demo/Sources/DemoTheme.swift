@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// Deliberately greyscale: the demo must not compete with the partners' own branded controls
-/// (Apple Pay, PayPal, Klarna) or suggest a Purse colour to a merchant. Only the outcome colours
-/// below carry hue.
+/// Deliberately greyscale, so nothing competes with the partners' own branded controls or suggests
+/// a Purse colour to a merchant. Only the outcome colours below carry hue.
 enum DemoTheme {
     static let surface = Color(uiColor: .secondarySystemGroupedBackground)
     static let background = Color(uiColor: .systemGroupedBackground)

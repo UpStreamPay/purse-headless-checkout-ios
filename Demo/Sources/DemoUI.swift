@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Fixed header, scrolling body, pinned bottom action.
 struct DemoScreen<Content: View, Action: View>: View {
     let step: Int
     let title: String
@@ -25,8 +24,11 @@ struct DemoScreen<Content: View, Action: View>: View {
 }
 
 struct ScreenHeader: View {
-    let step: Int
+    /// The playground's wizard position. `nil` in checkout mode: a shopper is not on "step 2 of 3".
+    var step: Int?
     let title: String
+    /// Replaces the step label when there is no step — a plain line of shopper-facing context.
+    var subtitle: String?
     var onBack: (() -> Void)?
 
     var body: some View {
@@ -36,7 +38,11 @@ struct ScreenHeader: View {
                     .accessibilityLabel("Back")
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text("Step \(step) of 3").font(.caption).foregroundStyle(.secondary)
+                if let step {
+                    Text("Step \(step) of 3").font(.caption).foregroundStyle(.secondary)
+                } else if let subtitle {
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                }
                 Text(title).font(.largeTitle.weight(.semibold))
             }
             Spacer()
@@ -59,7 +65,7 @@ struct DemoCard<Content: View>: View {
             .background(tinted ? DemoTheme.accentTint.opacity(0.08) : DemoTheme.surface)
             .clipShape(RoundedRectangle(cornerRadius: 20))
             // An outline, never a tint: a selected row's body hosts a partner's own UI, whose
-            // colours this demo does not control and cannot safely put on a coloured surface.
+            // colours this demo does not control.
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
                     .strokeBorder(DemoTheme.accentTint, lineWidth: selected ? 2 : 0)
@@ -189,7 +195,6 @@ struct EventLog: View {
     }
 }
 
-/// Blocks the whole screen while a payment is in flight.
 struct BusyOverlay: View {
     var body: some View {
         ZStack {

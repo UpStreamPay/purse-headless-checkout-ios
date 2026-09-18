@@ -4,9 +4,8 @@
 
 import Foundation
 
-/// A card scheme as reported by the session's `vault.supported_brands`. Deliberately distinct from
-/// `PurseSecureFields.CardBrand`, which uses Secure Fields' own BIN-lookup vocabulary (`AMEX` where
-/// the Payment API says `AMERICAN_EXPRESS`).
+/// The session's `vault.supported_brands`. Deliberately distinct from `PurseSecureFields.CardBrand`,
+/// whose BIN-lookup vocabulary differs (`AMEX` vs `AMERICAN_EXPRESS`).
 public enum CardBrand: String, Sendable, CaseIterable {
     case carteBancaire = "CARTE_BANCAIRE"
     case visa = "VISA"

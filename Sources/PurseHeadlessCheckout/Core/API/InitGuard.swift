@@ -4,9 +4,8 @@
 
 import Foundation
 
-/// Guards `/init` calls at the network boundary — the Swift port of web partner-ui's `initGuard`: -
-/// **coalesces** concurrent duplicate calls (same key → all callers share one in-flight request); -
-/// **retries** transient failures (``PaymentAPIError/isRetryable``: no HTTP status, or ≥ 500) up to
+/// Web partner-ui's `initGuard`: concurrent duplicates share one in-flight request, transient
+/// failures retry with backoff, and a terminal (4xx) failure fast-rejects immediate repeats.
 public actor InitGuard {
 
     public static let shared = InitGuard()
@@ -20,12 +19,12 @@ public actor InitGuard {
         case spent(any Error)
     }
 
-    /// Insertion order is tracked separately so over-capacity eviction can drop the oldest key —
-    /// a Swift `Dictionary` has no insertion order, unlike the `LinkedHashMap` Android uses.
+    /// Insertion order is tracked separately so eviction can drop the oldest key: a Swift
+    /// `Dictionary` has none, unlike Android's `LinkedHashMap`.
     private var guarded: [String: Entry] = [:]
     private var insertionOrder: [String] = []
 
-    /// Test hook — overridable so retry backoff does not slow the suite down.
+    /// Test hook, so retry backoff does not slow the suite down.
     var sleeper: @Sendable (UInt64) async throws -> Void = { try await Task.sleep(nanoseconds: $0) }
 
     public init() {}
@@ -42,7 +41,6 @@ public actor InitGuard {
         return "\(sessionId):\(part("partner")):\(part("method")):\(part("amount"))"
     }
 
-    /// Run `call` under the guard for `key`.
     public func run(key: String, call: @escaping @Sendable () async throws -> JSONValue) async throws -> JSONValue {
         switch guarded[key] {
         case let .spent(error):
@@ -77,8 +75,7 @@ public actor InitGuard {
             remove(key)
             return result
         } catch {
-            // Fast-rejection is for a **terminal** failure only — that is what this type's own doc
-            // promises, and what a 4xx means.
+            // Fast-rejection is for a terminal failure only, i.e. a 4xx.
             if (error as? PaymentAPIError)?.isRetryable == false {
                 store(.spent(error), for: key)
             } else {
@@ -108,13 +105,13 @@ public actor InitGuard {
         }
     }
 
-    /// Test-only: clears all tracked guard state between test cases.
+    /// Test-only.
     public func reset() {
         guarded.removeAll()
         insertionOrder.removeAll()
     }
 
-    /// Test-only: replaces the backoff sleeper.
+    /// Test-only.
     func setSleeper(_ sleeper: @escaping @Sendable (UInt64) async throws -> Void) {
         self.sleeper = sleeper
     }

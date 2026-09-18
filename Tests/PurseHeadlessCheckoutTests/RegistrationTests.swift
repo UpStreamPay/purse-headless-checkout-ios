@@ -8,8 +8,7 @@ import Testing
 @Suite(.serialized)
 struct RegistrationTests {
 
-    /// `PaymentAPIClient` takes any `apiRoot` directly, so this suite claims no `PurseEnvironment`
-    /// tier at all — same technique as `LoanSimulationTests`.
+    /// `PaymentAPIClient` takes any `apiRoot`, so this suite claims no `PurseEnvironment` tier.
     private static let host = "api.registrationtest.example"
 
     private struct StubCardPlugin: PartnerUIPlugin {
@@ -103,9 +102,7 @@ struct RegistrationTests {
         #expect(items.first?["payment_data"]?["card"] == nil)
     }
 
-    /// A saved instrument (already registered) is never re-registered, even if a decision exists in
-    /// the map — Android's `!source.isSaved` guard for secondaries; the primary path enforces the
-    /// same by construction (a `PaymentToken` never appears in `registrationByItem`).
+    /// A saved instrument is never re-registered, even with a decision in the map.
     @Test func aSavedSecondaryIsNeverReRegistered() async throws {
         StubURLProtocol.reset(host: Self.host)
         StubURLProtocol.set("/validate", .ok(#"{"global_status":"SUCCESS","results":[]}"#), host: Self.host)
@@ -205,14 +202,13 @@ struct RegistrationTests {
             return nil
         }.first)
 
-        // Registered *against* the mode's default (PREFER defaults to on), so "the decision
-        // survived" and "the default came back" cannot be confused.
+        // Registered against the mode's default (PREFER is on), so a surviving decision and a
+        // restored default cannot be confused.
         try checkout.register(method, registered: false, name: "Perso")
         #expect(!checkout.registrationOf(method).registered)
         #expect(checkout.registrationOf(method).name == "Perso")
 
-        // A different `labels` set is a different configuration under the same id, so the item does
-        // not survive.
+        // A different `labels` set is a different configuration under the same id.
         try checkout.setSession(
             TestSessions.widgetData(
                 paymentSession: TestSessions.paymentSession(

@@ -7,9 +7,8 @@ import PassKit
 import UIKit
 import PurseHeadlessCheckout
 
-/// The Apple Pay plugin — the protocol half, with no PassKit types in sight.
-///
-/// The sheet lives in ``ApplePayCoordinator``.
+/// The Apple Pay plugin — the protocol half, no PassKit types. The sheet lives in
+/// ``ApplePayCoordinator``.
 public struct ApplePayPlugin: PartnerUIPlugin {
 
     /// Keys the coordinator uses when handing its result back to the checkout.
@@ -63,14 +62,13 @@ public struct ApplePayPlugin: PartnerUIPlugin {
 
 }
 
-/// Install this to offer Apple Pay: There is no `ServiceLoader` on this platform, so a partner
-/// product is never discovered — it is linked and installed explicitly.
+/// Install this to offer Apple Pay: there is no `ServiceLoader` on this platform, so a partner
+/// product is linked and installed explicitly, never discovered.
 public struct ApplePayModule: PartnerModule {
     public let id = "purse.applepay"
 
-    /// Needed to render a payment element. The merchant id is entitlement-bound, so it can only
-    /// come from the app — nothing in the session carries it. `nil` still registers the plugin, so
-    /// a host driving `ApplePayCoordinator` itself keeps working; only the element needs it.
+    /// Needed to render a payment element: the merchant id is entitlement-bound, so nothing in the
+    /// session carries it. `nil` still registers the plugin — only the element needs it.
     private let configuration: ApplePayConfiguration?
 
     public init(configuration: ApplePayConfiguration? = nil) {
@@ -78,8 +76,7 @@ public struct ApplePayModule: PartnerModule {
     }
 
     @MainActor public func register(into registry: PluginRegistry) {
-        // Registered as a method fallback, whatever the partner: the session decides which PSP
-        // handles Apple Pay, and the variant is derived from it.
+        // A method fallback whatever the partner: the session decides which PSP handles Apple Pay.
         registry.registerFallback(method: .applePay) { ApplePayPlugin(partner: $0.partner) }
     }
 
@@ -97,8 +94,7 @@ public struct ApplePayModule: PartnerModule {
                 )))
             })
         }
-        // Read once: `canPay` is a `static var` nothing can observe, so a surface cannot react to
-        // it changing. A device that cannot pay renders no button at all.
+        // Read once: `canPay` is a `static var` nothing can observe.
         guard ApplePayCoordinator.canPay else { return .headless(submit: {}) }
 
         let coordinator = ApplePayCoordinator(host: request.host, configuration: configuration)

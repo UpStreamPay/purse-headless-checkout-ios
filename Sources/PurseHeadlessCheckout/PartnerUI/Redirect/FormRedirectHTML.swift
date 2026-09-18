@@ -4,7 +4,7 @@
 
 import Foundation
 
-/// Builds the auto-submitting `<form>` a POST redirect is actually delivered through.
+/// Builds the auto-submitting `<form>` a POST redirect is delivered through.
 enum FormRedirectHTML {
 
     static func autoSubmitting(actionURL: String, dataString: String) -> String {
@@ -24,8 +24,7 @@ enum FormRedirectHTML {
     }
 
     /// JSON first, falling back to a url-encoded query string — the PSP sends either. One level of
-    /// nesting is flattened to `key[subKey]`, mirroring web's handling; a PSP that nests deeper
-    /// would need the same treatment there first.
+    /// nesting is flattened to `key[subKey]`, as on web.
     static func parseFormFields(_ dataString: String) -> [(name: String, value: String)] {
         if let data = dataString.data(using: .utf8),
            let json = try? JSONDecoder().decode(JSONValue.self, from: data),
@@ -65,8 +64,8 @@ enum FormRedirectHTML {
 }
 
 private extension JSONValue {
-    /// A field value as the PSP expects to receive it: the literal text for a scalar, and the
-    /// re-encoded JSON for anything structured, matching Android's `value.toString()`.
+    /// Literal text for a scalar, re-encoded JSON for anything structured — Android's
+    /// `value.toString()`.
     var formFieldText: String {
         switch self {
         case let .string(text): text

@@ -4,8 +4,7 @@
 
 import Foundation
 
-/// Tracks the offset between the device clock and the Purse server clock, so session-expiry checks
-/// survive a wrong device clock.
+/// Device-to-server clock offset, so session-expiry checks survive a wrong device clock.
 public actor ServerDatetimeChecker {
     private let fetchServerTime: @Sendable () async throws -> Date
     private let clock: @Sendable () -> Date
@@ -13,7 +12,6 @@ public actor ServerDatetimeChecker {
     private var serverOffset: TimeInterval = 0
     public private(set) var synced = false
 
-    /// - Parameter fetchServerTime: typically ``DatetimeAPIClient/datetime()``.
     public init(
         fetchServerTime: @escaping @Sendable () async throws -> Date,
         clock: @escaping @Sendable () -> Date = { Date() }
@@ -22,8 +20,8 @@ public actor ServerDatetimeChecker {
         self.clock = clock
     }
 
-    /// Fetch the server time once and record the device-minus-server offset. Failures are
-    /// swallowed: the checker simply stays unsynced, matching web's catch-and-log.
+    /// Failures are swallowed on purpose — a payment must never be blocked because a clock-sync
+    /// call timed out. Matches web's catch-and-log.
     public func sync() async {
         guard !synced else { return }
         do {
@@ -35,7 +33,7 @@ public actor ServerDatetimeChecker {
         }
     }
 
-    /// Whether `expiration` has passed *for the server* (device clock corrected by the offset).
+    /// Whether `expiration` has passed *for the server*.
     public func isExpiredForServer(_ expiration: Date) -> Bool {
         expiration.addingTimeInterval(serverOffset) < clock()
     }

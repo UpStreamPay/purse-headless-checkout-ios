@@ -5,8 +5,7 @@
 import Foundation
 import UIKit
 
-/// The `partner_data.browser` block a 3-D Secure step wants — the ACS uses it for challenge sizing
-/// and locale.
+/// The `partner_data.browser` block a 3-D Secure step wants, for challenge sizing and locale.
 public enum BrowserData {
 
     /// `@MainActor` for `UIScreen`. Every caller is an `async` plugin hook, so `await` costs nothing.
@@ -16,8 +15,7 @@ public enum BrowserData {
         return [
             // No page URL on native; Android sends `android-app://{packageName}`.
             "referrer": .string("ios-app://\(Bundle.main.bundleIdentifier ?? "unknown")"),
-            // No `navigator.userAgent`, and no WebView to ask synchronously. Android falls back to
-            // the same constant when its WebView provider is unavailable.
+            // No `navigator.userAgent`, and no WebView to ask synchronously — Android's fallback too.
             "user_agent": .string("MOBILE"),
             "accept_header": .string("text/html"),
             "color_depth": .number("32"),

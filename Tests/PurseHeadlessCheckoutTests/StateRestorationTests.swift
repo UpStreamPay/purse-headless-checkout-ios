@@ -2,9 +2,8 @@ import Foundation
 import Testing
 @testable import PurseHeadlessCheckout
 
-/// `saveState()` / `CheckoutSavedState.toJSON()`/`fromJSON(_:)` / `restore(_:)` — picking a payment
-/// up after the process was killed. None of these tests touch the network (no saved tokens, no
-/// wallet session in the fixtures), so this suite claims no `PurseEnvironment` tier.
+/// `saveState()` / `toJSON()` / `fromJSON(_:)` / `restore(_:)` — picking a payment up after the
+/// process was killed. Nothing here touches the network, so this suite claims no environment tier.
 @MainActor
 struct StateRestorationTests {
 
@@ -106,8 +105,7 @@ struct StateRestorationTests {
         #expect(restored.amountSplit.isEmpty)
     }
 
-    /// A saved secondary slice the new session cannot honour is dropped rather than failing the
-    /// whole restore.
+    /// A secondary slice the new session cannot honour is dropped, not fatal to the restore.
     @Test func restoreDropsASecondarySliceThatNoLongerFits() throws {
         let saved = CheckoutSavedState(
             widgetData: TestSessions.widgetData(paymentSession: TestSessions.paymentSession(amount: 100)),
@@ -127,8 +125,7 @@ struct StateRestorationTests {
         #expect(restored.amountSplit.isEmpty)
     }
 
-    /// `saveState()` must snapshot the session **in force**, not the one the checkout was created
-    /// with.
+    /// `saveState()` snapshots the session in force, not the one the checkout was created with.
     @Test func saveStateSnapshotsTheSessionInForceNotTheOriginal() throws {
         let checkout = try PurseHeadlessCheckout(
             widgetData: TestSessions.widgetData(

@@ -4,9 +4,7 @@
 
 import Foundation
 
-/// The `/validate` response: the overall ``globalStatus``, an optional ``redirection`` the merchant
-/// must follow (3-D Secure, PayPal approval, …), and the ``raw`` body for anything a plugin's
-/// `postValidation` still needs to inspect. JSON stays at the edge.
+/// The `/validate` response. ``raw`` is kept for whatever a plugin's `postValidation` inspects.
 public struct ValidationResult: Sendable, Equatable {
     public let globalStatus: String
     public let redirection: Redirection?
@@ -18,7 +16,6 @@ public struct ValidationResult: Sendable, Equatable {
         self.raw = raw
     }
 
-    /// ``globalStatus`` as the typed ``PaymentStatus``; `unknown` for a value this SDK does not know.
     public var status: PaymentStatus { .fromWire(globalStatus) }
 
     /// Web treats `global_status === SUCCESS` as the go-ahead for post-validation.

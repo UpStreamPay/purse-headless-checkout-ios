@@ -5,8 +5,7 @@ import Testing
 @testable import PurseHeadlessCheckout
 
 /// Apple Pay's server-driven configuration and its per-partner envelopes. The sheet itself needs a
-/// real device and a provisioned merchant ID, so it is not unit tested — the same gap Android has
-/// with its Play Services sheet.
+/// real device and a provisioned merchant ID, so it is not unit tested.
 @MainActor
 struct ApplePayTests {
 
@@ -80,16 +79,14 @@ struct ApplePayTests {
         #expect(config.supportedNetworks == [.visa, .masterCard])
     }
 
-    /// `PKPaymentNetwork(rawValue:)` on a JS name is not the mapper — it silently returns `nil` for
-    /// every brand (`"visa"` ≠ `"Visa"`), which would make a real card's network vanish instead of
-    /// resolving. Caught by comparing against the framework's actual raw values, not by pattern.
+    /// `PKPaymentNetwork(rawValue:)` on a JS name returns `nil` for every brand (`"visa"` ≠
+    /// `"Visa"`), silently losing a real card's network.
     @Test func jsNetworkNamesAreTranslatedNotCast() {
         #expect(ApplePayJSNetworkMapper.network(forJSName: "visa") == .visa)
         #expect(ApplePayJSNetworkMapper.network(forJSName: "masterCard") == .masterCard)
         #expect(ApplePayJSNetworkMapper.network(forJSName: "amex") == .amex)
         #expect(ApplePayJSNetworkMapper.network(forJSName: "cartesBancaires") == .cartesBancaires)
-        // Proof the cast would have been wrong: PKPaymentNetwork's own raw value for amex is
-        // "AmEx", not "Amex" — a plausible-looking guess that is still wrong.
+        // Proof the cast is wrong: PKPaymentNetwork's own raw value for amex is "AmEx".
         #expect(PKPaymentNetwork(rawValue: "amex") != .amex)
     }
 
@@ -217,9 +214,8 @@ struct ApplePayTests {
 
     // MARK: What the sheet must refuse to build
 
-    /// A `PKPaymentRequest` with an empty country or currency cannot be presented, and PassKit does
-    /// not say why — the sheet simply refuses, and `present()`'s diagnosis blames the entitlement.
-    /// Defaulting those to `""` turned a server misconfiguration into a wild goose chase.
+    /// PassKit refuses such a sheet without saying why, and blames the entitlement — so a missing
+    /// country or currency must fail here, not default to `""`.
     @Test(arguments: ["country_code", "currency_code"])
     func refusesToBuildASheetWithoutACountryOrCurrency(_ missing: String) {
         var logs: [String: JSONValue] = ["country_code": "FR", "currency_code": "EUR"]
@@ -234,9 +230,8 @@ struct ApplePayTests {
         }
     }
 
-    /// The fallback is the merchant's configured trading name. It used to be the payment session
-    /// id, and with a single summary item PassKit renders that label as the grand-total line — so
-    /// every Adyen sheet read `TOTAL <session-uuid>`.
+    /// With a single summary item PassKit renders this label as the grand-total line, so the
+    /// fallback must be the trading name and never an identifier.
     @Test func fallsBackToTheConfiguredMerchantNameNeverTheSessionId() throws {
         let config = try ApplePayRequestConfiguration.from(
             initResponse: initResponse(["country_code": "FR", "currency_code": "EUR"]),
@@ -268,8 +263,7 @@ struct ApplePayTests {
 
     private let token = Data(#"{"data":"abc","version":"EC_v1"}"#.utf8)
 
-    /// Adyen takes the payment data base64-encoded, inside its own `paymentMethod` wrapper — the
-    /// same shape web builds in `getAdyenSessionFromResult`.
+    /// Adyen takes the payment data base64-encoded, inside its own `paymentMethod` wrapper.
     @Test func adyenWrapsTheTokenBase64() throws {
         let session = try #require(ApplePayTokenEnvelope.session(for: .adyen, paymentData: token, productId: nil))
         let json = try #require(try JSONSerialization.jsonObject(with: Data(session.utf8)) as? [String: Any])
@@ -287,9 +281,8 @@ struct ApplePayTests {
         #expect(method["productId"] as? String == "p1")
     }
 
-    /// An empty token is not a payment. Adyen would base64 it to `""` and ingenico decode it to
-    /// `""`, and the PSP then answers `BAD_REQUEST / Missing payment method details` a round trip
-    /// later — naming neither the field nor the cause.
+    /// An empty token must fail here: every variant encodes it to `""`, and the PSP's answer a
+    /// round trip later names neither the field nor the cause.
     @Test func anEmptyTokenIsRefusedByEveryVariant() {
         for variant in [ApplePayVariant.adyen, .ingenico, .default] {
             #expect(ApplePayTokenEnvelope.session(for: variant, paymentData: Data(), productId: nil) == nil)

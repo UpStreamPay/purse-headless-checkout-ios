@@ -4,8 +4,8 @@
 
 import Foundation
 
-/// Thin Payment API client. Mirrors web's `FetchPaymentAPI`: posts JSON to
-/// `{apiRoot}/{entityId}/sessions/{sessionId}/<path>` with `x-api-key` auth.
+/// Web's `FetchPaymentAPI`: JSON to `{apiRoot}/{entityId}/sessions/{sessionId}/<path>`, `x-api-key`
+/// auth.
 public struct PaymentAPIClient: Sendable {
     private let apiKey: String
     private let root: String
@@ -13,8 +13,7 @@ public struct PaymentAPIClient: Sendable {
     private let sessionId: String
     private let session: URLSession
 
-    /// - Parameter apiRoot: e.g. `https://api.purse-test.com/payment/v1`
-    ///   (``PurseEnvironment/paymentAPIRoot``). A trailing slash is tolerated.
+    /// - Parameter apiRoot: ``PurseEnvironment/paymentAPIRoot``. A trailing slash is tolerated.
     public init(apiKey: String, apiRoot: String, entityId: String, sessionId: String, session: URLSession = .shared) {
         self.apiKey = apiKey
         self.root = apiRoot.hasSuffix("/") ? String(apiRoot.dropLast()) : apiRoot
@@ -23,8 +22,7 @@ public struct PaymentAPIClient: Sendable {
         self.session = session
     }
 
-    /// `POST /init`. Runs under ``InitGuard``: concurrent duplicates coalesce, transient failures
-    /// retry with backoff, and a terminal failure fast-rejects immediate repeats of the same call.
+    /// `POST /init`, under ``InitGuard``.
     public func initPayment(_ payload: [String: JSONValue]) async throws -> JSONValue {
         let key = InitGuard.key(sessionId: sessionId, payload: payload)
         return try await InitGuard.shared.run(key: key) {
@@ -32,22 +30,18 @@ public struct PaymentAPIClient: Sendable {
         }
     }
 
-    /// `POST /validate` — takes a JSON *array* of items (one per method being submitted).
-    /// Returns the `{results, redirection, global_status}` object.
+    /// `POST /validate` — a JSON *array* of items, one per method being submitted.
     public func validate(_ payload: [JSONValue]) async throws -> JSONValue {
         try await post("/validate", body: .array(payload))
     }
 
-    /// Typed `POST /validate` — serializes each ``ValidateItemPayload`` and parses the response
-    /// into a ``ValidationResult``. This is what the create-payment pipeline calls.
     public func validate(items: [ValidateItemPayload]) async throws -> ValidationResult {
         let response = try await validate(items.map { $0.toJSON() })
         return ValidationResult.fromJSON(response)
     }
 
-    /// `POST {root}/simulation/{entityId}/{partner}/{method}` — one BNPL instalment schedule for
-    /// `product`, web's `FetchPaymentAPI.getSimulation`. Not session-scoped: the merchant entity is
-    /// enough, so the URL skips `/sessions/{sessionId}`.
+    /// Web's `FetchPaymentAPI.getSimulation`. Not session-scoped: the URL skips
+    /// `/sessions/{sessionId}`.
     public func getSimulation(partner: Partner, method: PaymentMethod, product: LoanProduct) async throws -> LoanSimulation {
         let path = simulationPath(partner: partner, method: method)
         let response = try await execute("POST", path: path, body: .object(product.payload), url: "\(root)\(path)")
@@ -61,9 +55,8 @@ public struct PaymentAPIClient: Sendable {
         return simulation
     }
 
-    /// `POST {root}/simulation/{entityId}/{partner}/{method}/multi` — every schedule the partner
-    /// offers for `product`, web's `getSimulationMulti`. Candidates without a `plugin_result` are
-    /// skipped rather than failing the call, matching web.
+    /// Web's `getSimulationMulti`. Candidates without a `plugin_result` are skipped rather than
+    /// failing the call, matching web.
     public func getSimulationMulti(
         partner: Partner, method: PaymentMethod, product: LoanProduct
     ) async throws -> [LoanSimulation] {
@@ -79,8 +72,7 @@ public struct PaymentAPIClient: Sendable {
         "/simulation/\(entityId)/\(partner.wireValue)/\(method.wireValue)"
     }
 
-    /// `GET /{entityId}/sessions/{sessionId}` — every transaction made so far against this session,
-    /// each with its own `status`.
+    /// Every transaction made so far against this session, each with its own `status`.
     public func getSession() async throws -> [JSONValue] {
         let body = try await execute("GET", path: "", body: nil)
         guard let array = body.arrayValue else {
@@ -95,7 +87,6 @@ public struct PaymentAPIClient: Sendable {
         try await execute("POST", path: path, body: body, url: url)
     }
 
-    /// Session-scoped URL — every call but the simulation ones lives under the session.
     private func sessionURL(_ path: String) -> String {
         "\(root)/\(entityId)/sessions/\(sessionId)\(path)"
     }
@@ -133,8 +124,8 @@ public struct PaymentAPIClient: Sendable {
         do {
             (data, response) = try await session.data(for: request)
         } catch {
-            // No status at all: the request may still have reached the server. `outcomeUnknown`
-            // is what tells a caller not to report this as a failed payment.
+            // No status at all: the request may still have reached the server, so `outcomeUnknown`
+            // tells the caller not to report a failed payment.
             throw PaymentAPIError(
                 "Payment API \(method) \(path) failed: \(error.localizedDescription)",
                 underlying: error,
@@ -145,8 +136,8 @@ public struct PaymentAPIClient: Sendable {
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         // Web's FetchPaymentAPI treats status < 400 as success.
         if status >= 400 {
-            // The body stays out of the message: it is partner/backend wording that ends up in
-            // telemetry and merchant logs. The parsed `error` code is what a caller acts on.
+            // The body stays out of the message: it is partner wording that ends up in telemetry
+            // and merchant logs. Callers act on the parsed `error` code.
             let errorCode = parseErrorCode(data)
             throw PaymentAPIError(
                 "Payment API \(method) \(path) failed: HTTP \(status)" + (errorCode.map { " (\($0))" } ?? ""),
@@ -167,7 +158,6 @@ public struct PaymentAPIClient: Sendable {
         }
     }
 
-    /// The `error` code from an API JSON error body, or `nil` when the body is not that shape.
     private func parseErrorCode(_ data: Data) -> String? {
         guard let json = try? JSONDecoder().decode(JSONValue.self, from: data) else { return nil }
         return json["error"]?.stringValue?.nonBlank

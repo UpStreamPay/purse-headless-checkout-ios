@@ -4,16 +4,14 @@
 
 import Foundation
 
-/// What every payment surface reports on — card, Apple Pay, PayPal, Klarna and redirection alike.
-/// Every member is defaulted: implement only what your screen reacts to.
+/// What every payment surface reports on. Every member is defaulted: implement only what your
+/// screen reacts to.
 @MainActor
 public protocol PaymentElementListener: AnyObject {
 
-    /// Readiness changed — a card form's validity, a prepared wallet or redirection flow. Gate your
-    /// Pay button on it. Self-submitting methods gate themselves.
+    /// Gate your Pay button on this. Self-submitting methods gate themselves.
     func onReady(_ ready: Bool)
 
-    /// The attempt ended. Branch on the case.
     func onOutcome(_ outcome: PaymentOutcome)
 
     /// A 3-D Secure / PSP page is being opened (informational).

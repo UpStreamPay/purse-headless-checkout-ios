@@ -1,6 +1,6 @@
 // Web: packages/partner-ui/src/plugins/index.ts (`getPlugin`) + `partners/partner_plugins.ts`
 // Same: resolution order vault → template → integration_mode=redirection → (partner, method) → method.
-// Differs: registration is explicit. Android discovers optional artifacts with `ServiceLoader`; Swift has no equivalent and no lazy class loading, so a merchant calls `install(_:)` for each partner product they link.
+// Differs: registration is explicit — Swift has no `ServiceLoader`, so a merchant calls `install(_:)` for each partner product they link.
 
 import Foundation
 
@@ -13,25 +13,22 @@ public struct PluginBuilderData: Sendable {
 /// Plugins are factory closures, as on web.
 public typealias PluginBuilder = @Sendable (PluginBuilderData) -> any PartnerUIPlugin
 
-/// A partner product's registration entry point. Android finds these on the classpath through
-/// `ServiceLoader`; iOS cannot, so each optional product exposes one and the merchant installs it
-/// at start-up:.
+/// A partner product's registration entry point, installed by the merchant at start-up.
 public protocol PartnerModule: Sendable {
-    /// A stable identity, so installing the same module twice is a no-op.
+    /// Stable, so installing the same module twice is a no-op.
     var id: String { get }
-    /// Main-actor isolated because the registry is: registration mutates checkout-facing state.
     @MainActor func register(into registry: PluginRegistry)
 
     /// Whether `plugin` is one of this module's own — a `plugin is MyPlugin` test.
     @MainActor func renders(_ plugin: any PartnerUIPlugin) -> Bool
 
-    /// The rendered half of `plugin` for one item. Only called when ``renders(_:)`` said `true`.
+    /// Only called when ``renders(_:)`` said `true`.
     @MainActor func surface(for plugin: any PartnerUIPlugin, request: SurfaceRequest) -> PaymentSurface?
 }
 
 public extension PartnerModule {
-    /// Defaulted so a module contributing only protocol plugins still compiles. Its items then get
-    /// an element with no UI whose submit reports `noPluginRegistered`.
+    /// Defaulted so a module contributing only protocol plugins still compiles; its items get an
+    /// element with no UI.
     @MainActor func renders(_ plugin: any PartnerUIPlugin) -> Bool { false }
     @MainActor func surface(for plugin: any PartnerUIPlugin, request: SurfaceRequest) -> PaymentSurface? { nil }
 }
@@ -48,26 +45,25 @@ public final class PluginRegistry {
     private var methodFallbacks: [PaymentMethod: PluginBuilder] = [:]
     private var installed: [any PartnerModule] = []
 
-    /// The built-in plugins every merchant gets — the Purse-vault card and the generic redirection
-    /// template — are installed here, mirroring Android's `PluginRegistry` init block. A caller that
-    /// registers the same key afterwards wins, which is what lets a test substitute one.
+    /// The built-ins every merchant gets, as Android's init block does. A caller registering the
+    /// same key afterwards wins, which is what lets a test substitute one.
     public init() {
         install(CardModule())
         install(RedirectionModule())
     }
 
-    /// The ids of the modules currently contributing plugins, in installation order.
+    /// In installation order.
     public var modules: [String] { installed.map(\.id) }
 
-    /// Add a module's plugins. Installing the same module twice is a no-op.
+    /// Installing the same module twice is a no-op.
     public func install(_ module: any PartnerModule) {
         guard !installed.contains(where: { $0.id == module.id }) else { return }
         installed.append(module)
         module.register(into: self)
     }
 
-    /// The installed module that renders `plugin` — Android's `moduleFor`. `nil` when the partner
-    /// product is linked but not installed, which is what makes an element headless.
+    /// Android's `moduleFor`. `nil` when the partner product is linked but not installed, which is
+    /// what makes an element headless.
     public func module(rendering plugin: any PartnerUIPlugin) -> (any PartnerModule)? {
         installed.first { $0.renders(plugin) }
     }
@@ -92,7 +88,8 @@ public final class PluginRegistry {
         vaultPlugins[vendor] = builder
     }
 
-    /// Resolution order, identical to web and Android:
+    /// Resolution order, identical to web and Android: vault → template → redirection → (partner,
+    /// method) → method.
     public func plugin(
         partner: Partner,
         method: PaymentMethod,
@@ -120,7 +117,7 @@ public final class PluginRegistry {
         return builder?(PluginBuilderData(partner: partner, method: method))
     }
 
-    /// Test-only: forget every registration.
+    /// Test-only.
     public func reset() {
         vaultPlugins.removeAll()
         genericPlugins.removeAll()

@@ -51,8 +51,7 @@ struct EventBatchQueueTests {
         #expect(await delivered.batches.isEmpty)
     }
 
-    /// Matches Android's default no-op processor: an event queued before a processor is ever wired
-    /// is simply dropped on flush, not held forever.
+    /// An event queued before a processor is wired is dropped on flush, not held forever.
     @Test func flushingWithNoProcessorSetDropsTheBatch() async {
         let queue = EventBatchQueue<Int>(batchSize: 1, flushAfterSeconds: 999)
         await queue.add(1)
@@ -73,8 +72,7 @@ struct EventBatchQueueTests {
         #expect(await delivered.batches == [[1]])
     }
 
-    /// The timer path must hand the processor an **uncancelled** task. `flushNow()` cancels
-    /// `pendingFlush`, which on the timer path is the task it is running in.
+    /// `flushNow()` cancels `pendingFlush`, which on the timer path is its own task.
     @Test func theTimerFlushRunsTheProcessorUncancelled() async throws {
         let queue = EventBatchQueue<Int>(batchSize: 100, flushAfterSeconds: 0.05)
         let observed = CancellationWitness()

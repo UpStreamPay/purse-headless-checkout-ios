@@ -88,7 +88,7 @@ pins the whole set. Adding a code means adding it on the other platforms too, or
 Swift 6 language mode, strict concurrency, and it currently compiles clean — keep it that way.
 
 - Networking is `async` on `URLSession` and touches no actor. That is what keeps SDK network calls
-  off the main thread *by construction* rather than by convention (SDK-12263).
+  off the main thread *by construction* rather than by convention.
 - Shared mutable state is an `actor` (`InitGuard`, `ServerDatetimeChecker`), not a lock.
 - `ISO8601DateFormatter` is **not** `Sendable`. It is built per call in `ISO8601Date.parse` rather
   than cached in a static. Do not "optimise" that into a shared instance.
@@ -147,30 +147,23 @@ plugin whose native step must run *after* `/validate`, not before.
 
 ## Tests: the stub is global, suites are not
 
-swift-testing runs **suites in parallel**, and `StubURLProtocol` holds process-wide state. Handlers
-are therefore keyed by **host**, and each suite that stubs the network must own a host no other
-suite uses — pick a different `PurseEnvironment` tier if you need one. All four real tiers are
-claimed: `SubmitPaymentTests` uses sandbox and test (one suite each, in the same file),
-`CoPaymentTests` uses development, `SavedSecondaryBalanceTests` uses production. Once a tier is
-taken, the way out is a fictional host instead, not squeezing onto someone else's tier:
-`PayPalTests`, `KlarnaTests`, `CardPluginTests`, `LoanSimulationTests` and `RegistrationTests` build
-their own `PaymentAPIClient`/`PartnerUIContext` directly against a made-up `apiRoot` — `PaymentAPIClient`
-takes any root string, so this sidesteps the tier limit entirely. `WalletTests` does the analogous
-thing for a **full** `PurseHeadlessCheckout` via `walletAPIRootOverride:` (a test-only init
-parameter, same seam `urlSession:` already is) — proof that "all tiers are taken" is never actually
-a blocker, only a prompt to make the thing under test accept its own root.
+swift-testing runs **suites in parallel** and `StubURLProtocol` holds process-wide state, so
+handlers are keyed by **host** and every suite that stubs the network must own a host no other suite
+uses. `@Suite(.serialized)` serializes only *within* a suite.
 
-Getting this wrong does not fail loudly: the other suite's response arrives instead of yours, and
-the test fails with a confusing assertion about the wrong body — including a nonsensical-looking
-value that turns out to be a *different* suite's fixture. It has already cost four debugging rounds.
-`@Suite(.serialized)` only serializes *within* a suite — it does nothing across them.
+All four real `PurseEnvironment` tiers are claimed. The way out is a fictional host, not squeezing
+onto someone else's tier: build a `PaymentAPIClient` against a made-up `apiRoot`, or hand a whole
+checkout its own root through a test-only init parameter (`walletAPIRootOverride:`, the same seam
+`urlSession:` is). "All tiers are taken" is never a blocker, only a prompt to let the thing under
+test accept its own root.
 
-**`InitGuard.shared` has the identical hazard, one layer down.** It is a process-global singleton
-keyed by `sessionId:partner:method:amount`, and a **terminal** `/init` failure is cached there
-(`spent`) indefinitely — never evicted on failure, only on success or LRU capacity. A test that
-deliberately drives a real terminal failure through `PaymentAPIClient.initPayment` poisons that key
-for any later test that happens to reuse the same `(sessionId, partner, method, amount)` — reset it
-around such a test: `await InitGuard.shared.reset()` before, and in a `defer` after.
+Getting this wrong does not fail loudly: another suite's response arrives instead of yours and the
+assertion complains about a body you never wrote.
+
+**`InitGuard.shared` has the identical hazard one layer down.** It is a process-global singleton
+keyed `sessionId:partner:method:amount`, and a terminal `/init` failure is cached there indefinitely
+— never evicted on failure. A test that drives a real terminal failure poisons that key for any
+later test reusing the same tuple, so call `await InitGuard.shared.reset()` before and in a `defer`.
 
 ## Redirects
 
@@ -215,7 +208,7 @@ after), do the same three checks that caught real problems with Secure Fields an
 
 1. **Does the package actually resolve?** `swift package resolve` against the real dependency URL,
    in a throwaway scratch package — not a search result, not the vendor's own docs. Secure Fields'
-   tagged releases do not resolve at all (see the README); PayPal's do.
+   tags once resolved for nobody, because the release assets behind its binary target 404'd.
 2. **Which products does it actually export, and from where?** Don't assume `import Foo` gives you
    everything the vendor's own sample code imports. PayPal's `CoreConfig`/`Environment` live in
    `CorePayments`, a separate product from `PayPalWebPayments` that is not re-exported — this only
@@ -247,7 +240,7 @@ This is how Klarna's `finalise` (British spelling, not `finalize`) and the exact
 would not have caught either.
 
 **The same discipline applies to our own dependencies, not just PayPal/Klarna.** `PurseTheme`
-(SDK-12262) was designed against an *assumed* gap — "Secure Fields has no styling API, so theming
+was designed against an *assumed* gap — "Secure Fields has no styling API, so theming
 has no real integration point yet" — until its actual `SecureFieldsConfig.swift` was read and turned
 out to already carry a real `SecureFieldsStyle` (font/colors/per-state overrides) and
 `SecureFieldsFieldsConfig` (per-field placeholder/accessibility label). The assumption would have
@@ -282,50 +275,29 @@ assumed either way, and documented on the type itself rather than silently wired
 
 ## `PurseHeadlessCheckout.host(for:)` — the concrete `PluginHost`
 
-`host(for item: any PrimarySource) throws -> PluginHost` is the seam a coordinator actually runs
-through in a real app. `item` must be a fresh `PrimaryMethod` or one of its saved `PaymentToken`s
-(anything else is a type error, not a runtime one — `PrimarySource` is the constraint). Asking for a
-host gives the plugin its `onSessionSet` exactly once per item id (`trackedPluginItemIds`), mirroring
-Android's `trackPlugin`/`activePlugins`. Throws `checkoutTornDown` after `teardown()`, same as every
-other network path. The returned host holds the checkout `unowned` — it must not outlive it.
+`host(for item: any PrimarySource) throws -> PluginHost` is the seam a coordinator runs through in a
+real app. `item` is a `PrimaryMethod` or one of its saved `PaymentToken`s — anything else is a
+compile-time error, not a runtime one. Asking for a host fires the plugin's `onSessionSet` exactly
+once per item id, mirroring Android's `activePlugins`. Throws `checkoutTornDown` after `teardown()`.
 
-**`onSessionSet` does not re-fire for a *surviving* item across `setSession`, by design, matching
-Android.** An item survives only when its configuration is deep-equal to what it was — by definition
-there is nothing to refresh. `trackedPluginItemIds` is pruned to survivors on every `setSession` (and
-cleared at `teardown()`, along with cancelling any still-pending `onSessionSet` `Task`s) purely so a
-**dropped** id, if some later session's item happens to reuse it (ids are `"{partner}-{method}"`, not
-content hashes), is treated as new and correctly re-tracked — not to re-notify anything unchanged.
-Don't read the protocol's "or refreshed" docstring on `onSessionSet` as a promise iOS calls it again
-for every session update; it doesn't, deliberately, same as Android's `PurseHeadlessCheckout.kt`.
+**The host holds the checkout `unowned`, and a coordinator must hold its host strongly.** Nothing
+else keeps an `ItemHost` alive: a `weak var host` goes nil as soon as the caller's local goes out of
+scope, and `setCollected`/`setFulfilled` silently become no-ops. All four coordinators use `let`.
 
-The adapter (`PurseHeadlessCheckout.ItemHost`, private, nested) is deliberately thin: every member
-forwards to an existing public method (`setCollected`, `setFulfilled`, `setPrimary`/`setPrimaryToken`,
-`submitPayment`) or an existing public property (`session`, `remainingAmountToPay`). The one thing it
-does itself is `pluginContext(for:api:)` — the same context shape `PaymentValidator` builds at actual
-`/validate` time, except `amount` here is the *live* `remainingAmountToPay` (updates as the splitter
-moves), not a frozen split amount. Don't confuse the two: a plugin's `buildContext()` during form entry
-and its `preValidation` context at submit are built by different code for a reason.
+**`onSessionSet` does not re-fire for an item that survives a `setSession`**, by design and matching
+Android: an item survives only when its configuration is deep-equal, so there is nothing to refresh.
+The tracked set is pruned to survivors so that a dropped id — ids are `"{partner}-{method}"`, not
+content hashes — is treated as new if a later session reuses it. Do not read the protocol's "or
+refreshed" docstring as a promise that iOS calls it again.
 
-**Real bug this uncovered, fixed in the same change**: `CardCoordinator` held its host as `private
-weak var host`, the only one of the four coordinators to do so (the other three use `let`, matching
-Android's own strong reference). Nothing else keeps a `host(for:)`-produced `ItemHost` alive, so the
-weak reference went nil as soon as the caller's local variable went out of scope — `setCollected`/
-`setFulfilled` silently became no-ops right after `init`. Existing tests never caught it because they
-always kept a local `let` reference to their fake host alive for the coordinator's lifetime. Now `let`,
-matching the other three.
+The adapter is deliberately thin: every member forwards to an existing public method or property.
+The exception is `pluginContext(for:api:)`, whose `amount` is the *live* `remainingAmountToPay`,
+not the frozen split amount `PaymentValidator` uses at `/validate` time. The two are built by
+different code on purpose.
 
-Test coverage: `PluginHostTests.swift`. It claims no `PurseEnvironment` tier — `buildContext`/
-`setCollected`/`setFulfilled`/`setAsPrimary`/`onSessionSet` are all synchronous or in-process, no
-network involved, so it can safely share a host with another suite (see `WalletTests`' header comment
-for the same reasoning).
-
-**Pre-existing, separate gap, not touched by this change**: `PartnerUIPlugin.onAmountUpdate` (fired
-by Android whenever the splitter's remaining amount moves, e.g. a gift card gets applied/removed
-after a card form is already mounted) has no call site on iOS either, same as `destroyClient` above.
-`host(for:)` only wires `onSessionSet`. A plugin that needs to react to a live amount change mid-form
-has no way to today; flag before assuming it works, and scope it separately if a real MOP needs it —
-it's a distinct feature (Android's `notifyAmountUpdate`, driven off `activePlugins`), not a `host(for:)`
-bug.
+**`onAmountUpdate` has no call site**, same as `destroyClient`. Android fires it whenever the
+splitter's remaining amount moves; a plugin that needs to react to a live amount change mid-form
+cannot today. Scope it separately if a real method needs it.
 
 ## Error codes with no dedicated case still need a real carrier
 
@@ -338,25 +310,18 @@ through `hookFailed(hook:underlying:code:)` instead. Adding a new `PurseErrorCod
 itself require a new `PurseCheckoutError` case: check whether an existing flexible carrier already
 covers it before adding one.
 
-## Monitoring: per-instance, not a process-wide singleton — and one honest correction to Android
+## Monitoring: per-instance, not a process-wide singleton
 
-`CheckoutEventBus` deliberately diverges from Android's `CheckoutEventBus`/web's event bus: it is
-owned by one `PurseHeadlessCheckout`, not a process-wide singleton every checkout instance shares
-and re-points via `install()`. Every other piece of mutable state here is already per-instance
-(`splitter`, `wallet`, …); a global bus would be the one exception, and it has a real failure mode
-Android's design accepts — two checkouts alive at once would have the second one's `install()`
-silently redirect the first one's events. Don't reach for a singleton/shared-instance pattern for
-monitoring state without checking whether the multi-instance case actually matters here (it does).
+`CheckoutEventBus` is owned by one `PurseHeadlessCheckout` rather than shared process-wide and
+re-pointed via `install()`, which is what Android does. Every other piece of mutable state here is
+already per-instance, and a global bus has a real failure mode: with two checkouts alive, the
+second one's `install()` silently redirects the first one's events.
 
-**Do not copy a payload field from Android without checking it against the privacy AC first.**
-Android's own `LoanSimulator.call` includes `"amount" to product.amount.toPlainString()` in
-`HEADLESS_CHECKOUT_METHOD_LOAN_SIM` — a real inconsistency with its own documented invariant ("no
-raw amount in any event", SDK-12220) that this port does not carry forward. Every monitoring call
-site here only ever sends `partner`/`method`/`currencyCode`/counts/booleans — the amount itself
-never appears. `monitoringPayload`/`errorPayload`/`summarizeValidationResults`
-(`Checkout/Monitoring/MonitoringPayloads.swift`) are the one place that decides what a payload can
-carry; route every new event through them rather than building a payload by hand, and check the
-privacy invariant yourself rather than trusting the Android source is already clean.
+**Do not copy a payload field from Android without checking it against the privacy invariant.**
+Android's loan-simulation event includes a raw `amount`, contradicting its own "no raw amount in any
+event" rule; this port does not carry that forward. `monitoringPayload`/`errorPayload`/
+`summarizeValidationResults` are the one place that decides what a payload may carry — route every
+new event through them rather than building one by hand.
 
 ## Repo layout
 
@@ -378,48 +343,24 @@ The version lives in the git tag and nowhere else. `scripts/generate-version.sh`
 `SDKVersion.swift`; the checked-in value is `0.0.0-SNAPSHOT`. Releases are conventional-commit
 driven through release-please.
 
-## Privacy manifest and lint — where SDK-12264 actually stands
+## Privacy manifest and lint
 
-`Sources/PurseHeadlessCheckout/PrivacyInfo.xcprivacy` exists and its
-`NSPrivacyAccessedAPITypes`/`NSPrivacyTracking` sections are real and verified: grepped this
-target's own source *and* `purse-securefields-ios`'s for every required-reason API Apple lists —
-none are used by either. PayPal and Klarna both bundle their own manifest inside their xcframeworks
-already (confirmed by inspecting the resolved artifacts, not assumed) — nothing owed on their
-behalf. Secure Fields itself ships no manifest of its own (same gap as its missing linter) — not
-this repo's to fix, but worth knowing if the merchant's own aggregate manifest ever gets audited.
+`Sources/PurseHeadlessCheckout/PrivacyInfo.xcprivacy` is real and verified: this target's source and
+`purse-securefields-ios`'s were grepped for every required-reason API Apple lists, and neither uses
+one. PayPal and Klarna bundle their own manifests inside their xcframeworks. Secure Fields ships
+none — not this repo's to fix, but worth knowing if a merchant's aggregate manifest gets audited.
 
-**`NSPrivacyCollectedDataTypes` is deliberately left empty with a comment, not filled in.** The
-monitoring collector (SDK-12265) sends device model, OS version, screen dimensions and a
-self-generated instance id — never an IDFA/IDFV, never used for tracking — but whether that counts
-as a declarable "collected data type" under Apple's taxonomy, and at what linkage level, is a
-privacy/legal categorization call, not an engineering one. Don't fill it in without that sign-off;
-an engineer's best guess here is exactly the kind of mistake an App Store review — or a customer's
-own privacy audit — will catch later.
+**`NSPrivacyCollectedDataTypes` is deliberately empty.** The monitoring collector sends device
+model, OS version, screen dimensions and a self-generated instance id, never an IDFA/IDFV and never
+for tracking — but whether that is a declarable collected data type, and at what linkage level, is a
+privacy and legal call. Do not fill it in without that sign-off.
 
-**SwiftLint/SwiftFormat were not added.** Neither tool is installed in this environment, so a config
-here could not be run against the ~30-file existing tree to see what it would actually flag before
-committing to it as a CI gate. Adding an unvalidated lint config directly to a *required* CI check
-risks blocking every future PR on an unknown volume of pre-existing violations. Do this properly
-when the tools are available: install both, run against the full tree, fix or explicitly baseline
-what they flag, *then* wire the CI step — not the other way around.
+**SwiftLint and SwiftFormat are not wired.** Neither tool is installed here, so a config could not be
+run against the existing tree first, and an unvalidated config on a required check blocks every
+future PR on an unknown volume of violations. Install both, run them, baseline what they flag, then
+add the CI step — in that order.
 
-**Why CI was red on every PR from `feat/card-payment` (#4) onward — and what actually fixed it.**
-`Package.swift` took `purse-securefields-ios` over **ssh** (`git@github.com:…`), and every run
-failed identically with `git@github.com: Permission denied (publickey)` while resolving that one
-dependency. PRs #1–#3 passed only because they predate the dependency entering the graph.
-
-It looked like a private-repo problem and was not. **SSH authenticates regardless of repository
-visibility**, so an SSH URL needs a key whether or not the repo is public — and a CI runner has
-none. Making `purse-securefields-ios` public was therefore necessary but not sufficient; the fix
-was switching the URL to `https://`, which needs no credentials for a public repo. An earlier
-version of this note predicted the opposite ("CI goes green with no workflow change needed once the
-repo is public"), which was wrong.
-
-Going public did remove the *other* blocker: the tags' `.binaryTarget` release assets now answer
-`200` unauthenticated, so the revision pin is gone and `Package.swift` takes a real version range.
-
-**When an artifact looks broken, wipe DerivedData first.** Switching between the source pin and the
-binary artifact leaves a stale `PurseSecureFields.framework` behind, and the mismatch surfaces as
-`Undefined symbol: PurseSecureFields.SecureFieldsStyle.default.unsafeMutableAddressor` on *every*
-tag — indistinguishable from a genuinely broken release. It cost one confident wrong diagnosis here;
-both tags build fine from clean.
+**Two dependency gotchas.** Take a package over `https://`, never `git@github.com:` — SSH needs a
+key a CI runner has not got, whatever the repository's visibility. And wipe DerivedData when an
+artifact looks broken: a stale framework surfaces as `Undefined symbol: …unsafeMutableAddressor` on
+every tag, indistinguishable from a genuinely broken release.

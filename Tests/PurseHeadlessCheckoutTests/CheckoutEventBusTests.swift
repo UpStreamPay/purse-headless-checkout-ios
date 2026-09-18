@@ -8,8 +8,7 @@ import Testing
 @MainActor
 struct CheckoutEventBusTests {
 
-    /// A fictional host — `MonitoringAPIClient` takes any root string directly, so this suite needs
-    /// no `PurseEnvironment` tier.
+    /// `MonitoringAPIClient` takes any root string, so this suite needs no `PurseEnvironment` tier.
     private static let host = "api.monitoringtest.example"
 
     @Test func aPostedEventReachesTheClientWithTheEnvelopeExtras() async throws {
@@ -25,8 +24,7 @@ struct CheckoutEventBusTests {
         await bus.patchExtras(entityId: "entity-1", paymentSessionId: "session-1", version: "1.2.3", wrapper: "direct")
         await bus.post(.ready)
 
-        // batchSize: 1 flushes synchronously inside post -> add -> flushNow, but the actual POST is
-        // itself async; give it a moment to land.
+        // batchSize 1 flushes inside `post`, but the POST itself is async; give it a moment.
         try? await Task.sleep(nanoseconds: 100_000_000)
 
         let body = try #require(StubURLProtocol.body(for: "headless_checkout", host: Self.host)?.array)
@@ -41,9 +39,8 @@ struct CheckoutEventBusTests {
         #expect(message["event"]?["code"]?.stringValue == "HEADLESS_CHECKOUT_READY")
     }
 
-    /// Later `patchExtras` calls merge onto earlier ones rather than replacing the whole set — web's
-    /// `patchExtrasData`, needed because `setSession` re-stamps only `paymentSessionId`/
-    /// `walletSessionId` without losing `entityId`/`version`/`wrapper` from the original `install`.
+    /// `patchExtras` merges rather than replaces: `setSession` re-stamps only the session ids and
+    /// must not lose `entityId`/`version`/`wrapper` from `install`.
     @Test func patchExtrasMergesRatherThanReplaces() async throws {
         StubURLProtocol.reset(host: Self.host)
         StubURLProtocol.set("headless_checkout", .ok("{}"), host: Self.host)
@@ -66,9 +63,8 @@ struct CheckoutEventBusTests {
         #expect(message["paymentSessionId"]?.stringValue == "session-2")
     }
 
-    /// Posting before `install` runs (a real race at construction: the install `Task` and the
-    /// `CREATE`/`SET_SESSION`/`READY` posts that follow it in the same `Task` body are still async
-    /// relative to the synchronous `init` returning) never crashes — the event is simply held until
+    /// A real race at construction: `init` returns synchronously while the install `Task` and the
+    /// posts following it are still pending.
     @Test func postingBeforeInstallNeverCrashes() async {
         let bus = CheckoutEventBus(batchSize: 100, flushAfterSeconds: 999)
         await bus.post(.ready)

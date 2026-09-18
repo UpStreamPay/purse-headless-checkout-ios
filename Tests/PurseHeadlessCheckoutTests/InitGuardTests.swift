@@ -90,8 +90,7 @@ struct InitGuardTests {
         #expect(await calls.value == InitGuard.maxAttempts)
     }
 
-    /// Exhausting the retries on a *transient* failure must not fast-reject the next attempt.
-    /// `shared` is process-wide and nothing evicts a spent entry, so treating "lost signal for two
+    /// `shared` is process-wide and never evicts a spent entry, so treating "lost signal for two
     /// seconds" as terminal would kill that method for the life of the app process.
     @Test func aRetryableFailureThatExhaustedItsAttemptsDoesNotPoisonTheKey() async throws {
         let guardActor = await makeGuard()

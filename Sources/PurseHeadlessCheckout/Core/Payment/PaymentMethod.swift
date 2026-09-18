@@ -1,23 +1,19 @@
 // Web: packages/sdk/src/types.ts (`Method` union)
 // Same: known wire values.
-// Differs: named `PaymentMethod`, not `Method`. Foundation re-exports the Objective-C runtime's `Method` typedef, so a merchant writing `-> Method` in any file that imports both gets "'Method' is ambiguous for type lookup" — and cannot qualify it, because the `PurseHeadlessCheckout` class shadows the module of the same name. Web and Android have no such collision. Also: `applePay` replaces Android's `googlePay`.
+// Differs: named `PaymentMethod` — Foundation re-exports Objective-C's `Method` typedef, making a bare `Method` ambiguous and unqualifiable. `applePay` replaces Android's `googlePay`.
 
 import Foundation
 
-/// A payment method under a ``Partner`` in a `protocols` entry. Only the methods this SDK targets
-/// get a named case; anything else round-trips through ``PaymentMethod/other(_:)`` rather than
-/// being dropped.
+/// A payment method under a ``Partner``. Unknown values round-trip through
+/// ``PaymentMethod/other(_:)`` rather than being dropped.
 public enum PaymentMethod: Sendable, Hashable {
-    /// Carte Bancaire / generic card payment.
     case creditCard
-    /// Apple Pay. The Android SDK's equivalent case is `googlepay`; the wire value differs, and so
-    /// does the whole partner integration — this is not a rename of the same thing.
+    /// Not a rename of Android's `googlepay`: different wire value, different integration.
     case applePay
-    /// Classic PayPal — distinct from the sibling ``PaymentMethod/bnpl`` ("Pay Later").
+    /// Classic PayPal — distinct from ``PaymentMethod/bnpl`` ("Pay Later").
     case wallet
     case giftCard
     case bnpl
-    /// Klarna's own pay-later / slice-it method.
     case installments
     case other(String)
 

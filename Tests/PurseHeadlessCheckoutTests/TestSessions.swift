@@ -1,14 +1,12 @@
 import Foundation
 @testable import PurseHeadlessCheckout
 
-/// Session fixtures. Mirrors Android's `eu/purse/core/session/TestSessions.kt`: build the JSON a
-/// real backend sends, base64 it, and let the real codec do the work — never construct the model
-/// types directly, or the parser is never exercised.
+/// Session fixtures: build the JSON a real backend sends and let the real codec decode it. Never
+/// construct the model types directly, or the parser is never exercised.
 enum TestSessions {
 
-    /// `apiURL` defaults to the declared environment's own root rather than a hardcoded sandbox
-    /// host: an unlocked checkout honours `api_url`, so a fixture that always said "sandbox" while
-    /// declaring `environment: "development"` would route somewhere the session never meant.
+    /// `apiURL` follows the declared environment, not a hardcoded sandbox host: an unlocked
+    /// checkout honours `api_url`, so a mismatched fixture would route to the wrong tier.
     static func widgetData(
         environment: String = "sandbox",
         apiKey: String = "test-key",

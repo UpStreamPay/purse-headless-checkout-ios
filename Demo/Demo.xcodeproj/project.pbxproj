@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		3C2B00000000000000000001 /* PurseHeadlessCheckout in Frameworks */ = {isa = PBXBuildFile; productRef = 3C2B00000000000000000002 /* PurseHeadlessCheckout */; };
 		BB00000000000000000061 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000060 /* Assets.xcassets */; };
+		BB00000000000000000134 /* AlbertSans-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000135 /* AlbertSans-Regular.ttf */; };
+		BB00000000000000000136 /* AlbertSans-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000137 /* AlbertSans-SemiBold.ttf */; };
 		BB00000000000000000100 /* AlfredClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000101 /* AlfredClient.swift */; };
 		BB00000000000000000102 /* DemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000103 /* DemoApp.swift */; };
 		BB00000000000000000104 /* DemoController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000105 /* DemoController.swift */; };
@@ -20,6 +22,13 @@
 		BB00000000000000000116 /* ResultScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000117 /* ResultScreen.swift */; };
 		BB00000000000000000118 /* SessionScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000119 /* SessionScreen.swift */; };
 		BB00000000000000000120 /* SimulationPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000121 /* SimulationPreview.swift */; };
+		BB00000000000000000150 /* PurseDS.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000151 /* PurseDS.swift */; };
+		BB00000000000000000122 /* CartScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000123 /* CartScreen.swift */; };
+		BB00000000000000000124 /* CheckoutPayScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000125 /* CheckoutPayScreen.swift */; };
+		BB00000000000000000126 /* CheckoutRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000127 /* CheckoutRouter.swift */; };
+		BB00000000000000000128 /* CheckoutUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000129 /* CheckoutUI.swift */; };
+		BB00000000000000000130 /* ConfirmationScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000131 /* ConfirmationScreen.swift */; };
+		BB00000000000000000132 /* DemoRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000133 /* DemoRootView.swift */; };
 		3C2B0000000000000001000 /* PurseCheckoutApplePay in Frameworks */ = {isa = PBXBuildFile; productRef = 3C2B0000000000000001002 /* PurseCheckoutApplePay */; };
 		3C2B0000000000000001003 /* PurseCheckoutPayPal in Frameworks */ = {isa = PBXBuildFile; productRef = 3C2B0000000000000001005 /* PurseCheckoutPayPal */; };
 		3C2B0000000000000001006 /* PurseCheckoutKlarna in Frameworks */ = {isa = PBXBuildFile; productRef = 3C2B0000000000000001008 /* PurseCheckoutKlarna */; };
@@ -29,6 +38,8 @@
 		BB0000000000000000000A /* Demo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Demo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB0000000000000000000B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BB00000000000000000060 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BB00000000000000000135 /* AlbertSans-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = AlbertSans-Regular.ttf; sourceTree = "<group>"; };
+		BB00000000000000000137 /* AlbertSans-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = AlbertSans-SemiBold.ttf; sourceTree = "<group>"; };
 		BB00000000000000000101 /* AlfredClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlfredClient.swift; sourceTree = "<group>"; };
 		BB00000000000000000103 /* DemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoApp.swift; sourceTree = "<group>"; };
 		BB00000000000000000105 /* DemoController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoController.swift; sourceTree = "<group>"; };
@@ -40,6 +51,13 @@
 		BB00000000000000000117 /* ResultScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultScreen.swift; sourceTree = "<group>"; };
 		BB00000000000000000119 /* SessionScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionScreen.swift; sourceTree = "<group>"; };
 		BB00000000000000000121 /* SimulationPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimulationPreview.swift; sourceTree = "<group>"; };
+		BB00000000000000000151 /* PurseDS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurseDS.swift; sourceTree = "<group>"; };
+		BB00000000000000000123 /* CartScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CartScreen.swift; sourceTree = "<group>"; };
+		BB00000000000000000125 /* CheckoutPayScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckoutPayScreen.swift; sourceTree = "<group>"; };
+		BB00000000000000000127 /* CheckoutRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckoutRouter.swift; sourceTree = "<group>"; };
+		BB00000000000000000129 /* CheckoutUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckoutUI.swift; sourceTree = "<group>"; };
+		BB00000000000000000131 /* ConfirmationScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmationScreen.swift; sourceTree = "<group>"; };
+		BB00000000000000000133 /* DemoRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoRootView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -70,6 +88,15 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXGroup section */
+		BB00000000000000000140 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				BB00000000000000000135 /* AlbertSans-Regular.ttf */,
+				BB00000000000000000137 /* AlbertSans-SemiBold.ttf */,
+			);
+			path = Fonts;
+			sourceTree = "<group>";
+		};
 		BB0000000000000000000D /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -101,6 +128,13 @@
 				BB00000000000000000117 /* ResultScreen.swift */,
 				BB00000000000000000119 /* SessionScreen.swift */,
 				BB00000000000000000121 /* SimulationPreview.swift */,
+				BB00000000000000000151 /* PurseDS.swift */,
+				BB00000000000000000123 /* CartScreen.swift */,
+				BB00000000000000000125 /* CheckoutPayScreen.swift */,
+				BB00000000000000000127 /* CheckoutRouter.swift */,
+				BB00000000000000000129 /* CheckoutUI.swift */,
+				BB00000000000000000131 /* ConfirmationScreen.swift */,
+				BB00000000000000000133 /* DemoRootView.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -110,6 +144,7 @@
 			children = (
 				BB0000000000000000000B /* Info.plist */,
 				BB00000000000000000060 /* Assets.xcassets */,
+				BB00000000000000000140 /* Fonts */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -183,6 +218,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				BB00000000000000000061 /* Assets.xcassets in Resources */,
+				BB00000000000000000134 /* AlbertSans-Regular.ttf in Resources */,
+				BB00000000000000000136 /* AlbertSans-SemiBold.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -204,6 +241,13 @@
 				BB00000000000000000116 /* ResultScreen.swift in Sources */,
 				BB00000000000000000118 /* SessionScreen.swift in Sources */,
 				BB00000000000000000120 /* SimulationPreview.swift in Sources */,
+				BB00000000000000000150 /* PurseDS.swift in Sources */,
+				BB00000000000000000122 /* CartScreen.swift in Sources */,
+				BB00000000000000000124 /* CheckoutPayScreen.swift in Sources */,
+				BB00000000000000000126 /* CheckoutRouter.swift in Sources */,
+				BB00000000000000000128 /* CheckoutUI.swift in Sources */,
+				BB00000000000000000130 /* ConfirmationScreen.swift in Sources */,
+				BB00000000000000000132 /* DemoRootView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

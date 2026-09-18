@@ -5,7 +5,7 @@ struct SessionScreen: View {
     @ObservedObject var controller: DemoController
 
     var body: some View {
-        DemoScreen(step: 1, title: "Session") {
+        DemoScreen(step: 1, title: "Session", onBack: controller.exitMode) {
             Text("Mint an orchestration session through alfred.")
                 .font(.body)
                 .foregroundStyle(.secondary)

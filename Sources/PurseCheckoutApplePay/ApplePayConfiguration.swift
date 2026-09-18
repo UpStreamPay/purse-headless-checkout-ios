@@ -1,14 +1,13 @@
 // Web: packages/partner-ui/src/plugins/generics/applepay/{types,partners_specifics,partners/*}.ts
 // Same: the payment request is built entirely from /init's plugin_result.logs, per partner.
-// Differs: no merchant-validation round trip. Web's `onvalidatemerchant` posts the validationURL back as a second /init; PassKit has no such step — Apple validates in-process against the processing certificate. In-app is simpler than web here.
+// Differs: no merchant-validation round trip — PassKit has no `onvalidatemerchant`; Apple validates in-process against the processing certificate.
 
 import Foundation
 import PassKit
 import PurseHeadlessCheckout
 
-/// What the merchant must supply, because no server can. `merchantIdentifier` has to be listed in
-/// the app's `com.apple.developer.in-app-payments` entitlement, which is validated against the
-/// app's provisioning profile — so it must exist in the merchant's own Apple Developer account.
+/// What the merchant must supply, because no server can: `merchantIdentifier` has to be listed in
+/// the app's `com.apple.developer.in-app-payments` entitlement and exist in their Apple account.
 public struct ApplePayConfiguration: Sendable {
     public let merchantIdentifier: String
     /// What the shopper reads on the sheet's total line when `/init` names nobody.
@@ -21,7 +20,7 @@ public struct ApplePayConfiguration: Sendable {
 }
 
 /// The partner-specific shape of an Apple Pay `/init` answer and its authorized token. Purse
-/// **forwards** the Apple token; it never decrypts it.
+/// **forwards** the Apple token, never decrypts it.
 enum ApplePayVariant: Sendable {
     case adyen
     case ingenico
@@ -58,9 +57,8 @@ struct ApplePayRequestConfiguration: Sendable {
             throw PartnerUIError("Apple Pay /init returned no plugin_result.logs to configure the sheet")
         }
 
-        /// A `PKPaymentRequest` with an empty country or currency cannot be presented, and PassKit
-        /// does not say why — the sheet just refuses, and `present()`'s diagnosis blames the
-        /// entitlement. Failing here names the real cause instead.
+        // A `PKPaymentRequest` with an empty country or currency silently refuses to present, and
+        // `present()`'s diagnosis then blames the entitlement. Fail here, where the cause is known.
         func require(_ value: String?, _ field: String) throws -> String {
             guard let value, !value.isEmpty else {
                 throw PartnerUIError("Apple Pay /init did not return \(field); the sheet cannot be presented")
@@ -126,28 +124,23 @@ struct ApplePayRequestConfiguration: Sendable {
             default: break
             }
         }
-        // A request with no capabilities is rejected by PassKit, and 3-D Secure is the one every
-        // PSP in this catalogue supports.
+        // PassKit rejects a request with no capabilities; 3-D Secure is the safe floor.
         return capabilities.isEmpty ? .threeDSecure : capabilities
     }
 }
 
-/// Wraps the authorized token in the shape the PSP's API expects.
-///
-/// The encrypted payload is identical in every case — only the envelope differs.
+/// Wraps the authorized token in the shape the PSP's API expects. The encrypted payload is
+/// identical in every case; only the envelope differs.
 enum ApplePayTokenEnvelope {
-    /// Takes the token's `paymentData` rather than the `PKPaymentToken` itself: `PKPaymentToken` is
-    /// not `Sendable`, and the delegate that produces it reads this one value out before hopping to
-    /// the main actor. It was the only thing this ever used.
+    /// Takes `paymentData`, not the `PKPaymentToken`: `PKPaymentToken` is not `Sendable`, so the
+    /// delegate reads this value out before hopping to the main actor.
     static func session(for variant: ApplePayVariant, paymentData: Data, productId: String?) -> String? {
-        // An empty token is not a payment. Two of the three variants would happily wrap it — adyen
-        // base64s it to `""`, ingenico decodes it to `""` — and the PSP answers `BAD_REQUEST /
-        // Missing payment method details` a round trip later, naming nothing.
+        // An empty token is not a payment: adyen and ingenico would both wrap it to `""` and the
+        // PSP answers `BAD_REQUEST / Missing payment method details` a round trip later.
         guard !paymentData.isEmpty else { return nil }
 
         switch variant {
         case .adyen:
-            // Adyen wants the payment data base64-encoded.
             return json([
                 "paymentMethod": [
                     "type": "applepay",
@@ -164,7 +157,6 @@ enum ApplePayTokenEnvelope {
             return json(["paymentMethod": method])
 
         case .default:
-            // The default variant forwards Apple's token object as-is.
             guard let object = try? JSONSerialization.jsonObject(with: paymentData) else { return nil }
             return json(object)
         }
@@ -176,8 +168,9 @@ enum ApplePayTokenEnvelope {
     }
 }
 
-/// Apple Pay **JS** network name strings (what `/init`'s `brands` array carries, and what web
-/// passes straight into `ApplePaySDKConfig.supportedNetworks`) → **native** `PKPaymentNetwork`.
+/// `/init`'s `brands` carries Apple Pay **JS** network names, which are *not* `PKPaymentNetwork`
+/// raw values (`"masterCard"` vs `"MasterCard"`, `"jcb"` vs `"JCB"`) — hence this table rather than
+/// `PKPaymentNetwork(rawValue:)`.
 enum ApplePayJSNetworkMapper {
     static func network(forJSName name: String) -> PKPaymentNetwork? {
         switch name {
