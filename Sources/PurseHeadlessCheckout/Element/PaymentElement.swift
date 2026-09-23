@@ -7,7 +7,8 @@ import UIKit
 
 /// One rendered payment method or saved token. Build it when the shopper *selects* the item, not
 /// for every row — building runs the partner's `prepare`, which for Klarna and Apple Pay is a
-/// `POST /init`. A redirection method's `/init` runs later, in `preValidation`.
+/// `POST /init`. A redirection method's `/init` runs later, in `preValidation`. For per-field card
+/// state, drive a ``CardCoordinator`` instead — see `docs/integration/card-form.md`.
 @MainActor
 public final class PaymentElement: ObservableObject {
 
