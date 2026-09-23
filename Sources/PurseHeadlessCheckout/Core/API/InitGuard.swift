@@ -4,8 +4,10 @@
 
 import Foundation
 
-/// Web partner-ui's `initGuard`: concurrent duplicates share one in-flight request, transient
-/// failures retry with backoff, and a terminal (4xx) failure fast-rejects immediate repeats.
+/// Web partner-ui's `initGuard`: concurrent duplicates share one in-flight request; transient
+/// failures (no HTTP status — including a success whose body is not JSON — or ≥ 500) retry up to
+/// ``maxAttempts`` sends in total, 0.3 s then 0.9 s apart, so one submit can put three identical
+/// `/init`s on the wire; a terminal (4xx) failure is never retried and fast-rejects immediate repeats.
 public actor InitGuard {
 
     public static let shared = InitGuard()
