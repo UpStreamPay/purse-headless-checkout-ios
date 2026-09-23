@@ -40,6 +40,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// The override as passed, kept apart from the resolved ``environment`` because `setSession`
     /// and `saveState` need the *decision*, not its result.
     private let lockedEnvironment: PurseEnvironment?
+    /// Locked, or downgraded by ``PurseEnvironment/resolve(_:isDebugHost:)``: either way the
+    /// session's `api_url` is not trusted.
+    private let ignoresDeclaredAPIRoot: Bool
     /// Kept so `saveState()` can round-trip the exact session `restore` rebuilds from.
     private var widgetData: String
 
@@ -176,9 +179,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
         self.params = params
         self.widgetData = widgetData
         self.lockedEnvironment = lockedEnvironment
-        let environment = lockedEnvironment ?? params.environment
+        let requested = lockedEnvironment ?? params.environment
+        let environment = PurseEnvironment.resolve(requested, isDebugHost: PurseEnvironment.isDebugHost)
         self.environment = environment
-        self.paymentAPIRoot = Self.resolveAPIRoot(params, locked: lockedEnvironment, environment: environment)
+        self.ignoresDeclaredAPIRoot = lockedEnvironment != nil || environment != requested
+        self.paymentAPIRoot = Self.resolveAPIRoot(params, locked: ignoresDeclaredAPIRoot, environment: environment)
         self.disabledMethods = disabledMethods
         self.options = options
         self.hooks = hooks
@@ -305,10 +310,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// point of locking, and ``PurseEnvironment``'s own header says so.
     private static func resolveAPIRoot(
         _ params: PurseSessionParams,
-        locked: PurseEnvironment?,
+        locked: Bool,
         environment: PurseEnvironment
     ) -> String {
-        guard locked == nil, let declared = params.apiURL.nonBlank else { return environment.paymentAPIRoot }
+        guard !locked, let declared = params.apiURL.nonBlank else { return environment.paymentAPIRoot }
         return declared
     }
 
@@ -884,7 +889,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
         )
         // The new blob may name a different host; the locked-environment decision is re-applied to
         // it unchanged.
-        paymentAPIRoot = Self.resolveAPIRoot(newParams, locked: lockedEnvironment, environment: environment)
+        paymentAPIRoot = Self.resolveAPIRoot(newParams, locked: ignoresDeclaredAPIRoot, environment: environment)
 
         // An item survives only when its configuration is deep-equal; anything else is a different
         // method wearing the same id.
