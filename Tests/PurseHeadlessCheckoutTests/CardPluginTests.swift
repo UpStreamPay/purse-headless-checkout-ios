@@ -1,4 +1,5 @@
 import Foundation
+import PurseSecureFields
 import Testing
 @testable import PurseHeadlessCheckout
 
@@ -236,5 +237,57 @@ struct CardPluginTests {
         #expect(coordinator.isFormValid)
         #expect(host.collected[CardPlugin.Collected.token] == .string("vault-1"))
         #expect(host.collected[CardPlugin.Collected.network] == .string(CardBrand.visa.wireValue))
+    }
+
+    // MARK: Delegate relay
+    //
+    // Called through the existential on purpose: these five methods have default no-op
+    // implementations, so a near-miss signature would compile and silently never be called.
+
+    private func coordinator(token: PayToken? = nil) throws -> CardCoordinator {
+        CardCoordinator(host: RecordingHost(context: try context()), tenantId: "tenant-1", supportedBrands: [.visa], token: token)
+    }
+
+    @Test func aBlurIsRemembered() throws {
+        let delegate: any SecureFieldsDelegate = try coordinator(token: PayToken(value: "tok", requiresCVV: false))
+        delegate.secureFieldsFocusChanged(field: .cvv, isFocused: true)
+        delegate.secureFieldsFocusChanged(field: .cvv, isFocused: false)
+        #expect((delegate as! CardCoordinator).fieldStates[.cvv]?.wasBlurred == true)
+    }
+
+    @Test func aFailedBinLookupIsSurfacedUntilTheNextDetection() throws {
+        let coordinator = try coordinator(token: PayToken(value: "tok", requiresCVV: false))
+        let delegate: any SecureFieldsDelegate = coordinator
+        delegate.secureFieldsBinLookupFailed(.invalidResponse)
+        #expect(coordinator.binLookupFailed)
+        delegate.secureFieldsBrandsDetected([.visa])
+        #expect(!coordinator.binLookupFailed)
+    }
+
+    @Test func contentAndBrandChangesRefreshTheFieldStates() throws {
+        for fire in [
+            { (d: any SecureFieldsDelegate) in d.secureFieldsContentChanged() },
+            { (d: any SecureFieldsDelegate) in d.secureFieldsBrandSelected(.visa) },
+        ] {
+            let coordinator = try coordinator()
+            fire(coordinator)
+            #expect(Set(coordinator.fieldStates.keys) == Set(CardField.allCases))
+            #expect(coordinator.fieldStates[.cardNumber] == CardFieldState())
+        }
+    }
+
+    @Test func fieldsCarryStableAccessibilityIdentifiers() throws {
+        let views = try coordinator().fieldViews
+        #expect(views[1].accessibilityIdentifier == "purse_card_exp_date")
+        #expect(views[2].accessibilityIdentifier == "purse_card_cvv")
+        #expect(views[3].accessibilityIdentifier == "purse_card_holder_name")
+    }
+
+    /// `cardNumber` is Secure Fields' `pan` — a name cast would not compile, but a wrong arm would.
+    @Test func fieldNamesMapBothWays() {
+        #expect(CardField(SecureField.pan) == .cardNumber)
+        for field in [SecureField.pan, .expDate, .cvv, .holderName] {
+            #expect(CardField(field)?.secureField == field)
+        }
     }
 }
