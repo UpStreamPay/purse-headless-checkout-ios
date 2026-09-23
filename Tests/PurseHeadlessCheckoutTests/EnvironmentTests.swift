@@ -29,3 +29,19 @@ struct EnvironmentTests {
         #expect(PurseEnvironment.fromWire(nil) == nil)
     }
 }
+
+/// The internal tiers never reach an App Store build — Secure Fields' `VaultEnvironment.resolve`.
+struct EnvironmentGateTests {
+
+    @Test(arguments: PurseEnvironment.allCases)
+    func aDevelopmentBuildGetsWhatItAsked(_ environment: PurseEnvironment) {
+        #expect(PurseEnvironment.resolve(environment, isDebugHost: true) == environment)
+    }
+
+    @Test func aReleaseBuildFallsBackToProductionFromTheInternalTiers() {
+        #expect(PurseEnvironment.resolve(.test, isDebugHost: false) == .production)
+        #expect(PurseEnvironment.resolve(.development, isDebugHost: false) == .production)
+        #expect(PurseEnvironment.resolve(.sandbox, isDebugHost: false) == .sandbox)
+        #expect(PurseEnvironment.resolve(.production, isDebugHost: false) == .production)
+    }
+}
