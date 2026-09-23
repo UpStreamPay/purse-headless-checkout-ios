@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0](https://github.com/UpStreamPay/purse-headless-checkout-ios/compare/v1.0.0...v1.1.0) (2026-09-23)
+
+
+### Features
+
+* **card:** co-badge selector, relayed field state, stable field identifiers ([#24](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/24)) ([961c99f](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/961c99f640506c1e09cd7fb7e0a63ac1f036c5ec))
+* ship signed XCFrameworks on every release, like Secure Fields ([#29](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/29)) ([7b535ee](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/7b535ee418ffcb09155b09a556942142ac2562d3))
+
+
+### Documentation
+
+* lockedEnvironment ignores api_url, InitGuard retry policy, actionable card validation error ([#26](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/26)) ([c68c832](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/c68c83230b5cfe02ca4878f22e3988cdd6bf5fbe))
+
 ## 1.0.0 (2026-09-18)
 
 
