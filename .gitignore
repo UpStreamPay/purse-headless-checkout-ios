@@ -29,3 +29,6 @@ build/
 .idea
 .run
 *.iml
+
+# Built by scripts/build-xcframeworks.sh
+xcframeworks/

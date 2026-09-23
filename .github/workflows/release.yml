@@ -1,0 +1,97 @@
+name: Release
+
+# Same shape as purse-securefields-ios: on every published release, build signed XCFrameworks,
+# rewrite Package.swift to binary targets, retag, attach the zips. PurseCheckoutPayPal stays a
+# source target (see scripts/binary-manifest.py).
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  xcframework:
+    name: Build & publish XCFrameworks
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Import signing certificate
+        uses: apple-actions/import-codesign-certs@5142e029c445c10ffc7149d172e540235a065466 # v7.0.0
+        with:
+          p12-file-base64: ${{ secrets.APPLE_SIGNING_CERT_P12_BASE64 }}
+          p12-password: ${{ secrets.APPLE_SIGNING_CERT_P12_PASSWORD }}
+
+      - name: Build XCFrameworks
+        run: ./scripts/build-xcframeworks.sh
+
+      - name: Verify XCFrameworks before publishing
+        run: |
+          set -eu
+          for module in PurseHeadlessCheckout PurseCheckoutApplePay PurseCheckoutKlarna; do
+            for slice in xcframeworks/$module.xcframework/ios-*; do
+              fw="$slice/$module.framework"
+              ls "$fw/Modules/$module.swiftmodule/"*.swiftinterface > /dev/null \
+                || { echo "::error::$slice has no .swiftinterface — consumers cannot import $module."; exit 1; }
+              if [ "$module" != PurseHeadlessCheckout ]; then
+                # A plugin must link the core framework, never carry its own copy of it.
+                otool -L "$fw/$module" | grep -q "@rpath/PurseHeadlessCheckout.framework" \
+                  || { echo "::error::$module does not link PurseHeadlessCheckout.framework."; exit 1; }
+              fi
+            done
+          done
+          test -f xcframeworks/PurseHeadlessCheckout.xcframework/ios-arm64/PurseHeadlessCheckout.framework/PrivacyInfo.xcprivacy \
+            || { echo "::error::PrivacyInfo.xcprivacy missing from the framework root."; exit 1; }
+          # The published layout — binaries plus the PayPal source plugin — must compile and link
+          # for a consumer, exactly as a merchant's build would.
+          python3 scripts/binary-manifest.py path xcframeworks PurseHeadlessCheckout PurseCheckoutApplePay PurseCheckoutKlarna
+          sed -i '' 's/, type: .dynamic, targets: \["PurseCheckoutPayPal"\]/, targets: ["PurseCheckoutPayPal"]/' Package.swift
+          mv Sources/PurseHeadlessCheckout Sources/PurseCheckoutApplePay Sources/PurseCheckoutKlarna "$RUNNER_TEMP/"
+          xcodebuild build -quiet -scheme PurseCheckoutPayPal -destination "generic/platform=iOS Simulator" CODE_SIGNING_ALLOWED=NO
+          mv "$RUNNER_TEMP/PurseHeadlessCheckout" "$RUNNER_TEMP/PurseCheckoutApplePay" "$RUNNER_TEMP/PurseCheckoutKlarna" Sources/
+          git checkout Package.swift
+          rm -rf Sources/*Deps
+
+      - name: Sign, zip, checksum
+        run: |
+          set -eu
+          IDENTITY=$(security find-identity -v -p codesigning | awk '/^[[:space:]]*[0-9]+\)/ {print $2; exit}')
+          if [ -z "$IDENTITY" ]; then
+            IDENTITY=$(security find-identity -p codesigning | awk '/^[[:space:]]*[0-9]+\)/ {print $2; exit}')
+            [ -n "$IDENTITY" ] && echo "::warning::No *valid* identity. Falling back to $IDENTITY, which has a private key."
+          fi
+          [ -n "$IDENTITY" ] || { echo "::error::No codesigning identity with a private key — re-export the .p12 with its private key."; exit 1; }
+          SPECS=""
+          for module in PurseHeadlessCheckout PurseCheckoutApplePay PurseCheckoutKlarna; do
+            codesign --timestamp -v --sign "$IDENTITY" "xcframeworks/$module.xcframework"
+            (cd xcframeworks && zip -qr "$module.xcframework.zip" "$module.xcframework")
+            SPECS="$SPECS $module=$(swift package compute-checksum "xcframeworks/$module.xcframework.zip")"
+          done
+          echo "SPECS=$SPECS" >> "$GITHUB_ENV"
+
+      - name: Rewrite Package.swift to binary targets
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          # shellcheck disable=SC2086
+          python3 scripts/binary-manifest.py url \
+            "https://github.com/${{ github.repository }}/releases/download/$TAG" $SPECS
+
+      - name: Commit & retag
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Package.swift Sources/*Deps
+          git commit -m "release: ${TAG} — binary targets"
+          git tag -f "${TAG}"
+          git push origin "${TAG}" --force
+
+      - name: Upload XCFrameworks to release
+        run: gh release upload "${{ github.event.release.tag_name }}" xcframeworks/*.xcframework.zip --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

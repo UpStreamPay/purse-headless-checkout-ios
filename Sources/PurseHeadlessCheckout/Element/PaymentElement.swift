@@ -2,6 +2,7 @@
 // Same: one element per rendered method or saved token; `hasUI` false for redirection and no-CVV tokens.
 // Differs: an object from the checkout, not a Compose `remember` — so keying it is the caller's job.
 
+import Combine
 import Foundation
 import UIKit
 

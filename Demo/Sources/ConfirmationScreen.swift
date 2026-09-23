@@ -65,6 +65,7 @@ struct ConfirmationScreen: View {
         case .confirmed: return .authorized
         case .failed: return .failed
         case .pending, .none: return controller.result?.kind ?? .unconfirmed
+        @unknown default: return .unconfirmed
         }
     }
 

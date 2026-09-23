@@ -65,6 +65,9 @@ struct DemoResult {
         case .canceled:
             // Not a result: the shopper may try again on the same screen.
             return nil
+        @unknown default:
+            // An outcome this app predates: never claim a failure it cannot vouch for.
+            return DemoResult(kind: .unconfirmed, method: method, detail: "Unrecognized outcome — fetch the transactions below.")
         }
     }
 
