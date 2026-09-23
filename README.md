@@ -48,7 +48,18 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | Confirmation — `sessionTransactions()`, `paymentStatus()`, `awaitPaymentOutcome()` over a typed `PaymentSessionStatus` | ✅ |
 | Payment-method badges — `PurseAssets`, `iconURL(for:)`, `schemeAssets(for:)` (CDN URLs; you render them) | ✅ |
 | Demo app (`Demo/Demo.xcodeproj`) — a playground and a shopper-facing checkout, both over real sessions | ✅ (see below) |
-| XCFramework signing/distribution, SwiftLint/SwiftFormat, docs | planned |
+| Signed XCFrameworks on every release (core, Apple Pay, Klarna; PayPal plugin stays source) | ✅ (`.github/workflows/release.yml`) |
+| SwiftLint/SwiftFormat, docs | planned |
+
+## Installation
+
+Swift Package Manager, `https://github.com/UpStreamPay/purse-headless-checkout-ios.git`. From the
+first release after 1.0.0, tags resolve to signed XCFrameworks, like Secure Fields. Two consequences of a binary SDK:
+
+- Public enums are not frozen: an exhaustive `switch` over one (`PaymentOutcome`,
+  `PaymentSessionStatus`, …) needs an `@unknown default`, so a new case can ship in a minor release.
+- `PurseEnvironment.test` and `.development` fall back to `.production` in a release-signed app
+  (App Store, enterprise); they work in the simulator and in development and ad-hoc builds.
 
 ## Development
 

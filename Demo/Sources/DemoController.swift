@@ -296,6 +296,8 @@ final class DemoController: ObservableObject {
             // An unknown method is still a method, not a partner: show the wire value.
             default: return wire.capitalized
             }
+        @unknown default:
+            return method.wireValue.capitalized
         }
     }
 

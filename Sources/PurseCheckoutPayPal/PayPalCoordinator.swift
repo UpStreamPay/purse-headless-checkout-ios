@@ -117,11 +117,9 @@ extension PayPalCoordinator: PayPalWebCheckoutDelegate {
 
 private extension PurseEnvironment {
     /// PayPal has only sandbox and live, so every non-production Purse tier maps to sandbox.
+    /// Not a `switch`: against the binary core, `PurseEnvironment` is a non-frozen enum.
     var payPalEnvironment: CorePayments.Environment {
-        switch self {
-        case .production: .live
-        case .sandbox, .development, .test: .sandbox
-        }
+        self == .production ? .live : .sandbox
     }
 }
 

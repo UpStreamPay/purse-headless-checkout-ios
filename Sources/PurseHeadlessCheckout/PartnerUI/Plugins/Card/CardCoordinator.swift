@@ -2,6 +2,7 @@
 // Same: three modes (fresh card / saved card needing its CVV / saved card needing nothing); brands from the token's own scheme, then the vault's supported brands.
 // Differs: Secure Fields is a Swift 5 module, so nothing it owns crosses an isolation boundary — see "Crossing the Swift 5 boundary" in AGENTS.md. Android's `sdk` is public; here the manager stays private and its state is relayed as our own types.
 
+import Combine
 import Foundation
 import PurseSecureFields
 import UIKit
