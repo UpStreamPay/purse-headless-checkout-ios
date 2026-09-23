@@ -136,13 +136,7 @@ struct CardModule: PartnerModule {
             selfSubmitting: false,
             makeView: {
                 guard coordinator.mode.rendersForm else { return nil }
-                let theme = (context.options.theme ?? .default).resolve()
-                let stack = UIStackView(
-                    arrangedSubviews: coordinator.fieldViews.map { Self.matchingPAN($0, theme: theme) }
-                )
-                stack.axis = .vertical
-                stack.spacing = 12
-                return stack
+                return CardFormView(coordinator: coordinator, theme: (context.options.theme ?? .default).resolve())
             },
             prepare: { observer.start() },
             submit: {
@@ -182,6 +176,50 @@ extension CardModule {
         ])
         return box
     }
+}
+
+/// The card form as the SDK renders it: per field, a label, the secure field, and a line for the
+/// helper text or error (Android `PurseCardForm`).
+@MainActor
+final class CardFormView: UIStackView {
+    private var cancellable: AnyCancellable?
+
+    init(coordinator: CardCoordinator, theme: PurseTheme.Resolved) {
+        super.init(frame: .zero)
+        axis = .vertical
+        spacing = 12
+
+        var rows: [(CardField, ResolvedFieldTexts, UILabel, UILabel)] = []
+        for (field, view) in zip(coordinator.fields, coordinator.fieldViews) {
+            guard let texts = coordinator.texts[field] else { continue }
+            let label = UILabel()
+            label.text = texts.label
+            label.font = theme.label.font
+            let message = UILabel()
+            message.numberOfLines = 0
+            message.font = theme.helperText.font
+            // Also reserves the line, so an error appearing later does not resize the form.
+            message.text = " "
+            let column = UIStackView(arrangedSubviews: [label, CardModule.matchingPAN(view, theme: theme), message])
+            column.axis = .vertical
+            column.spacing = 4
+            addArrangedSubview(column)
+            rows.append((field, texts, label, message))
+        }
+
+        cancellable = coordinator.$fieldStates.sink { states in
+            for (field, texts, label, message) in rows {
+                let state = states[field] ?? CardFieldState()
+                let invalid = texts.error(for: state) != nil
+                label.textColor = (invalid ? theme.labelInvalid.color : theme.label.color) ?? .label
+                message.textColor = (invalid ? theme.helperTextInvalid.color : theme.helperText.color) ?? .secondaryLabel
+                message.text = texts.message(for: state) ?? " "
+            }
+        }
+    }
+
+    @available(*, unavailable)
+    required init(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
 }
 
 /// Bridges `CardCoordinator.$isFormValid` onto the element listener. A no-CVV token renders no form
