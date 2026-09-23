@@ -158,8 +158,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
         )
     }
 
-    /// Designated, and internal: `serverClockOverride` is a test seam with no production caller,
-    /// so it stays out of the SDK's semver contract.
+    /// Designated, and internal: `serverClockOverride` and `isDebugHostOverride` are test seams
+    /// with no production caller, so they stay out of the SDK's semver contract.
     init(
         widgetData: String,
         lockedEnvironment: PurseEnvironment? = nil,
@@ -173,6 +173,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
         monitoringAPIRootOverride: String? = nil,
         restored: Bool = false,
         options: PluginOptions = PluginOptions(),
+        isDebugHostOverride: Bool? = nil,
         serverClockOverride: ServerDatetimeChecker?
     ) throws {
         let params = try SessionCodec.decode(widgetData)
@@ -180,7 +181,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
         self.widgetData = widgetData
         self.lockedEnvironment = lockedEnvironment
         let requested = lockedEnvironment ?? params.environment
-        let environment = PurseEnvironment.resolve(requested, isDebugHost: PurseEnvironment.isDebugHost)
+        let environment = PurseEnvironment.resolve(requested, isDebugHost: isDebugHostOverride ?? PurseEnvironment.isDebugHost)
         self.environment = environment
         self.ignoresDeclaredAPIRoot = lockedEnvironment != nil || environment != requested
         self.paymentAPIRoot = Self.resolveAPIRoot(params, locked: ignoresDeclaredAPIRoot, environment: environment)

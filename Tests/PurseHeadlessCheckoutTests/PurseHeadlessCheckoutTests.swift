@@ -77,6 +77,24 @@ struct PurseHeadlessCheckoutTests {
         #expect(noURL.paymentAPIRoot == PurseEnvironment.sandbox.paymentAPIRoot)
     }
 
+    /// A release-signed app must not reach TEST through the session's `api_url` either — the
+    /// environment gate alone would leave the Payment API calls on the TEST host.
+    @Test func aReleaseBuildIgnoresATestSessionsApiURL() throws {
+        let testSession = TestSessions.widgetData(environment: "test")
+        let release = try PurseHeadlessCheckout(
+            widgetData: testSession, isDebugHostOverride: false, serverClockOverride: nil
+        )
+        #expect(release.paymentAPIRoot == PurseEnvironment.production.paymentAPIRoot)
+
+        try release.setSession(testSession)
+        #expect(release.paymentAPIRoot == PurseEnvironment.production.paymentAPIRoot)
+
+        let debug = try PurseHeadlessCheckout(
+            widgetData: testSession, isDebugHostOverride: true, serverClockOverride: nil
+        )
+        #expect(debug.paymentAPIRoot == PurseEnvironment.test.paymentAPIRoot)
+    }
+
     /// A new blob can name a different host, so the root cannot be resolved once at init.
     @Test func setSessionReResolvesTheApiRoot() throws {
         let checkout = try PurseHeadlessCheckout(widgetData: TestSessions.widgetData())
