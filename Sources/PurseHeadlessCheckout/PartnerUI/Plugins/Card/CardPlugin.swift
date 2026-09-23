@@ -136,7 +136,7 @@ struct CardModule: PartnerModule {
             selfSubmitting: false,
             makeView: {
                 guard coordinator.mode.rendersForm else { return nil }
-                return CardFormView(coordinator: coordinator, theme: (context.options.theme ?? .default).resolve())
+                return CardFormView(coordinator: coordinator)
             },
             prepare: { observer.start() },
             submit: {
@@ -179,12 +179,14 @@ extension CardModule {
 }
 
 /// The card form as the SDK renders it: per field, a label, the secure field, and a line for the
-/// helper text or error (Android `PurseCardForm`).
+/// helper text or error (Android `PurseCardForm`). `paymentElement` mounts it for you; mount it
+/// yourself when driving a ``CardCoordinator`` directly.
 @MainActor
-final class CardFormView: UIStackView {
+public final class CardFormView: UIStackView {
     private var cancellable: AnyCancellable?
 
-    init(coordinator: CardCoordinator, theme: PurseTheme.Resolved) {
+    public init(coordinator: CardCoordinator) {
+        let theme = coordinator.theme
         super.init(frame: .zero)
         axis = .vertical
         spacing = 12
@@ -196,9 +198,13 @@ final class CardFormView: UIStackView {
             label.text = texts.label
             label.font = theme.label.font
             let message = UILabel()
-            message.numberOfLines = 0
+            // ponytail: one line that shrinks to fit, because `PaymentElementView` measures the form
+            // once and a message that wrapped later would be clipped. Wrap instead once the view
+            // re-measures on content change.
+            message.numberOfLines = 1
+            message.adjustsFontSizeToFitWidth = true
+            message.minimumScaleFactor = 0.6
             message.font = theme.helperText.font
-            // Also reserves the line, so an error appearing later does not resize the form.
             message.text = " "
             let column = UIStackView(arrangedSubviews: [label, CardModule.matchingPAN(view, theme: theme), message])
             column.axis = .vertical

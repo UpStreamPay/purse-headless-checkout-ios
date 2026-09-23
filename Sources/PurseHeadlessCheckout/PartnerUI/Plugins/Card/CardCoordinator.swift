@@ -31,8 +31,8 @@ public struct CardFieldState: Sendable, Equatable {
     public var wasBlurred = false
 }
 
-/// Drives the Secure Fields card form for one payment item. Mount its ``fieldViews``, observe
-/// ``isFormValid``, call ``submit()``.
+/// Drives the Secure Fields card form for one payment item. Mount a ``CardFormView`` (or the
+/// ``fieldViews``), observe ``isFormValid``, call ``submit()``.
 @MainActor
 public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDelegate {
 
@@ -71,6 +71,7 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
 
     /// Label / helper / error copy per field, SDK defaults filled in.
     let texts: [CardField: ResolvedFieldTexts]
+    let theme: PurseTheme.Resolved
 
     private let manager: SecureFieldsManager?
     /// Strong: nothing else retains a `host(for:)`-produced adapter, so a weak reference would go
@@ -90,6 +91,8 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
         self.isFormValid = !mode.rendersForm
         let copy = options.cardFormTexts.resolved(locale: options.locale)
         self.texts = copy
+        let resolved = (options.theme ?? .default).resolve()
+        self.theme = resolved
 
         if mode.rendersForm {
             // A CVV-only form has no PAN to BIN-detect, so the saved token's own scheme comes first.
@@ -100,7 +103,6 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
                 return supportedBrands.isEmpty ? [.visa, .mastercard, .carteBancaire] : supportedBrands
             }()
 
-            let resolved = (options.theme ?? .default).resolve()
             let texts = options.cardFormTexts
             let style = SecureFieldsStyle(
                 font: resolved.input.font ?? .systemFont(ofSize: 16),
@@ -190,6 +192,12 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
 
         apply(tokenization)
         return tokenization
+    }
+
+    /// The error ``CardFormView`` shows under `field` right now, or `nil` — for a host that draws
+    /// its own form.
+    public func errorMessage(for field: CardField) -> String? {
+        texts[field]?.error(for: fieldStates[field] ?? CardFieldState())
     }
 
     /// Pick the scheme on a co-badged card, as a chip tap would. Ignored unless the BIN lookup

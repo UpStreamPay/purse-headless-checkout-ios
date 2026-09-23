@@ -290,4 +290,24 @@ struct CardPluginTests {
             #expect(CardField(field)?.secureField == field)
         }
     }
+
+    /// `PaymentElementView` measures the form once; an error appearing later must not need more
+    /// room, or SwiftUI clips it. The French holder-name error is the longest message.
+    @Test func anErrorAppearingDoesNotResizeTheForm() throws {
+        let coordinator = CardCoordinator(
+            host: RecordingHost(context: try context()), tenantId: "tenant-1", supportedBrands: [.visa],
+            options: PluginOptions(locale: "fr-FR")
+        )
+        let form = CardFormView(coordinator: coordinator)
+        func height() -> CGFloat {
+            form.systemLayoutSizeFitting(
+                CGSize(width: 200, height: 0),
+                withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel
+            ).height
+        }
+        let before = height()
+        (coordinator as any SecureFieldsDelegate).secureFieldsFocusChanged(field: .holderName, isFocused: false)
+        #expect(coordinator.errorMessage(for: .holderName) == "Entrez le nom du titulaire comme il apparaît sur la carte.")
+        #expect(height() == before)
+    }
 }
