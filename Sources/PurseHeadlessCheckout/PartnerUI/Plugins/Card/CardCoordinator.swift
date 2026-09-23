@@ -1,6 +1,6 @@
 // Web: packages/partner-ui hosted fields mount + submitForResult
 // Same: three modes (fresh card / saved card needing its CVV / saved card needing nothing); brands from the token's own scheme, then the vault's supported brands.
-// Differs: Secure Fields is a Swift 5 module, so nothing it owns crosses an isolation boundary — see "Crossing the Swift 5 boundary" in AGENTS.md.
+// Differs: Secure Fields is a Swift 5 module, so nothing it owns crosses an isolation boundary — see "Crossing the Swift 5 boundary" in AGENTS.md. Android's `sdk` is public; here the manager stays private and its state is relayed as our own types.
 
 import Foundation
 import PurseSecureFields
@@ -15,6 +15,20 @@ public struct CardTokenization: Sendable, Equatable {
     public let lastFourDigits: String?
     /// In **Payment API** vocabulary; `nil` on a CVV-only form.
     public let selectedNetwork: CardBrand?
+}
+
+/// One field of the card form, named as in ``CardFormTexts``.
+public enum CardField: Sendable, CaseIterable {
+    case cardNumber, expDate, cvv, holderName
+}
+
+/// What the form knows about one field. `wasBlurred` turns true the first time the field loses
+/// focus and stays true.
+public struct CardFieldState: Sendable, Equatable {
+    public var isValid = false
+    public var isFocused = false
+    public var hasContent = false
+    public var wasBlurred = false
 }
 
 /// Drives the Secure Fields card form for one payment item. Mount its ``fieldViews``, observe
@@ -43,6 +57,17 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
     @Published public private(set) var isFormValid: Bool
 
     @Published public private(set) var detectedBrands: [CardBrand] = []
+
+    /// The scheme the card will be tokenized under: the shopper's pick on a co-badged card, else
+    /// the auto-selected one. Change it with ``selectBrand(_:)``.
+    @Published public private(set) var selectedBrand: CardBrand?
+
+    /// Per-field state, refreshed on every content or focus change.
+    @Published public private(set) var fieldStates: [CardField: CardFieldState] = [:]
+
+    /// `true` when the last BIN lookup failed — `detectedBrands` is then stale, not "no brand".
+    /// Cleared by the next successful lookup.
+    @Published public private(set) var binLookupFailed = false
 
     private let manager: SecureFieldsManager?
     /// Strong: nothing else retains a `host(for:)`-produced adapter, so a weak reference would go
@@ -86,20 +111,28 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
                 tenantId: tenantId,
                 environment: host.environment.vaultEnvironment,
                 brands: brands.compactMap(\.secureFieldsBrand),
+                // Secure Fields renders the co-badge chips itself; off, a CB/Mastercard card
+                // cannot be arbitrated at all.
+                brandSelector: mode == .freshCard,
                 style: style,
                 // The field subset *is* how CVV-only is expressed — there is no flag. With no PAN
                 // mounted, Secure Fields omits the `card` object and the Vault reads a CVV-only
                 // submission (purse-securefields-ios >= 1.8.0).
                 fields: mode == .tokenCVV
-                    ? SecureFieldsFieldsConfig(cvv: .init(placeholder: texts.cvv.placeholder))
+                    ? SecureFieldsFieldsConfig(cvv: Self.fieldConfig(texts.cvv))
                     : SecureFieldsFieldsConfig(
-                        pan: .init(placeholder: texts.cardNumber.placeholder),
-                        expDate: .init(placeholder: texts.expDate.placeholder),
-                        holderName: .init(placeholder: texts.holderName.placeholder),
-                        cvv: .init(placeholder: texts.cvv.placeholder)
+                        pan: Self.fieldConfig(texts.cardNumber),
+                        expDate: Self.fieldConfig(texts.expDate),
+                        holderName: Self.fieldConfig(texts.holderName),
+                        cvv: Self.fieldConfig(texts.cvv)
                     )
             )
-            self.manager = SecureFieldsManager(config: config)
+            let manager = SecureFieldsManager(config: config)
+            manager.panContainer.panFieldAccessibilityIdentifier = CardField.cardNumber.accessibilityIdentifier
+            manager.expDateView.accessibilityIdentifier = CardField.expDate.accessibilityIdentifier
+            manager.cvvView.accessibilityIdentifier = CardField.cvv.accessibilityIdentifier
+            manager.holderNameView.accessibilityIdentifier = CardField.holderName.accessibilityIdentifier
+            self.manager = manager
         } else {
             self.manager = nil
         }
@@ -111,7 +144,7 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
         host.setFulfilled(!mode.rendersForm)
     }
 
-    /// In display order.
+    /// In display order. They size themselves: do not constrain their height.
     public var fieldViews: [UIView] {
         guard let manager else { return [] }
         switch mode {
@@ -124,8 +157,9 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
         }
     }
 
-    /// Tokenize the form and stash the result on the checkout. A mode that renders no form has
-    /// nothing to tokenize and returns immediately.
+    /// Tokenize the form and stash the result on the checkout. Does **not** pay: call
+    /// `checkout.submitPayment()` next, or use `paymentElement`, which does both. A mode that
+    /// renders no form has nothing to tokenize and returns immediately.
     @discardableResult
     public func submit(saveToken: Bool = false) async throws -> CardTokenization? {
         guard let manager, mode.rendersForm else { return nil }
@@ -142,6 +176,13 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
 
         apply(tokenization)
         return tokenization
+    }
+
+    /// Pick the scheme on a co-badged card, as a chip tap would. Ignored unless the BIN lookup
+    /// detected `brand`.
+    public func selectBrand(_ brand: CardBrand) {
+        guard let brand = brand.secureFieldsBrand else { return }
+        manager?.selectBrand(brand)
     }
 
     /// Stash the vault token for `/validate` and re-arm the fulfilment gate.
@@ -190,12 +231,53 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
 
     public nonisolated func secureFieldsBrandsDetected(_ brands: [PurseSecureFields.CardBrand]) {
         let mapped = brands.compactMap { CardBrand.fromSecureFields($0) }
-        MainActor.assumeIsolated { detectedBrands = mapped }
+        MainActor.assumeIsolated {
+            detectedBrands = mapped
+            binLookupFailed = false
+            refresh()
+        }
+    }
+
+    public nonisolated func secureFieldsBrandSelected(_ brand: PurseSecureFields.CardBrand) {
+        MainActor.assumeIsolated { refresh() }
+    }
+
+    public nonisolated func secureFieldsContentChanged() {
+        MainActor.assumeIsolated { refresh() }
+    }
+
+    public nonisolated func secureFieldsFocusChanged(field: SecureField, isFocused: Bool) {
+        let changed = CardField(field)
+        MainActor.assumeIsolated {
+            if !isFocused, let changed { fieldStates[changed, default: CardFieldState()].wasBlurred = true }
+            refresh()
+        }
+    }
+
+    public nonisolated func secureFieldsBinLookupFailed(_ error: SecureFieldsError) {
+        MainActor.assumeIsolated { binLookupFailed = true }
+    }
+
+    /// Re-read what the manager knows. `wasBlurred` is ours alone — Secure Fields tracks no such thing.
+    private func refresh() {
+        guard let manager else { return }
+        selectedBrand = manager.selectedBrand.flatMap { CardBrand.fromSecureFields($0) }
+        for field in CardField.allCases where manager.configuredFields.contains(field.secureField) {
+            var state = fieldStates[field, default: CardFieldState()]
+            state.isValid = manager.isFieldValid(field.secureField)
+            state.isFocused = manager.isFieldFocused(field.secureField)
+            state.hasContent = manager.hasFieldContent(field.secureField)
+            fieldStates[field] = state
+        }
     }
 
     private func resume(_ result: Result<CardTokenization, any Error>) {
         pending?.resume(with: result)
         pending = nil
+    }
+
+    private static func fieldConfig(_ texts: CardFormTexts.FieldTexts) -> SecureFieldConfig {
+        SecureFieldConfig(placeholder: texts.placeholder, accessibilityLabel: texts.label)
     }
 
     /// `nil` when the theme leaves that state at the base style, so Secure Fields' own inheritance
@@ -216,6 +298,38 @@ extension PurseEnvironment {
         case .production: .production
         case .sandbox, .development: .sandbox
         case .test: .test
+        }
+    }
+}
+
+extension CardField {
+    /// Our field names vs Secure Fields' `SecureField`: `cardNumber` is its `pan`.
+    init?(_ field: SecureField) {
+        switch field {
+        case .pan: self = .cardNumber
+        case .expDate: self = .expDate
+        case .cvv: self = .cvv
+        case .holderName: self = .holderName
+        @unknown default: return nil
+        }
+    }
+
+    var secureField: SecureField {
+        switch self {
+        case .cardNumber: .pan
+        case .expDate: .expDate
+        case .cvv: .cvv
+        case .holderName: .holderName
+        }
+    }
+
+    /// Stable UI-test handle set on each field view.
+    public var accessibilityIdentifier: String {
+        switch self {
+        case .cardNumber: "purse_card_number"
+        case .expDate: "purse_card_exp_date"
+        case .cvv: "purse_card_cvv"
+        case .holderName: "purse_card_holder_name"
         }
     }
 }
