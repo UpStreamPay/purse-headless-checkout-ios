@@ -14,6 +14,7 @@ and the Android SDK, in Swift.
 | | |
 |---|---|
 | [Payment methods by platform](payment-methods-matrix.md) | What this SDK supports, method by method, versus web and Android. |
+| [Card form: two levels](integration/card-form.md) | `paymentElement` drop-in vs `CardCoordinator` for full field state. |
 | **Getting started** *(not written)* | Install via SPM, create the checkout, render a method, pay, confirm. |
 | Recipes *(not written)* | One task per section: each payment method, gift cards, saved cards, hooks, theme, errors, session refresh, BNPL. |
 | API reference *(not written)* | Generated DocC, shipped with each release. |

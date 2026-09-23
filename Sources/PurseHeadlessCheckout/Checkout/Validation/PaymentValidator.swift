@@ -91,7 +91,9 @@ struct PaymentValidator {
             )
 
             guard try await plugin.validateUI(context) else {
-                throw PurseCheckoutError.validateFailed("client-side validation failed for \(source.id)", nil)
+                // The usual cause: a card form submitted here without being tokenized first.
+                let hint = plugin is CardPlugin ? " — tokenize the card form first (CardCoordinator.submit())" : ""
+                throw PurseCheckoutError.validateFailed("client-side validation failed for \(source.id)\(hint)", nil)
             }
 
             payloads.append(Self.enhanceWithRegistration(try await plugin.preValidation(context), registration))

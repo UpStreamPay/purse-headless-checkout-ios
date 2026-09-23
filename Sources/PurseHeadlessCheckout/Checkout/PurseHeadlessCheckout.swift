@@ -123,7 +123,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
     // MARK: Creation
 
     /// - Parameters: - widgetData: the base64 `widget.data` string from your backend's Client
-    /// Session response. - lockedEnvironment: overrides whatever `widgetData` declares.
+    /// Session response. - lockedEnvironment: overrides whatever `widgetData` declares — including
+    /// its `api_url`: the tier's built-in root (`…/payment/v1`) is used instead.
     public convenience init(
         widgetData: String,
         lockedEnvironment: PurseEnvironment? = nil,
