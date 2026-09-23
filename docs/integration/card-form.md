@@ -21,6 +21,7 @@ listener. Field errors are rendered inside the form; the element does not expose
 
 ```swift
 let host = try checkout.host(for: method)
+try host.setAsPrimary()                      // the split must cover the amount, or nothing pays
 let context = host.buildContext()
 let card = CardCoordinator(
     host: host,
