@@ -53,8 +53,8 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 
 ## Installation
 
-Swift Package Manager, `https://github.com/UpStreamPay/purse-headless-checkout-ios.git`. Release tags
-resolve to signed XCFrameworks, like Secure Fields. Two consequences of a binary SDK:
+Swift Package Manager, `https://github.com/UpStreamPay/purse-headless-checkout-ios.git`. From the
+first release after 1.0.0, tags resolve to signed XCFrameworks, like Secure Fields. Two consequences of a binary SDK:
 
 - Public enums are not frozen: an exhaustive `switch` over one (`PaymentOutcome`,
   `PaymentSessionStatus`, …) needs an `@unknown default`, so a new case can ship in a minor release.
