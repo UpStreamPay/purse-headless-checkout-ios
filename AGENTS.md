@@ -248,7 +248,11 @@ shipped `PurseTheme` as an inert data type with no wiring; reading the real depe
 it into a working feature. The inverse also happened in the same PR: `CardFormTexts.label`/
 `helperText`/`requiredError`/`formatError` really do have no Secure Fields surface (only
 `placeholder` and `accessibilityLabel` exist per field) — confirmed by reading the same file, not
-assumed either way, and documented on the type itself rather than silently wired to nothing.
+assumed either way. They were then accepted and silently dropped, which QA caught (2026-09-22). The
+SDK now draws them itself: `CardFormView` (in `CardPlugin.swift`) renders label + helper/error per
+field, with Android's copy as defaults (`CardFormCopy.swift`) and Android's error rule
+(`FieldUiState.message()`). Secure Fields tracks no "blurred" state, so `CardCoordinator` keeps
+`wasBlurred` itself from `secureFieldsFocusChanged`.
 
 ## What NOT to do
 

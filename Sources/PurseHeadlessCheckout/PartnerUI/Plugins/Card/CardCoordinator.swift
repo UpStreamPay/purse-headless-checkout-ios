@@ -31,8 +31,8 @@ public struct CardFieldState: Sendable, Equatable {
     public var wasBlurred = false
 }
 
-/// Drives the Secure Fields card form for one payment item. Mount its ``fieldViews``, observe
-/// ``isFormValid``, call ``submit()``.
+/// Drives the Secure Fields card form for one payment item. Mount a ``CardFormView`` (or the
+/// ``fieldViews``), observe ``isFormValid``, call ``submit()``.
 @MainActor
 public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDelegate {
 
@@ -69,6 +69,10 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
     /// Cleared by the next successful lookup.
     @Published public private(set) var binLookupFailed = false
 
+    /// Label / helper / error copy per field, SDK defaults filled in.
+    let texts: [CardField: ResolvedFieldTexts]
+    let theme: PurseTheme.Resolved
+
     private let manager: SecureFieldsManager?
     /// Strong: nothing else retains a `host(for:)`-produced adapter, so a weak reference would go
     /// nil as soon as the caller's local did, silently no-oping `setCollected`/`setFulfilled`.
@@ -85,6 +89,10 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
         self.host = host
         self.mode = Mode.of(token)
         self.isFormValid = !mode.rendersForm
+        let copy = options.cardFormTexts.resolved(locale: options.locale)
+        self.texts = copy
+        let resolved = (options.theme ?? .default).resolve()
+        self.theme = resolved
 
         if mode.rendersForm {
             // A CVV-only form has no PAN to BIN-detect, so the saved token's own scheme comes first.
@@ -95,7 +103,6 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
                 return supportedBrands.isEmpty ? [.visa, .mastercard, .carteBancaire] : supportedBrands
             }()
 
-            let resolved = (options.theme ?? .default).resolve()
             let texts = options.cardFormTexts
             let style = SecureFieldsStyle(
                 font: resolved.input.font ?? .systemFont(ofSize: 16),
@@ -119,12 +126,12 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
                 // mounted, Secure Fields omits the `card` object and the Vault reads a CVV-only
                 // submission (purse-securefields-ios >= 1.8.0).
                 fields: mode == .tokenCVV
-                    ? SecureFieldsFieldsConfig(cvv: Self.fieldConfig(texts.cvv))
+                    ? SecureFieldsFieldsConfig(cvv: Self.fieldConfig(texts.cvv, copy[.cvv]))
                     : SecureFieldsFieldsConfig(
-                        pan: Self.fieldConfig(texts.cardNumber),
-                        expDate: Self.fieldConfig(texts.expDate),
-                        holderName: Self.fieldConfig(texts.holderName),
-                        cvv: Self.fieldConfig(texts.cvv)
+                        pan: Self.fieldConfig(texts.cardNumber, copy[.cardNumber]),
+                        expDate: Self.fieldConfig(texts.expDate, copy[.expDate]),
+                        holderName: Self.fieldConfig(texts.holderName, copy[.holderName]),
+                        cvv: Self.fieldConfig(texts.cvv, copy[.cvv])
                     )
             )
             let manager = SecureFieldsManager(config: config)
@@ -147,13 +154,22 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
     /// In display order. They size themselves: do not constrain their height.
     public var fieldViews: [UIView] {
         guard let manager else { return [] }
+        return fields.map { field in
+            switch field {
+            case .cardNumber: manager.panContainer
+            case .expDate: manager.expDateView
+            case .cvv: manager.cvvView
+            case .holderName: manager.holderNameView
+            }
+        }
+    }
+
+    /// The fields ``fieldViews`` holds, in the same order.
+    public var fields: [CardField] {
         switch mode {
-        case .freshCard:
-            return [manager.panContainer, manager.expDateView, manager.cvvView, manager.holderNameView]
-        case .tokenCVV:
-            return [manager.cvvView]
-        case .tokenNoCVV:
-            return []
+        case .freshCard: [.cardNumber, .expDate, .cvv, .holderName]
+        case .tokenCVV: [.cvv]
+        case .tokenNoCVV: []
         }
     }
 
@@ -176,6 +192,12 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
 
         apply(tokenization)
         return tokenization
+    }
+
+    /// The error ``CardFormView`` shows under `field` right now, or `nil` — for a host that draws
+    /// its own form.
+    public func errorMessage(for field: CardField) -> String? {
+        texts[field]?.error(for: fieldStates[field] ?? CardFieldState())
     }
 
     /// Pick the scheme on a co-badged card, as a chip tap would. Ignored unless the BIN lookup
@@ -276,8 +298,8 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
         pending = nil
     }
 
-    private static func fieldConfig(_ texts: CardFormTexts.FieldTexts) -> SecureFieldConfig {
-        SecureFieldConfig(placeholder: texts.placeholder, accessibilityLabel: texts.label)
+    private static func fieldConfig(_ texts: CardFormTexts.FieldTexts, _ copy: ResolvedFieldTexts?) -> SecureFieldConfig {
+        SecureFieldConfig(placeholder: texts.placeholder, accessibilityLabel: copy?.label)
     }
 
     /// `nil` when the theme leaves that state at the base style, so Secure Fields' own inheritance

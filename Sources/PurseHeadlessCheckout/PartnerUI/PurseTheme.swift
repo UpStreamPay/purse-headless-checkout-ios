@@ -1,6 +1,6 @@
 // Web: packages/partner-ui/src/commons/PartnerUI/theming
 // Same: scopes global / input / label / helperText with :focus :invalid :valid, the fallback chain (scope variant → scope → global variant → global).
-// Differs: native UIColor/UIFont, not CSS-like strings; `input` maps straight onto `SecureFieldsStyle`, while `label`/`helperText` have no rendering surface yet — see AGENTS.md.
+// Differs: native UIColor/UIFont, not CSS-like strings; `input` maps straight onto `SecureFieldsStyle`, `label`/`helperText` style the SDK's own `CardFormView`.
 
 import UIKit
 

@@ -68,3 +68,37 @@ struct PurseThemeTests {
         #expect(PurseTheme(gap: 16).resolve().gap == 16)
     }
 }
+
+/// Card form copy and the error display rule — Android's `rememberCardTexts` and
+/// `FieldUiState.message()`.
+struct CardFormCopyTests {
+
+    private let texts = CardFormTexts().resolved(locale: "en")[.expDate]!
+
+    @Test func errorsShowOnlyOnceTheShopperLeavesTheField() {
+        // Typing an incomplete value: nothing, however invalid.
+        #expect(texts.error(for: .init(isValid: false, isFocused: true, hasContent: true)) == nil)
+        // Leaving it invalid: format error.
+        #expect(texts.error(for: .init(isValid: false, hasContent: true, wasBlurred: true)) == texts.formatError)
+        // Corrected: cleared.
+        #expect(texts.error(for: .init(isValid: true, hasContent: true, wasBlurred: true)) == nil)
+        // Never touched: nothing. Left empty: required error, even back in focus.
+        #expect(texts.error(for: .init()) == nil)
+        #expect(texts.error(for: .init(wasBlurred: true)) == texts.requiredError)
+        #expect(texts.error(for: .init(isFocused: true, wasBlurred: true)) == texts.requiredError)
+    }
+
+    @Test func helperTextShowsOnlyWhileFocused() {
+        #expect(texts.message(for: .init(isFocused: true)) == texts.helperText)
+        #expect(texts.message(for: .init()) == nil)
+    }
+
+    @Test func defaultsFollowTheLocaleAndTheMerchantWins() {
+        #expect(CardFormTexts().resolved(locale: "fr-FR")[.cvv]?.label == "Cryptogramme")
+        #expect(CardFormTexts().resolved(locale: "de-DE")[.cvv]?.label == "Security code")
+        let own = CardFormTexts(cvv: .init(label: "CVC", helperText: " "))
+        #expect(own.resolved(locale: "fr")[.cvv]?.label == "CVC")
+        #expect(own.resolved(locale: "fr")[.cvv]?.helperText == nil)
+        #expect(own.resolved(locale: "fr")[.cvv]?.formatError == "Cryptogramme invalide.")
+    }
+}
