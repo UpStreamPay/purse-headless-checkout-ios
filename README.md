@@ -80,7 +80,7 @@ dev server that holds the server-side Purse credentials a real merchant backend 
 | Mode | What it is |
 |---|---|
 | **Playground** | Session → pay → result, the same three screens as Android's `:app`: raw session and transaction dumps, an event log, a `widget.data` paste box, a manual capture tool. For working on the SDK. |
-| **Checkout** | Basket → payment → confirmation. What a shopper sees, with the same SDK calls and none of the developer chrome. Its confirmation screen resolves the outcome with `awaitPaymentOutcome()` rather than asking alfred, because that is the only path a real merchant has. |
+| **Checkout** | Basket → payment → confirmation. What a shopper sees, with the same SDK calls and none of the developer chrome. Its confirmation screen reads the session through alfred, standing in for the merchant backend: that read needs server credentials, and `widget.data`'s client key gets a 401. |
 
 Checkout mode is styled to the Purse reference (`Demo/Sources/PurseDS.swift`): Albert Sans, an ink
 call to action with Peppermint reserved for identity and selected states, and Lucide icons shipped
