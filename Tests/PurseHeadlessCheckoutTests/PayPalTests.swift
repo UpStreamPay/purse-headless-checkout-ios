@@ -177,6 +177,18 @@ struct PayPalTests {
         #expect(!"https://acs.bank.example/3ds".isPayPalApprovalEcho)
     }
 
+    /// Pay Later has no native approval step, so the same URL is the approval and must be followed.
+    @Test func theBnplApprovalIsFollowed() {
+        let url = "https://www.sandbox.paypal.com/checkoutnow?token=ORDER-1"
+        let response = JSONValue.object([
+            "global_status": "SUCCESS",
+            "results": .array([]),
+            "redirection": .object(["url": .string(url)]),
+        ])
+        let action = RedirectionResolver.resolve(validateResponse: response, partner: "paypal", method: "bnpl")
+        #expect(action == .get(url: url))
+    }
+
     /// A genuine redirect for a *different* method must not be caught by this suppression.
     @Test func aGenuineRedirectIsUnaffected() {
         let response = JSONValue.object([
