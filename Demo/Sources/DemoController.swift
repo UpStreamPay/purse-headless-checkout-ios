@@ -171,7 +171,7 @@ final class DemoController: ObservableObject {
             } catch {
                 // A confirmation that cannot be fetched is not a failed payment: leave the screen
                 // on whatever the attempt itself reported.
-                snackbar = "Couldn't reach the payment session: \(error.localizedDescription)"
+                snackbar = "Couldn't reach the payment session: \(error.asPurseError().message)"
             }
             confirming = false
         }
@@ -592,11 +592,12 @@ final class DemoController: ObservableObject {
 
     func log(_ line: String) { events.append(line) }
 
-    /// Only a payment actually in flight reaches the result screen; a setup failure (an express
-    /// method whose `prepare` could not `/init`) is reported where the shopper already is.
+    /// A setup failure (an express method whose `prepare` could not `/init`) is reported where the
+    /// shopper already is. Anything else is a payment outcome, even from a self-submitting button
+    /// (PayPal, Apple Pay) that never sets `submitting`.
     func finish(_ outcome: PaymentOutcome, method: String) {
-        guard submitting else {
-            if case let .failed(error) = outcome { snackbar = "\(method): \(error.message)" }
+        if !submitting, case let .failed(error) = outcome {
+            snackbar = "\(method): \(error.message)"
             return
         }
         guard let result = DemoResult.from(outcome, method: method) else {

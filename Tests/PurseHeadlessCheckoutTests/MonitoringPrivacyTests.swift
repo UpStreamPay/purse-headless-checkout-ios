@@ -125,4 +125,30 @@ struct MonitoringPrivacyTests {
         #expect(!strings.contains { $0 == disabled.message })
         #expect(!strings.contains { $0.contains(disabled.message) })
     }
+
+    /// Android's `ApiCallMonitor`: every Payment API call is timed, by path — never by URL.
+    @Test func anAPICallIsTimedByPathAndNeverByURL() async throws {
+        StubURLProtocol.reset(host: Self.monitoringHost)
+        StubURLProtocol.reset(host: Self.paymentHost)
+        StubURLProtocol.set("headless_checkout", .ok("{}"), host: Self.monitoringHost)
+        StubURLProtocol.set(
+            "/init",
+            .ok(#"{"status":{"state":"SUCCESS"},"plugin_result":{"payment_data":{"cards":[{"balance":30}]},"logs":{}}}"#),
+            host: Self.paymentHost
+        )
+
+        let checkout = try makeCheckout()
+        await checkout.pendingMonitoringInstall?.value
+        let method = try #require(checkout.secondaryMethods.first)
+        _ = try await checkout.getSecondaryToken(method: method, pan: Self.pan, cvv: "123")
+
+        checkout.teardown()
+        try? await Task.sleep(nanoseconds: 300_000_000)
+
+        let strings = try postedStrings()
+        #expect(strings.contains("HEADLESS_CHECKOUT_PARTNER_API_CALL_START"))
+        #expect(strings.contains("HEADLESS_CHECKOUT_PARTNER_API_CALL_END"))
+        #expect(strings.contains("/init"))
+        #expect(!strings.contains { $0.contains(Self.paymentHost) })
+    }
 }

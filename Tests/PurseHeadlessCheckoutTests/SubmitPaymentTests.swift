@@ -479,13 +479,16 @@ struct RedirectHandoffTests {
         }
     }
 
-    private func checkout(hooks: PurseCheckoutHooks? = nil) throws -> PurseHeadlessCheckout {
+    private func checkout(
+        hooks: PurseCheckoutHooks? = nil,
+        sessionURLs: [String: Any] = [:]
+    ) throws -> PurseHeadlessCheckout {
         let registry = PluginRegistry()
         registry.install(StubModule())
         let checkout = try PurseHeadlessCheckout(
             widgetData: TestSessions.widgetData(
                 environment: "test",
-                paymentSession: TestSessions.paymentSession(amount: 100)
+                paymentSession: TestSessions.paymentSession(amount: 100, extra: sessionURLs)
             ),
             hooks: hooks,
             registry: registry,
@@ -529,6 +532,76 @@ struct RedirectHandoffTests {
 
         #expect(outcome == nil)
         #expect(presenter.presented.isEmpty)
+    }
+
+    private static let sessionURLs: [String: Any] = [
+        "success": "https://shop.example/success",
+        "failure": "https://shop.example/failure",
+        "redirection": "https://shop.example/return",
+    ]
+
+    /// Web's fallback: a success naming no redirect, with nothing in `results`.
+    @Test func aSuccessWithNoResultsFallsBackToTheSuccessURL() async throws {
+        stubValidate(#"{"global_status":"SUCCESS","results":[]}"#)
+        let checkout = try checkout(sessionURLs: Self.sessionURLs)
+
+        let result = try await checkout.submitPayment()
+
+        #expect(checkout.pendingRedirect(for: result)
+            == .get(url: "https://shop.example/success", returnURLPrefix: "https://shop.example/return"))
+    }
+
+    /// Web's `onValidateError`: any non-success naming no redirect.
+    @Test func aNonSuccessFallsBackToTheFailureURL() async throws {
+        stubValidate(#"{"global_status":"FAILED","results":[{"partner":"adyen","method":"creditcard","status":"FAILED"}]}"#)
+        let checkout = try checkout(sessionURLs: Self.sessionURLs)
+
+        let result = try await checkout.submitPayment()
+
+        #expect(checkout.pendingRedirect(for: result)
+            == .get(url: "https://shop.example/failure", returnURLPrefix: "https://shop.example/return"))
+    }
+
+    /// A pending answer is neither page.
+    @Test func aPendingAnswerDoesNotFallBack() async throws {
+        stubValidate(#"{"global_status":"WAITING","results":[]}"#)
+        let checkout = try checkout(sessionURLs: Self.sessionURLs)
+
+        let result = try await checkout.submitPayment()
+
+        #expect(checkout.pendingRedirect(for: result) == nil)
+    }
+
+    /// A primary that answered in `results` owns its outcome: no fallback.
+    @Test func aPrimarySuccessWithResultsDoesNotFallBack() async throws {
+        stubValidate(#"{"global_status":"SUCCESS","results":[{"partner":"adyen","method":"creditcard","status":"SUCCESS"}]}"#)
+        let checkout = try checkout(sessionURLs: Self.sessionURLs)
+
+        let result = try await checkout.submitPayment()
+
+        #expect(checkout.pendingRedirect(for: result) == nil)
+    }
+
+    /// The fallback is the session's own return URL: nothing to open, the answer is the result.
+    @Test func aFallbackOntoTheReturnURLOpensNothing() async throws {
+        stubValidate(#"{"global_status":"SUCCESS","results":[]}"#)
+        let checkout = try checkout(sessionURLs: [
+            "success": "https://shop.example/return?ok",
+            "redirection": "https://shop.example/return",
+        ])
+
+        let result = try await checkout.submitPayment()
+
+        #expect(checkout.pendingRedirect(for: result) == nil)
+    }
+
+    @Test func aRedirectTheResponseNamesWinsOverTheFallback() async throws {
+        stubValidate(Self.withRedirect)
+        let checkout = try checkout(sessionURLs: Self.sessionURLs)
+
+        let result = try await checkout.submitPayment()
+
+        #expect(checkout.pendingRedirect(for: result)?.targetURL == "https://acs.bank.example/3ds")
     }
 
     /// A merchant returning `true` takes the redirect over: the SDK opens nothing.

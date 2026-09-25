@@ -295,9 +295,9 @@ The exception is `pluginContext(for:api:)`, whose `amount` is the *live* `remain
 not the frozen split amount `PaymentValidator` uses at `/validate` time. The two are built by
 different code on purpose.
 
-**`onAmountUpdate` has no call site**, same as `destroyClient`. Android fires it whenever the
-splitter's remaining amount moves; a plugin that needs to react to a live amount change mid-form
-cannot today. Scope it separately if a real method needs it.
+**`onAmountUpdate` fires from `refresh()`** whenever the remaining amount actually moves, to every
+plugin `host(for:)` has tracked, fire-and-forget — Android's `notifyAmountUpdate`. `destroyClient`
+still has no call site: iOS keeps no live plugin instance to tear down.
 
 ## Error codes with no dedicated case still need a real carrier
 

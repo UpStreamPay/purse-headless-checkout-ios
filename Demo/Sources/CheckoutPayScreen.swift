@@ -1,6 +1,5 @@
 import PurseHeadlessCheckout
 import SwiftUI
-import WebKit
 
 /// The pay screen a shopper would actually see: same SDK calls as `PayScreen`, no developer chrome.
 struct CheckoutPayScreen: View {
@@ -186,40 +185,15 @@ private struct ShopperElementBody: View {
     }
 }
 
-/// The CDN badge, in a `WKWebView` because the badges are **SVG** and neither `UIImage` nor
-/// `AsyncImage` decodes that — `AsyncImage` shows an empty placeholder forever. WebKit is already
-/// linked for redirects; a real merchant would add an SVG library rather than a web view per row.
-private struct MethodBadge: UIViewRepresentable {
+/// The CDN badge, bundled: the badges are SVG, which `AsyncImage` cannot decode, and a web view
+/// per row spawns a WebContent process each. The name is the CDN file's.
+private struct MethodBadge: View {
     let url: String
 
-    func makeUIView(context: Context) -> WKWebView {
-        let view = WKWebView()
-        view.isOpaque = false
-        view.backgroundColor = .clear
-        view.scrollView.isScrollEnabled = false
-        // Interaction belongs to the row behind it, not to the badge.
-        view.isUserInteractionEnabled = false
-        return view
-    }
-
-    func updateUIView(_ view: WKWebView, context: Context) {
-        guard let url = URL(string: url), context.coordinator.loaded != url else { return }
-        context.coordinator.loaded = url
-        view.loadHTMLString(
-            """
-            <html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-            <body style="margin:0;display:flex;align-items:center;justify-content:center;height:100%">
-            <img src="\(url.absoluteString)" style="max-width:100%;max-height:100%">
-            </body></html>
-            """,
-            baseURL: url
-        )
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    final class Coordinator {
-        var loaded: URL?
+    var body: some View {
+        let name = URL(string: url)?.deletingPathExtension().lastPathComponent ?? ""
+        let asset = UIImage(named: "badge-\(name)") == nil ? "badge-creditcard" : "badge-\(name)"
+        Image(asset).resizable().scaledToFit()
     }
 }
 

@@ -25,6 +25,15 @@ public final class KlarnaCoordinator: NSObject {
     /// `/init` for a client token, inflate the widget into `container`, wait for it to load. On
     /// success the step id and an authorize token are stashed on the checkout.
     public func prepare(into container: UIView, returnURL: URL) async throws {
+        do {
+            try await load(into: container, returnURL: returnURL)
+        } catch {
+            host.dispatch(.initFailed(message: error.asPurseError().message))
+            throw error
+        }
+    }
+
+    private func load(into container: UIView, returnURL: URL) async throws {
         let context = host.buildContext()
         let initResponse = try await context.api.initPayment(
             KlarnaRequestBuilder.initPayload(amount: context.amount, partner: context.partner)
@@ -145,6 +154,7 @@ extension KlarnaCoordinator: KlarnaPaymentEventListener {
     public nonisolated func klarnaFailed(inPaymentView paymentView: KlarnaPaymentView, withError error: KlarnaPaymentError) {
         // KlarnaError is a plain NSObject with no Sendable annotation: read the message out here.
         let message = error.message
+        let recoverable = !error.isFatal
         Task { @MainActor in
             if let pending = self.pendingAuthorize {
                 self.pendingAuthorize = nil
@@ -153,8 +163,9 @@ extension KlarnaCoordinator: KlarnaPaymentEventListener {
                 self.pendingReady = nil
                 pending.resume(throwing: PartnerUIError("Klarna widget failed to load: \(message)"))
             } else {
-                // Nothing pending: the widget is already up, so just clear fulfilment.
+                // Nothing pending: the widget is already up and failed while mounted.
                 self.host.setFulfilled(false)
+                self.host.dispatch(.partnerError(message: message, recoverable: recoverable))
             }
         }
     }

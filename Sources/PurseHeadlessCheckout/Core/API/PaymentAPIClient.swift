@@ -12,6 +12,9 @@ public struct PaymentAPIClient: Sendable {
     private let entityId: String
     private let sessionId: String
     private let session: URLSession
+    /// Android's `ApiCallMonitor` listener, per client rather than process-wide: the event bus it
+    /// feeds belongs to one checkout.
+    var monitor: (@Sendable (CheckoutEventCode, EventLevel, JSONValue) -> Void)?
 
     /// - Parameter apiRoot: ``PurseEnvironment/paymentAPIRoot``. A trailing slash is tolerated.
     public init(apiKey: String, apiRoot: String, entityId: String, sessionId: String, session: URLSession = .shared) {
@@ -91,7 +94,27 @@ public struct PaymentAPIClient: Sendable {
         "\(root)/\(entityId)/sessions/\(sessionId)\(path)"
     }
 
+    /// Times every call for `PARTNER_API_CALL_START`/`_END`. `path`, never the URL: the envelope
+    /// already names the entity and session.
     private func execute(_ method: String, path: String, body: JSONValue?, url: String? = nil) async throws -> JSONValue {
+        guard let monitor else { return try await executeUnmonitored(method, path: path, body: body, url: url) }
+        monitor(.partnerAPICallStart, .network, monitoringPayload(["call": .string(method), "path": .string(path)]))
+        let startedAt = ContinuousClock.now
+        var success = false
+        defer {
+            let elapsed = ContinuousClock.now - startedAt
+            let durationMs = elapsed.components.seconds * 1000 + elapsed.components.attoseconds / 1_000_000_000_000_000
+            monitor(.partnerAPICallEnd, .performance, monitoringPayload([
+                "call": .string(method), "path": .string(path),
+                "durationMs": .number(String(durationMs)), "success": .bool(success)
+            ]))
+        }
+        let response = try await executeUnmonitored(method, path: path, body: body, url: url)
+        success = true
+        return response
+    }
+
+    private func executeUnmonitored(_ method: String, path: String, body: JSONValue?, url: String? = nil) async throws -> JSONValue {
         let urlString = url ?? sessionURL(path)
         guard let requestURL = URL(string: urlString) else {
             throw PaymentAPIError(

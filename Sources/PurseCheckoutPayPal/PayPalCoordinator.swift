@@ -38,11 +38,18 @@ public final class PayPalCoordinator: NSObject {
             )
         }
 
-        let initResponse = try await context.api.initPayment(
-            PayPalRequestBuilder.initPayload(amount: context.amount, partner: context.partner)
-        )
-        let orderId = try PayPalRequestBuilder.parseOrderId(initResponse)
-        let stepId = try PayPalRequestBuilder.parseStepId(initResponse)
+        let orderId: String
+        let stepId: Int?
+        do {
+            let initResponse = try await context.api.initPayment(
+                PayPalRequestBuilder.initPayload(amount: context.amount, partner: context.partner)
+            )
+            orderId = try PayPalRequestBuilder.parseOrderId(initResponse)
+            stepId = try PayPalRequestBuilder.parseStepId(initResponse)
+        } catch {
+            host.dispatch(.initFailed(message: error.asPurseError().message))
+            throw error
+        }
 
         let client = PayPalWebCheckoutClient(
             config: CoreConfig(clientID: clientId, environment: host.environment.payPalEnvironment)
@@ -99,13 +106,16 @@ extension PayPalCoordinator: PayPalWebCheckoutDelegate {
         // CoreSDKError is not Sendable; take only what's needed before crossing to the main actor.
         let message = error.localizedDescription
         Task { @MainActor in
+            self.host.dispatch(.clientError(message: message))
             self.resume(.failure(PartnerUIError("PayPal approval failed: \(message)")))
         }
     }
 
     public nonisolated func payPalDidCancel(_ payPalClient: PayPalWebCheckoutClient) {
+        // `CancellationError` so the surface reports `.canceled`, not a failure — Android's `Canceled`.
         Task { @MainActor in
-            self.resume(.failure(PartnerUIError("the shopper cancelled PayPal approval")))
+            self.host.dispatch(.cancelled)
+            self.resume(.failure(CancellationError()))
         }
     }
 

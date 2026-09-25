@@ -34,11 +34,21 @@ enum ElementFlow {
             return
         }
 
+        // A session success/failure page is shown, not followed: the answer is already the outcome.
+        if checkout.responseRedirect(for: result) == nil {
+            _ = try? await checkout.presentRedirectIfNeeded(for: result, using: presenter)
+            listener.onOutcome(.completed(result))
+            return
+        }
+
+        host.dispatch(.redirect)
         listener.onRequiresAction()
         do {
             switch try await checkout.presentRedirectIfNeeded(for: result, using: presenter) {
             case let .returned(url): listener.onOutcome(.returnedFromRedirect(url: url))
-            case .canceled: listener.onOutcome(.canceled)
+            case .canceled:
+                host.dispatch(.cancelled)
+                listener.onOutcome(.canceled)
             case nil: listener.onOutcome(.completed(result))  // the `onRedirection` hook took it over
             }
         } catch {

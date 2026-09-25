@@ -42,6 +42,15 @@ public final class ApplePayCoordinator: NSObject {
     /// `POST /init` for the sheet configuration.
     /// - Throws: ``PartnerUIError`` when `/init` returns nothing usable.
     public func prepare() async throws {
+        do {
+            try await loadConfiguration()
+        } catch {
+            host.dispatch(.initFailed(message: error.asPurseError().message))
+            throw error
+        }
+    }
+
+    private func loadConfiguration() async throws {
         let context = host.buildContext()
         let response = try await context.api.initPayment([
             "partner": .string(context.partner.wireValue),
@@ -93,6 +102,7 @@ public final class ApplePayCoordinator: NSObject {
             controller.present { presented in
                 guard !presented else { return }
                 MainActor.assumeIsolated {
+                    self.host.dispatch(.clientError(message: "the Apple Pay sheet could not be presented"))
                     // PassKit refuses to present without saying why; usually the entitlement.
                     self.resume(.failure(PartnerUIError(
                         """
@@ -154,6 +164,7 @@ extension ApplePayCoordinator: PKPaymentAuthorizationControllerDelegate {
             productId: request?.productId
         ) else {
             handler.callAsFunction(PKPaymentAuthorizationResult(status: .failure, errors: nil))
+            host.dispatch(.clientError(message: "the Apple Pay token could not be read"))
             resume(.failure(PartnerUIError("the Apple Pay token could not be read")))
             return
         }
@@ -196,7 +207,9 @@ extension ApplePayCoordinator: PKPaymentAuthorizationControllerDelegate {
             resume(.success(()))
         } else {
             host.setFulfilled(false)
-            resume(.failure(PartnerUIError("the shopper dismissed the Apple Pay sheet")))
+            host.dispatch(.cancelled)
+            // `CancellationError` so the surface reports `.canceled`, not a failure.
+            resume(.failure(CancellationError()))
         }
     }
 }
