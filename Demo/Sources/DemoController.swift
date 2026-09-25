@@ -39,7 +39,8 @@ final class DemoController: ObservableObject {
 
     // MARK: Confirmation (checkout mode)
 
-    /// From the SDK's `awaitPaymentOutcome()`, not alfred — the call a merchant actually has.
+    /// From alfred, standing in for the merchant backend: reading the session needs server
+    /// credentials, which `widget.data`'s client key does not carry.
     @Published var confirmedStatus: PaymentSessionStatus?
     @Published var confirming = false
     @Published var orderReference = "PRS-\(Int.random(in: 100_000...999_999))"
@@ -158,23 +159,33 @@ final class DemoController: ObservableObject {
         checkoutStep = .cart
     }
 
-    /// Ask the **session** whether the money moved. The playground asks alfred, which no merchant
-    /// can do.
+    /// Ask the **session**, through alfred, whether the money moved — the same read a merchant's
+    /// backend makes. Polls while it is pending, like `awaitPaymentOutcome()`.
     func confirmPayment() {
-        guard let checkout, !confirming else { return }
+        guard !confirming, !alfredSessionId.isEmpty else { return }
         confirming = true
         Task {
             do {
-                confirmedStatus = try await checkout.awaitPaymentOutcome(
-                    timeout: .seconds(20), pollInterval: .seconds(2)
-                )
+                let deadline = ContinuousClock.now + .seconds(20)
+                var status = try await sessionStatus()
+                while case .pending = status, ContinuousClock.now < deadline {
+                    try await Task.sleep(for: .seconds(2))
+                    status = try await sessionStatus()
+                }
+                confirmedStatus = status
             } catch {
                 // A confirmation that cannot be fetched is not a failed payment: leave the screen
                 // on whatever the attempt itself reported.
-                snackbar = "Couldn't reach the payment session: \(error.localizedDescription)"
+                snackbar = "Couldn't reach the payment session: \(error.asPurseError().message)"
             }
             confirming = false
         }
+    }
+
+    private func sessionStatus() async throws -> PaymentSessionStatus {
+        let rows = try await alfred.paymentSession(id: alfredSessionId)
+        let data = try JSONSerialization.data(withJSONObject: rows.map(\.rawObject))
+        return PaymentSessionStatus.from(try JSONDecoder().decode([JSONValue].self, from: data))
     }
 
     func backToShop() {
@@ -594,11 +605,12 @@ final class DemoController: ObservableObject {
 
     func log(_ line: String) { events.append(line) }
 
-    /// Only a payment actually in flight reaches the result screen; a setup failure (an express
-    /// method whose `prepare` could not `/init`) is reported where the shopper already is.
+    /// A setup failure (an express method whose `prepare` could not `/init`) is reported where the
+    /// shopper already is. Anything else is a payment outcome, even from a self-submitting button
+    /// (PayPal, Apple Pay) that never sets `submitting`.
     func finish(_ outcome: PaymentOutcome, method: String) {
-        guard submitting else {
-            if case let .failed(error) = outcome { snackbar = "\(method): \(error.message)" }
+        if !submitting, case let .failed(error) = outcome {
+            snackbar = "\(method): \(error.message)"
             return
         }
         guard let result = DemoResult.from(outcome, method: method) else {

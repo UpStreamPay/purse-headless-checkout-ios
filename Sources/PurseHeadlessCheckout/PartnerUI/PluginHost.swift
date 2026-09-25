@@ -29,3 +29,10 @@ public protocol PluginHost: AnyObject {
 
     func submitPayment() async throws -> ValidationResult
 }
+
+public extension PluginHost {
+    /// Android's `PaymentCoordinator.dispatch`: report a ``PluginEvent`` to the checkout.
+    func dispatch(_ event: PluginEvent) {
+        buildContext().dispatchEvent(event)
+    }
+}

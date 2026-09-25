@@ -241,6 +241,8 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
     public nonisolated func secureFieldsDidFail(_ error: SecureFieldsError) {
         let message = String(describing: error)
         MainActor.assumeIsolated {
+            // Not `message`: a vault API error is free text, and monitoring carries the reason.
+            host.dispatch(.clientError(message: "card tokenization failed"))
             resume(.failure(PartnerUIError("card tokenization failed: \(message)")))
         }
     }

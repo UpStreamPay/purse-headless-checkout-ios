@@ -40,7 +40,9 @@ public enum RedirectionResolver {
 
         guard let action, let target = action.targetURL else { return action }
         let isOwnReturn = sessionReturnURL.map(target.hasPrefix) ?? false
-        let isEcho = target.isWidgetConfirmationRedirect || target.isPayPalApprovalEcho
+        // Only the wallet approves natively before /validate; for bnpl this URL *is* the approval.
+        let isPayPalWalletEcho = partner == "paypal" && method == "wallet" && target.isPayPalApprovalEcho
+        let isEcho = target.isWidgetConfirmationRedirect || isPayPalWalletEcho
         return (isOwnReturn || isEcho) ? nil : action
     }
 

@@ -1,8 +1,8 @@
 import PurseHeadlessCheckout
 import SwiftUI
 
-/// The order-confirmation page. Where the playground's result screen asks **alfred** what happened,
-/// this asks the session through `awaitPaymentOutcome()` — the path a merchant can actually ship.
+/// The order-confirmation page: the session's own transactions, read through alfred the way a
+/// merchant's backend would read them.
 struct ConfirmationScreen: View {
     @ObservedObject var controller: DemoController
 

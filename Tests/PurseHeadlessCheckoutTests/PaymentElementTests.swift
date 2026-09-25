@@ -58,14 +58,14 @@ struct PaymentElementTests {
     }
 
     /// `empty` drops even the built-in card and redirection modules, so nothing renders.
-    private func makeCheckout(empty: Bool = false) throws -> PurseHeadlessCheckout {
+    private func makeCheckout(empty: Bool = false, extra: [String: Any] = [:]) throws -> PurseHeadlessCheckout {
         let registry = PluginRegistry()
         registry.reset()
         if !empty { registry.install(StubModule()) }
         return try PurseHeadlessCheckout(
             widgetData: TestSessions.widgetData(
                 apiURL: "https://\(Self.host)/payment/v1",
-                paymentSession: TestSessions.paymentSession(id: "payment-element-session", amount: 100)
+                paymentSession: TestSessions.paymentSession(id: "payment-element-session", amount: 100, extra: extra)
             ),
             registry: registry,
             urlSession: StubURLProtocol.session()
@@ -228,6 +228,29 @@ struct PaymentElementTests {
         }
         // And explicitly not a success: the final redirect is built server-side.
         #expect(spy.outcomes.first?.isSuccess == false)
+    }
+
+    /// The session's failure page is shown, but a known decline stays a completion — even when the
+    /// shopper closes the page.
+    @Test func aDeclineShowsTheFailurePageAndStillCompletes() async throws {
+        stubValidate(#"{"global_status":"FAILED","results":[]}"#)
+        let checkout = try makeCheckout(extra: [
+            "failure": "https://shop.example/failure", "redirection": "https://shop.example/return",
+        ])
+        let spy = Spy()
+        let presenter = SpyPresenter()
+        presenter.answer = .canceled
+
+        let element = checkout.paymentElement(for: try selectCard(checkout), listener: spy, redirect: presenter)
+        await element.submit().value
+
+        #expect(presenter.presented.map(\.targetURL) == ["https://shop.example/failure"])
+        #expect(spy.requiresAction == 0)
+        guard case let .completed(result) = try #require(spy.outcomes.first) else {
+            Issue.record("a decline is a completion — got \(spy.outcomes)")
+            return
+        }
+        #expect(result.status == .failed)
     }
 
     @Test func aDismissedRedirectIsACancel() async throws {

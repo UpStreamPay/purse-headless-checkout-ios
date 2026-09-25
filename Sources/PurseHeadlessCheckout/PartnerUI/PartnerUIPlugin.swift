@@ -55,6 +55,9 @@ public struct PartnerUIContext: Sendable {
     /// id, a vault token), so `preValidation` can build its payload.
     public let collected: [String: JSONValue]
     public let options: PluginOptions
+    /// Android's `dispatchEvent`: how a coordinator tells the checkout its native step failed,
+    /// recovered or ended the session.
+    public let dispatchEvent: @MainActor @Sendable (PluginEvent) -> Void
 
     public init(
         partner: Partner,
@@ -65,7 +68,8 @@ public struct PartnerUIContext: Sendable {
         register: Bool = false,
         token: PayToken? = nil,
         collected: [String: JSONValue] = [:],
-        options: PluginOptions = PluginOptions()
+        options: PluginOptions = PluginOptions(),
+        dispatchEvent: @escaping @MainActor @Sendable (PluginEvent) -> Void = { _ in }
     ) {
         self.partner = partner
         self.method = method
@@ -76,6 +80,7 @@ public struct PartnerUIContext: Sendable {
         self.token = token
         self.collected = collected
         self.options = options
+        self.dispatchEvent = dispatchEvent
     }
 
     public var configuration: MethodConfiguration? {

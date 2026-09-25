@@ -129,6 +129,9 @@ public struct PayPalModule: PartnerModule {
                 submit: {
                     do {
                         try await coordinator.authorize()
+                    } catch is CancellationError {
+                        listener.onOutcome(.canceled)
+                        return
                     } catch {
                         listener.onOutcome(.failed(error.asPurseError()))
                         return
@@ -167,6 +170,9 @@ private final class PayPalButtonBox {
         Task { @MainActor in
             do {
                 try await coordinator.authorize()
+            } catch is CancellationError {
+                request.listener.onOutcome(.canceled)
+                return
             } catch {
                 request.listener.onOutcome(.failed(error.asPurseError()))
                 return

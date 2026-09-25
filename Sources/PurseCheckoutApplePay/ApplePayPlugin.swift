@@ -28,6 +28,13 @@ public struct ApplePayPlugin: PartnerUIPlugin {
         self.partner = partner
     }
 
+    /// A device that cannot pay with Apple Pay at all never offers the method.
+    public func ensureClientCompatibility(_ context: PartnerUIContext) async throws {
+        guard await ApplePayCoordinator.canPay else {
+            throw PartnerUIError("this device cannot make Apple Pay payments")
+        }
+    }
+
     /// Only an authorized sheet can be submitted — there is nothing to send otherwise.
     public func validateUI(_ context: PartnerUIContext) async throws -> Bool {
         context.collected[Collected.session]?.stringValue != nil
@@ -137,6 +144,9 @@ private final class ApplePayButtonBox {
         Task { @MainActor in
             do {
                 try await coordinator.present()
+            } catch is CancellationError {
+                request.listener.onOutcome(.canceled)
+                return
             } catch {
                 request.listener.onOutcome(.failed(error.asPurseError()))
                 return

@@ -1,6 +1,6 @@
 // Web: packages/headless-checkout/src/headless-checkout.ts
 // Same: session in force, method list, split, fulfilment, setSession survivor rules.
-// Differs: @Published properties rather than Svelte stores / StateFlow. Submit, plugins, wallet operations, BNPL and teardown land in later PRs.
+// Differs: @Published properties rather than Svelte stores / StateFlow; plugin events through a callback; with no redirect, falls back on the session's `success`/`failure` URL rather than `redirection`.
 
 import Combine
 import Foundation
@@ -117,11 +117,17 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// Save-token decisions for a temporary secondary instrument, keyed by item id.
     private var registrationBySecondaryToken: [String: RegistrationState] = [:]
     /// Items already given their plugin's `onSessionSet` — `host(for:)` fires it exactly once per
-    /// item, Android's `activePlugins` gate.
-    private var trackedPluginItemIds: Set<String> = []
+    /// item, Android's `activePlugins` gate. Kept with their plugin so `onAmountUpdate` can reach it.
+    private var trackedPlugins: [String: (item: any PrimarySource, plugin: any PartnerUIPlugin)] = [:]
+    /// The remaining amount tracked plugins were last told about.
+    private var lastNotifiedRemaining: Decimal?
     /// Test seam: the fire-and-forget `onSessionSet` `Task` started by `host(for:)`, keyed by item
     /// id, so a test can `await` it instead of racing the checkout's own background work.
     var pendingSessionSet: [String: Task<Void, Never>] = [:]
+
+    /// Every ``PluginEvent`` a partner's native step reports, after the checkout has reacted to it —
+    /// Android's `pluginEvents`.
+    public var onPluginEvent: ((CheckoutPluginEvent) -> Void)?
 
     // MARK: Creation
 
@@ -222,6 +228,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
         // Saved gift cards carry no balance in the session — re-`/init` each one now (web's
         // `buildSecondaryPaymentToken` fires the same call as the token is built).
         resolveSavedSecondaryBalances()
+        runEligibilityChecks()
         // Only with a `wallet_session`. Failures are swallowed: the wallet gates management
         // operations and syncs names, so it must never break the checkout.
         if wallet.client != nil {
@@ -324,13 +331,17 @@ public final class PurseHeadlessCheckout: ObservableObject {
     private var api: PaymentAPIClient {
         get throws {
             try requireOpen()
-            return PaymentAPIClient(
+            var client = PaymentAPIClient(
                 apiKey: params.apiKey,
                 apiRoot: paymentAPIRoot,
                 entityId: params.entityId,
                 sessionId: session.id,
                 session: urlSession
             )
+            client.monitor = { [eventBus] code, level, payload in
+                Task { await eventBus.post(code, level, payload) }
+            }
+            return client
         }
     }
 
@@ -432,6 +443,13 @@ public final class PurseHeadlessCheckout: ObservableObject {
                 "results": summarizeValidationResults(result.raw, onlyFailures: true)
             ]))
         }
+        if sessionFallbackRedirect(for: result) != nil {
+            await eventBus.post(.paymentError, .error, monitoringPayload([
+                "message": .string("Missing redirection URL in validate response, falling back to session URL"),
+                "api_status": .string(result.globalStatus),
+                "has_redirection": .bool(false)
+            ]))
+        }
         return result
     }
 
@@ -467,6 +485,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// destination is **not** an outcome: the final redirect is built server-side and can land on a
     /// URL this client cannot read.
     public func pendingRedirect(for result: ValidationResult) -> RedirectAction? {
+        responseRedirect(for: result) ?? sessionFallbackRedirect(for: result)
+    }
+
+    /// The redirect the `/validate` answer itself asks for — a step the payment still needs.
+    func responseRedirect(for result: ValidationResult) -> RedirectAction? {
         let primary = splitter.primaryMethod
         return RedirectionResolver.resolve(
             validateResponse: result.raw,
@@ -474,6 +497,31 @@ public final class PurseHeadlessCheckout: ObservableObject {
             method: primary?.method.wireValue ?? "",
             sessionReturnURL: session.source.redirection
         )?.withReturnURLPrefix(session.source.redirection)
+    }
+
+    /// Web's fallbacks when `/validate` names no redirect: after a success with no primary (or no
+    /// `results`), and after a failure. Web uses `session.redirection` for both; iOS sends the
+    /// shopper to `success` or `failure`, and never on a pending answer. Only a page to show — the
+    /// `/validate` answer is already the outcome.
+    func sessionFallbackRedirect(for result: ValidationResult) -> RedirectAction? {
+        guard result.redirection?.url == nil, result.redirection?.form == nil,
+              responseRedirect(for: result) == nil
+        else { return nil }
+        let url: String?
+        switch result.status {
+        case .success:
+            let results = result.raw["results"]?.arrayValue ?? []
+            guard splitter.primaryMethod == nil || results.isEmpty else { return nil }
+            url = session.source.success?.nonBlank
+        case .failed, .error:
+            url = session.source.failure?.nonBlank
+        case .uncertain, .waiting, .unknown:
+            return nil
+        }
+        let returnURL = session.source.redirection
+        // Opening the session's own return URL shows nothing.
+        guard let url, !(returnURL.map(url.hasPrefix) ?? false) else { return nil }
+        return .get(url: url, returnURLPrefix: returnURL)
     }
 
     /// Whether `error`, **or anything in its `underlying` chain**, is a terminal Payment API answer
@@ -789,17 +837,18 @@ public final class PurseHeadlessCheckout: ObservableObject {
             register: registration,
             token: token,
             collected: collectedByItem[item.id] ?? [:],
-            options: options
+            options: options,
+            dispatchEvent: { [weak self] event in self?.handlePluginEvent(event, from: item) }
         )
     }
 
     /// Resolve `item`'s plugin and give it `onSessionSet` once — Android's `trackPlugin`. A no-op
     /// when no plugin is registered yet, or `item` was already tracked.
     private func trackPlugin(_ item: any PrimarySource, api apiClient: PaymentAPIClient) {
-        guard trackedPluginItemIds.insert(item.id).inserted else { return }
-        guard let plugin = registry.plugin(partner: item.partner, method: item.method, session: session.source) else {
-            return
-        }
+        guard trackedPlugins[item.id] == nil,
+              let plugin = registry.plugin(partner: item.partner, method: item.method, session: session.source)
+        else { return }
+        trackedPlugins[item.id] = (item, plugin)
         let context = pluginContext(for: item, api: apiClient)
         pendingSessionSet[item.id] = Task {
             try? await plugin.onSessionSet(context)
@@ -920,7 +969,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
         // A dropped id may be reused by an unrelated item in a later session (ids are
         // `"{partner}-{method}"`, not content hashes) — Android's `activePlugins.filterKeys`/
         // `remove` prune.
-        trackedPluginItemIds = trackedPluginItemIds.intersection(survivingIds)
+        trackedPlugins = trackedPlugins.filter { survivingIds.contains($0.key) }
         for (id, task) in pendingSessionSet where !survivingIds.contains(id) {
             task.cancel()
             pendingSessionSet.removeValue(forKey: id)
@@ -937,6 +986,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
         sessionState = .ready
         refresh()
         resolveSavedSecondaryBalances()
+        runEligibilityChecks()
         // The wallet session outlives any one payment session — reapply what it already knows onto
         // the freshly rebuilt items rather than fetching again.
         if wallet.client != nil { syncWalletTokens() }
@@ -993,7 +1043,21 @@ public final class PurseHeadlessCheckout: ObservableObject {
             splitSources: splitter.splits.map(\.source)
         )
         reportDisabledTransitions(before: before, after: meansOfPayment)
+        publishItems()
 
+        remainingAmountToPay = splitter.primaryReach
+        amountSplit = splitter.splits
+        let fulfilled = splitter.fulfilled && unfulfilledItemId == nil
+        if fulfilled != isPaymentFulfilled {
+            postMonitoring(.paymentFulfilled, .info, monitoringPayload(["isFulfilled": .bool(fulfilled)]))
+        }
+        isPaymentFulfilled = fulfilled
+        notifyAmountUpdate()
+    }
+
+    /// Republish the item lists. On its own, without a recompute, when a state was just set —
+    /// `MethodAvailability.recompute` would wipe a recoverable one.
+    private func publishItems() {
         // Filtered states mean "never show this" — the item stays in the internal list so a later
         // recompute can still see it, but no merchant ever renders it.
         var visible = meansOfPayment.filter { $0.disabled?.isFiltered != true }
@@ -1018,14 +1082,123 @@ public final class PurseHeadlessCheckout: ObservableObject {
             if case let .savedSecondaryToken(token) = $0 { return token }
             return nil
         }
+    }
 
-        remainingAmountToPay = splitter.primaryReach
-        amountSplit = splitter.splits
-        let fulfilled = splitter.fulfilled && unfulfilledItemId == nil
-        if fulfilled != isPaymentFulfilled {
-            postMonitoring(.paymentFulfilled, .info, monitoringPayload(["isFulfilled": .bool(fulfilled)]))
+    /// Android's `notifyAmountUpdate`: only when the remaining amount actually moved, to every
+    /// tracked plugin, fire-and-forget.
+    private func notifyAmountUpdate() {
+        let remaining = splitter.primaryReach
+        guard remaining != lastNotifiedRemaining else { return }
+        let isFirst = lastNotifiedRemaining == nil
+        lastNotifiedRemaining = remaining
+        guard !isFirst, !trackedPlugins.isEmpty, let client = try? api else { return }
+        for (item, plugin) in trackedPlugins.values {
+            let context = pluginContext(for: item, api: client)
+            Task { try? await plugin.onAmountUpdate(context) }
         }
-        isPaymentFulfilled = fulfilled
+    }
+
+    // MARK: Plugin events
+
+    /// Android's `onPluginEvent`.
+    private func handlePluginEvent(_ event: PluginEvent, from item: any PrimarySource) {
+        switch event {
+        case .ready:
+            clearRecoverableDisabled(item.id)
+        case let .initFailed(message), let .clientError(message):
+            deactivate(item.id, .partnerUIFatalError(reason: message))
+        case let .partnerError(message, recoverable):
+            deactivate(item.id, recoverable
+                ? .partnerUIRecoverableError(reason: message)
+                : .partnerUIFatalError(reason: message))
+        case .endOfSession:
+            sessionState = .terminated
+        case .redirect, .cancelled:
+            break
+        }
+
+        // Web's `resolveUIEventLevel`.
+        let level: EventLevel = switch event {
+        case .initFailed, .clientError: .error
+        case let .partnerError(_, recoverable): recoverable ? .warning : .error
+        default: .info
+        }
+        postMonitoring(.partnerUIEvent, level, monitoringPayload([
+            "code": .string(event.code),
+            "partner": .string(item.partner.wireValue),
+            "method": .string(item.method.wireValue),
+            "reason": event.message.map { .string(String($0.prefix(Self.maxReasonLength))) }
+        ]))
+        onPluginEvent?(CheckoutPluginEvent(itemId: item.id, event: event))
+    }
+
+    static let maxReasonLength = 200
+
+    /// Web's `fatalError` → `clearSplit` + `deactivateMop`.
+    private func deactivate(_ itemId: String, _ state: DisabledState) {
+        guard let index = meansOfPayment.firstIndex(where: { $0.id == itemId }) else { return }
+        let before = meansOfPayment
+        meansOfPayment[index] = meansOfPayment[index].withDisabled(state)
+        if state.requiresUIClear || state.isFiltered, splitter.primaryMethod?.id == itemId {
+            splitter.setPrimary(nil)
+            refresh()
+            return
+        }
+        reportDisabledTransitions(before: before, after: meansOfPayment)
+        publishItems()
+    }
+
+    private func clearRecoverableDisabled(_ itemId: String) {
+        guard let index = meansOfPayment.firstIndex(where: { $0.id == itemId }),
+              meansOfPayment[index].disabled?.isRecoverable == true
+        else { return }
+        meansOfPayment[index] = meansOfPayment[index].withDisabled(nil)
+        publishItems()
+    }
+
+    // MARK: Eligibility
+
+    /// Test seam: the `ensureClientCompatibility` probes started by the last eligibility pass.
+    var pendingEligibility: [Task<Void, Never>] = []
+
+    /// Android's `runEligibilityChecks`: name a missing partner product, and let each plugin refuse
+    /// a device it cannot run on.
+    private func runEligibilityChecks() {
+        guard let client = try? api else { return }
+        pendingEligibility = meansOfPayment.compactMap { item -> Task<Void, Never>? in
+            let source: any PrimarySource
+            switch item {
+            case let .primaryMethod(method): source = method
+            case let .paymentToken(token): source = token
+            case .secondaryMethod, .savedSecondaryToken: return nil
+            }
+            guard let plugin = registry.plugin(partner: item.partner, method: item.method, session: session.source) else {
+                if let product = PartnerProducts.product(partner: item.partner, method: item.method) {
+                    postMonitoring(.methodDisabled, .warning, monitoringPayload([
+                        "partner": .string(item.partner.wireValue),
+                        "method": .string(item.method.wireValue),
+                        "code": .string("MISSING_PARTNER_ARTIFACT"),
+                        "artifact": .string(product)
+                    ]))
+                }
+                return nil
+            }
+            let context = pluginContext(for: source, api: client)
+            return Task { [weak self] in
+                do {
+                    try await plugin.ensureClientCompatibility(context)
+                } catch {
+                    guard let self else { return }
+                    self.postMonitoring(.partnerUIEvent, .warning, monitoringPayload([
+                        "code": .string("pluginIsIncompatibleWithClient"),
+                        "partner": .string(item.partner.wireValue),
+                        "method": .string(item.method.wireValue),
+                        "reason": .string(String(error.asPurseError().message.prefix(Self.maxReasonLength)))
+                    ]))
+                    self.deactivate(item.id, .pluginIncompatible)
+                }
+            }
+        }
     }
 
     /// Every transition of an item into a new ``DisabledState`` (or into none) as one
@@ -1577,7 +1750,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
         expiryWatchdog?.cancel()
         for task in pendingSessionSet.values { task.cancel() }
         pendingSessionSet.removeAll()
-        trackedPluginItemIds.removeAll()
+        trackedPlugins.removeAll()
         Task {
             await eventBus.post(.pageUnload)
             await eventBus.flush()
