@@ -1,0 +1,26 @@
+name: Dependencies
+
+# GitHub reads Package.resolved itself, so unlike Android (which has to submit its resolved Gradle
+# graph first) the review needs no submission job. On a pull request, a new or changed dependency
+# with a known high or critical vulnerability blocks the merge (PCI-DSS 6.2.3).
+# See docs/contributing/ci.md.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependencies-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high

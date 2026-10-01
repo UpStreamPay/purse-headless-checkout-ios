@@ -1,0 +1,30 @@
+version: 2
+updates:
+  # Package.swift's dependencies (Secure Fields, PayPal, Klarna). A vendor SDK bump lands as a PR,
+  # so CI's library tests and both Demo configurations vet it before merge.
+  - package-ecosystem: swift
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      swift-dependencies:
+        patterns:
+          - "*"
+      # Groups only cover version updates by default; security updates need their own group.
+      swift-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # Keeps the SHA pins in .github/workflows/ current: Dependabot rewrites both the SHA and its
+  # trailing version comment. The `ci` prefix keeps these bumps out of the changelog.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
