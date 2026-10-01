@@ -26,6 +26,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     permissions:
+      actions: read            # on a private repository, the action reads its own workflow run
       contents: read
       security-events: write   # upload the results
     strategy:
@@ -33,6 +34,11 @@ jobs:
       matrix:
         include:
           - language: actions
+            runner: ubuntu-latest
+            build-mode: none
+          # scripts/*.py, which build the release manifests. Default setup scans it today, so the
+          # switch to this workflow must not drop it.
+          - language: python
             runner: ubuntu-latest
             build-mode: none
           - language: swift

@@ -23,7 +23,7 @@ submit first. Dependabot alerts come from the same graph.
 Dependabot (`.github/dependabot.yml`) proposes weekly updates of the Swift packages and of the
 pinned GitHub Actions.
 
-`.github/workflows/codeql.yml` scans **Swift** and the **workflows** (`actions`) on every pull
+`.github/workflows/codeql.yml` scans **Swift**, the release scripts (**Python**) and the **workflows** (`actions`) on every pull
 request, every push to `main` and weekly. It is an advanced setup on purpose: GitHub's default setup
 builds Swift with `swift build`, which fails for an iOS-only package, so the Swift job builds each
 product's own scheme for the simulator instead. Code scanning must be enabled on the repository with
@@ -52,7 +52,7 @@ for that to apply.
 - no deletion, no force-push, no bypass
 - pull request required, **1 approval**, **review from a code owner**, approvals dismissed on a new push
 - status checks, **strict** (branch up to date with `main`): `Library Tests`, `Demo App`,
-  `Dependency review`, `CodeQL (swift)`, `CodeQL (actions)`
+  `Dependency review`, `CodeQL (swift)`, `CodeQL (python)`, `CodeQL (actions)`
 - code scanning: CodeQL, blocking on high or critical security alerts and on errors
 
 **`release tags` ruleset** on `refs/tags/v*`: creation, update and deletion restricted. Bypass:
