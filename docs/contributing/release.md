@@ -64,6 +64,36 @@ Two more guards keep unreviewed or untrusted output out of a release:
 Around them, repository settings (applied once by an admin, see [ci.md](ci.md#repository-settings)):
 the `main` ruleset and the `v*` tag ruleset.
 
+### Why two environments, `release-please` and `release`
+
+Both jobs that need `RELEASE_PLEASE_TOKEN` must run under different rules, and an environment holds
+only one set of rules (one reviewer list, one list of refs allowed to deploy):
+
+| | `release-please` | `release` |
+|---|---|---|
+| Job | `release-please.yml` | `release.yml` |
+| Runs | on every push to `main`, unattended | on a published release (`v*` tag) |
+| Approval | none: it only opens or updates the release PR, which is reviewed anyway | `@UpStreamPay/pci-dss`: it signs and publishes binaries |
+| Deploys from | `main` | `v*` tags |
+| Secrets | `RELEASE_PLEASE_TOKEN` | `RELEASE_PLEASE_TOKEN`, `APPLE_SIGNING_*` |
+
+Every way of collapsing them into one gives one of the jobs the wrong rules:
+
+- **One environment with reviewers** (`main` and `v*`): every merge to `main` waits for a pci-dss
+  approval before release-please can run. An approval per merge, for a job that publishes nothing,
+  trains reviewers to click through the one approval that matters.
+- **One environment without reviewers**: the release loses its approval gate (PCI-DSS 6.5.1).
+- **No environment for release-please, token as a repository secret**: a workflow pushed on any
+  branch can read a repository secret, and this one is an admin's token that bypasses the `release
+  tags` ruleset.
+
+A job also runs in exactly one environment, so `release.yml` cannot borrow the token from
+`release-please` — and it runs from a tag, which that environment's `main`-only policy rejects.
+
+The cost is **two copies of the same token**: rotate them together. A GitHub App (short-lived
+installation tokens, nothing to rotate) would remove the rotation but not the two environments; it
+needs an org admin to create.
+
 ## Versioning
 
 release-please owns the version in three places at once: the git tag,

@@ -66,7 +66,8 @@ every workflow run, and a workflow on any branch can ask for `contents: write`, 
 let anyone with write access move a release tag.
 
 **`release-please` environment**: no reviewers, deployments from `main` only. It holds a copy of
-`RELEASE_PLEASE_TOKEN`, so only `release-please.yml` running on `main` can read it.
+`RELEASE_PLEASE_TOKEN`, so only `release-please.yml` running on `main` can read it. Why this is a separate
+environment from `release`: [release.md](release.md#why-two-environments-release-please-and-release).
 
 **`release` environment**: required reviewers `@UpStreamPay/pci-dss`, self-review prevented,
 deployments only from `v*` tags. It holds the `APPLE_SIGNING_*` secrets and the other copy of
