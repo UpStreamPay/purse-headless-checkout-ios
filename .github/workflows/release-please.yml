@@ -1,21 +1,32 @@
 name: Release Please
 
+# Conventional commits on main decide the next semantic version. release-please keeps a release PR
+# open with the changelog; merging it (reviewed and gated like any other PR) creates the `v<version>`
+# tag and the GitHub release, and publishing that release triggers release.yml. Nothing is pushed
+# to main directly. See docs/contributing/release.md.
+
 on:
   push:
     branches: [main]
 
 permissions:
   contents: write
+  # Documented by the action as required. A token passed as an input is not scoped by this block,
+  # so a missing entry here stays invisible until the token changes.
+  issues: write
   pull-requests: write
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      # The PAT is load-bearing: the default GITHUB_TOKEN does not fire the downstream
-      # `release: published` event the packaging workflow will listen for (see SDK-12264).
-      - uses: googleapis/release-please-action@v4
+      # RELEASE_PLEASE_TOKEN is a fine-grained token scoped to this repository alone (Contents,
+      # Pull requests and Issues: read and write). It is not GITHUB_TOKEN because events raised by
+      # GITHUB_TOKEN start no workflow: CI must run on the release PR, and the published release
+      # must trigger release.yml. It replaces the org-wide admin PAT, as in Secure Fields.
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
-          token: ${{ secrets.USP_GITHUB_ADMIN_ACCES_TOKEN }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
