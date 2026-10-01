@@ -34,16 +34,18 @@ layout compiles for a consumer.
 
 | Secret | Where | Value |
 |---|---|---|
-| `RELEASE_PLEASE_TOKEN` | repository | Fine-grained PAT on this repository alone with **Contents**, **Pull requests** and **Issues: Read and Write**, so CI runs on the release PR and the published release triggers `release.yml` (events raised by `GITHUB_TOKEN` start no workflow). Its account must be a repository admin: the `v*` tag ruleset lets only admins create tags. It expires — put the rotation in a calendar. |
+| `RELEASE_PLEASE_TOKEN` | `release-please` **and** `release` environments (the same value in both; never a repository secret) | Fine-grained PAT on this repository alone with **Contents**, **Pull requests** and **Issues: Read and Write**, so CI runs on the release PR and the published release triggers `release.yml` (events raised by `GITHUB_TOKEN` start no workflow). Its account must be a repository admin: the `v*` tag ruleset lets only admins create or move a tag, and both release-please and `release.yml`'s retag write one. It expires — put the rotation in a calendar, and update both copies. |
 | `APPLE_SIGNING_CERT_P12_BASE64` | `release` environment | The Apple Distribution certificate **and its private key**, exported as `.p12`, base64-encoded — the same one as Secure Fields |
 | `APPLE_SIGNING_CERT_P12_PASSWORD` | `release` environment | The `.p12` export password |
 
-`release.yml` checks the two signing secrets inside the gated job and **fails** with their names
-when one is missing. Without that check, the v1.1.0 run died inside the certificate import and
+`release.yml` checks its three secrets inside the gated job and **fails** with their names when one
+is missing. Without that check, the v1.1.0 run died inside the certificate import and
 1.1.0 shipped with no XCFrameworks.
 
-`GITHUB_TOKEN` covers the rest: the tag move and the asset upload, under the job's
-`contents: write`.
+`GITHUB_TOKEN` covers the asset upload, under the job's `contents: write`. The tag move does not use
+it: `GITHUB_TOKEN` cannot bypass the `release tags` ruleset (see
+[ci.md](ci.md#repository-settings)). `RELEASE_PLEASE_TOKEN` is used for that one `git push` only and
+never given to checkout, so it is not in `.git/config` while third-party package code builds.
 
 ## Release approval
 

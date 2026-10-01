@@ -23,7 +23,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 60
     # Every release waits for a codeowner: the `release` environment requires a review from
-    # @UpStreamPay/pci-dss and holds the signing secrets.
+    # @UpStreamPay/pci-dss and holds the signing secrets and the release token.
     environment: release
 
     steps:
@@ -41,12 +41,14 @@ jobs:
 
       # The v1.1.0 run died inside the certificate import on "At least one of p12-filepath or
       # p12-file-base64 must be provided". Say what is missing instead.
-      - name: Check the signing secrets
+      - name: Check the release secrets
         env:
           P12: ${{ secrets.APPLE_SIGNING_CERT_P12_BASE64 }}
           P12_PASSWORD: ${{ secrets.APPLE_SIGNING_CERT_P12_PASSWORD }}
+          RELEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         run: |
           missing=""
+          [ -n "$RELEASE_TOKEN" ] || missing="$missing RELEASE_PLEASE_TOKEN"
           [ -n "$P12" ] || missing="$missing APPLE_SIGNING_CERT_P12_BASE64"
           [ -n "$P12_PASSWORD" ] || missing="$missing APPLE_SIGNING_CERT_P12_PASSWORD"
           [ -z "$missing" ] || { echo "::error::Missing secrets:$missing — see docs/contributing/release.md."; exit 1; }
@@ -108,16 +110,24 @@ jobs:
           python3 scripts/binary-manifest.py url \
             "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG" $SPECS
 
+      # The `release tags` ruleset lets only repository admins create or move a v* tag, so the push
+      # goes out as RELEASE_PLEASE_TOKEN (an admin's token, readable only inside this approved job)
+      # and not as GITHUB_TOKEN: bypassing the GitHub Actions app instead would let any workflow on
+      # any branch move a tag. The token is used for this one command only, never handed to
+      # checkout, so it is not in .git/config while third-party package code builds.
       - name: Commit & retag
-        # Moving the tag onto the binary-manifest commit is the one tag write that is not
-        # release-please's: the `release tags` ruleset must let github-actions bypass it.
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Package.swift Sources/*Deps
           git commit -m "release: ${TAG} — binary targets"
           git tag -f "${TAG}"
-          git push origin "${TAG}" --force
+          # The empty extraheader drops checkout's GITHUB_TOKEN header, so the URL's token is used.
+          git -c http.https://github.com/.extraheader= \
+            push "https://x-access-token:${RELEASE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "refs/tags/${TAG}" --force
 
       - name: Upload XCFrameworks to release
         run: gh release upload "$TAG" xcframeworks/*.xcframework.zip --clobber

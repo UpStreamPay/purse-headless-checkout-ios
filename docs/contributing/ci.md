@@ -39,7 +39,9 @@ ruleset blocks a merge on a high or critical code scanning alert.
 - Untrusted text (a tag name, a branch name) reaches a script only through `env`, never through
   `${{ }}` interpolation into the script itself.
 - No organisation-wide token: release-please uses a fine-grained token scoped to this repository
-  (see [release.md](release.md#prerequisites-one-time-setup)).
+  (see [release.md](release.md#prerequisites-one-time-setup)), stored only as an **environment**
+  secret. A repository secret is readable by a workflow pushed on any branch; an environment secret
+  only by a job allowed to deploy to that environment.
 
 ## Repository settings
 
@@ -55,14 +57,21 @@ for that to apply.
   `Dependency review`, `CodeQL (swift)`, `CodeQL (python)`, `CodeQL (actions)`
 - code scanning: CodeQL, blocking on high or critical security alerts and on errors
 
-**`release tags` ruleset** on `refs/tags/v*`: creation, update and deletion restricted. Bypass:
-repository admins (release-please's token belongs to one, so it can create the tag) **and the
-GitHub Actions app** — `release.yml` force-moves the tag onto the binary-manifest commit with
-`GITHUB_TOKEN`, and without the bypass every release fails at *Commit & retag*.
+**`release tags` ruleset** on `refs/tags/v*`: creation, update and deletion restricted, bypass for
+the **repository admin** role only. SPM resolves a version from its tag, so moving one changes the
+code every merchant gets. Both legitimate tag writes go out as `RELEASE_PLEASE_TOKEN`, an admin's
+token: release-please creating the tag, and `release.yml` force-moving it onto the binary-manifest
+commit. The GitHub Actions app is deliberately **not** a bypass actor: `GITHUB_TOKEN` belongs to
+every workflow run, and a workflow on any branch can ask for `contents: write`, so that bypass would
+let anyone with write access move a release tag.
+
+**`release-please` environment**: no reviewers, deployments from `main` only. It holds a copy of
+`RELEASE_PLEASE_TOKEN`, so only `release-please.yml` running on `main` can read it.
 
 **`release` environment**: required reviewers `@UpStreamPay/pci-dss`, self-review prevented,
-deployments only from `v*` tags. It holds the `APPLE_SIGNING_*` secrets. It must exist **before**
-a workflow naming it runs, otherwise GitHub creates it with no protection.
+deployments only from `v*` tags. It holds the `APPLE_SIGNING_*` secrets and the other copy of
+`RELEASE_PLEASE_TOKEN`. It must exist **before** a workflow naming it runs, otherwise GitHub
+creates it with no protection — the same goes for `release-please`.
 
 **Code security**: code scanning (CodeQL, default setup off — see [Dependencies](#dependencies)),
 secret scanning and push protection on. On a private repository these need GitHub Advanced
