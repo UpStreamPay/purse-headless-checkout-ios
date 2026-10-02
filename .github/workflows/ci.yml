@@ -61,3 +61,17 @@ jobs:
               CODE_SIGNING_ALLOWED=NO \
               | grep --line-buffered -E "(error:|warning:|BUILD)"
           done
+
+  release-build:
+    name: Release build (macos-15)
+    # What release.yml builds, on the toolchain it builds with (macos-15, an older Xcode on purpose),
+    # unsigned. That compiler is not the one the jobs above use: v1.2.0 failed to release on a Swift
+    # 6.1 concurrency error that Xcode 26 accepts, and nothing had built with Xcode 16 before.
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build XCFrameworks
+        run: ./scripts/build-xcframeworks.sh
