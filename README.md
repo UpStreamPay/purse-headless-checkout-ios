@@ -41,7 +41,7 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | Theming (`PurseTheme`, mapped onto Secure Fields' own style) | ✅ |
 | `teardown()`/`isTornDown`, process-death state restoration, error-code coverage meta-test | ✅ |
 | Observability — batched event bus, monitoring collector, privacy-audited payloads | ✅ |
-| CI (build + test on PR), semantic versioning, release-please | ✅ (see `.github/workflows/`) |
+| CI (build + test on PR), semantic versioning, release-please, codeowner-approved releases | ✅ (see [`docs/contributing/`](docs/contributing/)) |
 | `PrivacyInfo.xcprivacy` (no required-reason APIs; data-type declaration pending a privacy sign-off) | ✅ |
 | `PurseHeadlessCheckout.host(for:)` — the concrete `PluginHost` every coordinator runs through | ✅ |
 | Payment elements — one `hasUI`/`isReady`/`submit()` shape per method, with a sealed `PaymentOutcome` | ✅ |

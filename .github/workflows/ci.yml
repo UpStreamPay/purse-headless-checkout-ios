@@ -2,6 +2,14 @@ name: CI
 
 on:
   pull_request:
+  # The merged result is what release-please tags; test it, not only the PR head.
+  push:
+    branches: [main]
+
+# Read-only is all the build needs. It also keeps a write-scoped GITHUB_TOKEN away from pull
+# requests, whatever the repository default is.
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -11,9 +19,10 @@ jobs:
   library-tests:
     name: Library Tests
     runs-on: macos-26
+    timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/ios-simulator
 
@@ -29,9 +38,10 @@ jobs:
   demo-app:
     name: Demo App
     runs-on: macos-26
+    timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/ios-simulator
 
