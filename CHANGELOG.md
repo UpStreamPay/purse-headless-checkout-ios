@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0](https://github.com/UpStreamPay/purse-headless-checkout-ios/compare/v1.1.0...v1.2.0) (2026-10-02)
+
+
+### Features
+
+* plugin events, amount updates, compatibility probe and API call timing ([#32](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/32)) ([260c3d3](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/260c3d3d374a7ddd4241a836c6da25a04cdfdf40))
+
+
+### Documentation
+
+* **contributing:** CI gates, release approval and the repository settings (SDK-12355) ([f6e18ab](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/f6e18abf3d22268f3f1c15cd2a0b15afe74e582f))
+* **contributing:** why release-please and release are two environments (SDK-12355) ([fc20ddf](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/fc20ddf5cb8c9cb240b3c993de916df27bb523a5))
+
 ## [1.1.0](https://github.com/UpStreamPay/purse-headless-checkout-ios/compare/v1.0.0...v1.1.0) (2026-09-23)
 
 
