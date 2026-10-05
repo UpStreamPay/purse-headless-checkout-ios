@@ -201,7 +201,15 @@ extension ApplePayCoordinator: PKPaymentAuthorizationControllerDelegate {
     }
 
     private func dismissAndResume() async {
-        await controller?.dismiss()
+        // The completion-handler form, as in `present()`, not `await controller?.dismiss()`: Xcode
+        // 16's PassKit imports that as a nonisolated async method, so awaiting it sends this
+        // main-actor controller off the actor — a Swift 6.1 error (the release toolchain, macos-15)
+        // that Xcode 26 accepts. v1.2.0 failed to release on exactly this.
+        if let controller {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                controller.dismiss { continuation.resume() }
+            }
+        }
         controller = nil
         if authorized {
             resume(.success(()))
