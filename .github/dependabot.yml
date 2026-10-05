@@ -1,16 +1,26 @@
 version: 2
-updates:
-  # Package.swift's dependencies (Secure Fields, PayPal, Klarna). A vendor SDK bump lands as a PR,
-  # so CI's library tests and both Demo configurations vet it before merge.
-  - package-ecosystem: swift
-    directory: /
+
+# One pull request a week for every dependency, as in the other three SDKs: Swift packages and
+# GitHub Actions share this group, so a single review (and a single run of the required checks)
+# covers them all. Security updates still open their own pull request as soon as an advisory lands.
+multi-ecosystem-groups:
+  dependencies:
     schedule:
       interval: weekly
+    labels:
+      - dependencies
+
+updates:
+  # Package.swift's dependencies (Secure Fields, PayPal, Klarna). A vendor SDK bump lands as a PR,
+  # so CI's library tests and both Demo configurations vet it before merge. Klarna cannot be
+  # resolved by Dependabot (its CDN answers 403, see docs/contributing/ci.md).
+  - package-ecosystem: swift
+    directory: /
+    multi-ecosystem-group: dependencies
+    patterns:
+      - "*"
     groups:
-      swift-dependencies:
-        patterns:
-          - "*"
-      # Groups only cover version updates by default; security updates need their own group.
+      # Security updates are not part of the weekly group; this keeps them in one PR too.
       swift-security:
         applies-to: security-updates
         patterns:
@@ -20,11 +30,8 @@ updates:
   # trailing version comment. The `ci` prefix keeps these bumps out of the changelog.
   - package-ecosystem: github-actions
     directory: /
-    schedule:
-      interval: weekly
+    multi-ecosystem-group: dependencies
+    patterns:
+      - "*"
     commit-message:
       prefix: "ci"
-    groups:
-      github-actions:
-        patterns:
-          - "*"
