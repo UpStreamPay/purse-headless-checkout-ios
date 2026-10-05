@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.1](https://github.com/UpStreamPay/purse-headless-checkout-ios/compare/v1.2.0...v1.2.1) (2026-10-05)
+
+
+### Bug Fixes
+
+* **applepay:** dismiss the sheet without sending the controller off the main actor ([#35](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/35)) ([747f386](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/747f386135a04ee57a4ffdcdf54332e84e4d0d50))
+
+
+### Documentation
+
+* who can approve a release, the changelog issue, Klarna and Dependabot (SDK-12355) ([#36](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/36)) ([a14ac1c](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/a14ac1c433d4cf5931c4dca4b3033da7a34f0b07))
+
 ## [1.2.0](https://github.com/UpStreamPay/purse-headless-checkout-ios/compare/v1.1.0...v1.2.0) (2026-10-02)
 
 
