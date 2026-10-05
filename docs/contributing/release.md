@@ -54,6 +54,12 @@ never given to checkout, so it is not in `.git/config` while third-party package
 the reviewers. The person who started the run cannot approve it, and only `v*` tags may deploy to
 the environment (PCI-DSS 6.5.1).
 
+**The owner of `RELEASE_PLEASE_TOKEN` can never approve a release.** release-please publishes the
+GitHub release with that token, so GitHub counts its owner as the person who started every release
+run, and *Prevent self-review* excludes them. Another member of `@UpStreamPay/pci-dss` approves.
+Do not turn self-review prevention off to work around it. A GitHub App instead of a personal token
+would start releases as `<app>[bot]` and let every reviewer approve; it needs an org admin to create.
+
 Two more guards keep unreviewed or untrusted output out of a release:
 
 - **The workflow refuses a tag that is not on `main`.** Only code that went through a reviewed PR
@@ -107,6 +113,16 @@ on every monitoring event, so the tagged commit must report its own version.
 | `feat:` | minor: `1.2.3` → `1.3.0` |
 | `fix:`, `perf:` | patch: `1.2.3` → `1.2.4` |
 | `docs:`, `chore:`, `style:`, `test:`, `ci:`, `build:`, `refactor:` | none |
+
+### Known issue: the release PR lists the whole history (from 1.3.0)
+
+release-please finds the previous release by walking `main` back to the commit its tag points to.
+`release.yml` moves every tag onto its binary-manifest commit, which is never on `main`, so from the
+first tag it moved (v1.2.0) release-please no longer finds the previous release: it walks back to
+the first commit, lists the whole history in the changelog, and reopens a release PR on any push to
+`main`, because old `feat:` commits count again. v1.1.0 failed before its tag was moved, which is why
+the 1.2.0 changelog was still right. Purse Secure Fields iOS has the same issue. Until it is fixed,
+**check the changelog of every release PR**, and close it when `main` holds nothing new to ship.
 
 ## Local verification
 
