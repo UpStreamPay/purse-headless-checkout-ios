@@ -11,8 +11,8 @@ The release is driven from GitHub, exactly like
 | Step | Trigger | What happens |
 |---|---|---|
 | 1 | Push to `main` | `release-please.yml`: conventional commits decide the next version; a **release PR** carries the version and the changelog |
-| 2 | Release PR merged | release-please creates tag `v<version>` and publishes the GitHub release with the changelog |
-| 3 | Release published, after a codeowner approves | `release.yml`: builds and signs the XCFrameworks, rewrites `Package.swift` to binary targets, moves the tag onto that commit and attaches the zips |
+| 2 | Release PR merged | release-please creates tag `sdk-v<version>` on `main` and publishes the GitHub release with the changelog |
+| 3 | Release published, after a codeowner approves | `release.yml`: builds and signs the XCFrameworks, rewrites `Package.swift` to binary targets, creates the SPM tag `v<version>` on that commit and attaches the zips |
 
 Merging the release PR is all it takes to start a release; a codeowner then approves it before
 anything is built or signed. Pushes made only of non-releasable commits (`docs:`, `chore:`, …)
@@ -20,8 +20,8 @@ produce no release PR.
 
 ## What gets published
 
-One tag, resolved by SPM at `https://github.com/UpStreamPay/purse-headless-checkout-ios.git`. At
-that tag `Package.swift` points at three signed XCFrameworks attached to the GitHub release —
+One SPM tag, `v<version>`, resolved at `https://github.com/UpStreamPay/purse-headless-checkout-ios.git`
+(see [Two tags per version](#two-tags-per-version)). At that tag `Package.swift` points at three signed XCFrameworks attached to the GitHub release —
 `PurseHeadlessCheckout`, `PurseCheckoutApplePay`, `PurseCheckoutKlarna` — while
 `PurseCheckoutPayPal` stays a source target (see `scripts/binary-manifest.py`). Before anything is
 uploaded, the workflow checks every slice has a `.swiftinterface`, every plugin links the core
@@ -42,8 +42,8 @@ layout compiles for a consumer.
 is missing. Without that check, the v1.1.0 run died inside the certificate import and
 1.1.0 shipped with no XCFrameworks.
 
-`GITHUB_TOKEN` covers the asset upload, under the job's `contents: write`. The tag move does not use
-it: `GITHUB_TOKEN` cannot bypass the `release tags` ruleset (see
+`GITHUB_TOKEN` covers the asset upload, under the job's `contents: write`. Creating the SPM tag does
+not use it: `GITHUB_TOKEN` cannot bypass the `release tags` ruleset (see
 [ci.md](ci.md#repository-settings)). `RELEASE_PLEASE_TOKEN` is used for that one `git push` only and
 never given to checkout, so it is not in `.git/config` while third-party package code builds.
 
@@ -51,7 +51,7 @@ never given to checkout, so it is not in `.git/config` while third-party package
 
 `release.yml` runs in the **`release` environment**. Each run waits until a member of
 `@UpStreamPay/pci-dss` approves it under **Actions → the run → Review deployments**; GitHub emails
-the reviewers. The person who started the run cannot approve it, and only `v*` tags may deploy to
+the reviewers. The person who started the run cannot approve it, and only `sdk-v*` tags may deploy to
 the environment (PCI-DSS 6.5.1).
 
 **The owner of `RELEASE_PLEASE_TOKEN` can never approve a release.** release-please publishes the
@@ -78,9 +78,9 @@ only one set of rules (one reviewer list, one list of refs allowed to deploy):
 | | `release-please` | `release` |
 |---|---|---|
 | Job | `release-please.yml` | `release.yml` |
-| Runs | on every push to `main`, unattended | on a published release (`v*` tag) |
+| Runs | on every push to `main`, unattended | on a published release (`sdk-v*` tag) |
 | Approval | none: it only opens or updates the release PR, which is reviewed anyway | `@UpStreamPay/pci-dss`: it signs and publishes binaries |
-| Deploys from | `main` | `v*` tags |
+| Deploys from | `main` | `sdk-v*` tags |
 | Secrets | `RELEASE_PLEASE_TOKEN` | `RELEASE_PLEASE_TOKEN`, `APPLE_SIGNING_*` |
 
 Every way of collapsing them into one gives one of the jobs the wrong rules:
@@ -102,7 +102,7 @@ needs an org admin to create.
 
 ## Versioning
 
-release-please owns the version in three places at once: the git tag,
+release-please owns the version in three places at once: its `sdk-v` tag,
 `.release-please-manifest.json` and the `x-release-please-version` annotation in
 `Sources/PurseHeadlessCheckout/Core/SDKVersion.swift`. `SDKVersion.value` is the `version` field
 on every monitoring event, so the tagged commit must report its own version.
@@ -114,15 +114,22 @@ on every monitoring event, so the tagged commit must report its own version.
 | `fix:`, `perf:` | patch: `1.2.3` → `1.2.4` |
 | `docs:`, `chore:`, `style:`, `test:`, `ci:`, `build:`, `refactor:` | none |
 
-### Known issue: the release PR lists the whole history (from 1.3.0)
+### Two tags per version
 
-release-please finds the previous release by walking `main` back to the commit its tag points to.
-`release.yml` moves every tag onto its binary-manifest commit, which is never on `main`, so from the
-first tag it moved (v1.2.0) release-please no longer finds the previous release: it walks back to
-the first commit, lists the whole history in the changelog, and reopens a release PR on any push to
-`main`, because old `feat:` commits count again. v1.1.0 failed before its tag was moved, which is why
-the 1.2.0 changelog was still right. Purse Secure Fields iOS has the same issue. Until it is fixed,
-**check the changelog of every release PR**, and close it when `main` holds nothing new to ship.
+Every version has two tags, each with one job:
+
+| Tag | Created by | Points to | Read by |
+|---|---|---|---|
+| `sdk-v1.3.0` | release-please, when the release PR is merged | the release commit, **on `main`**; never moved | release-please, to find the previous release; the GitHub release (and its zips) hangs off it |
+| `v1.3.0` | `release.yml`, after approval | the binary-targets commit (`Package.swift` pointing at the signed zips), never on `main` | **SPM** — merchants resolve `1.3.0` from it |
+
+SPM only reads semver tags, so it ignores `sdk-v*`; release-please only reads its own `sdk-v*`
+tags, so it ignores `v*`. Until 1.2.1 a single `vX.Y.Z` tag did both jobs: `release.yml` moved it
+off `main` onto the binary commit, so release-please no longer found the previous release and the
+next release PR listed the whole history (#39, a "1.3.0" with nothing new, was closed for that
+reason). `bootstrap-sha` in `release-please-config.json` tells release-please where 1.2.1 is on
+`main`, since the old tags are not in its format; it is only used until the first `sdk-v*` release
+exists.
 
 ## Local verification
 
