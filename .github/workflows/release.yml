@@ -10,8 +10,11 @@ on:
 permissions:
   contents: write
 
-# Read by every step through the environment, never interpolated into a script: a tag name is text
-# anyone with write access chooses.
+# Two tags per version. release-please creates `sdk-vX.Y.Z` on the release commit on main and never
+# moves it — that is how it finds the previous release. This workflow then creates `vX.Y.Z` on the
+# binary-targets commit (Package.swift pointing at the signed zips), the only tag SPM sees. TAG (the
+# release's) is read by every step through the environment, never interpolated into a script: a tag
+# name is text anyone with write access chooses.
 env:
   TAG: ${{ github.event.release.tag_name }}
 
@@ -38,6 +41,14 @@ jobs:
         run: |
           git merge-base --is-ancestor "$TAG" origin/main \
             || { echo "::error::$TAG is not on main — only reviewed code is released."; exit 1; }
+
+      # The release tag must be release-please's own `sdk-vX.Y.Z`; VERSION (`vX.Y.Z`) is the SPM tag
+      # this run creates. Anything else — an old-style `vX.Y.Z` release, a typo — stops here.
+      - name: Read the version from the release tag
+        run: |
+          [[ "$TAG" =~ ^sdk-v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+            || { echo "::error::$TAG is not a release-please tag (sdk-vX.Y.Z)."; exit 1; }
+          echo "VERSION=${TAG#sdk-}" >> "$GITHUB_ENV"
 
       # The v1.1.0 run died inside the certificate import on "At least one of p12-filepath or
       # p12-file-base64 must be provided". Say what is missing instead.
@@ -110,24 +121,25 @@ jobs:
           python3 scripts/binary-manifest.py url \
             "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG" $SPECS
 
-      # The `release tags` ruleset lets only repository admins create or move a v* tag, so the push
-      # goes out as RELEASE_PLEASE_TOKEN (an admin's token, readable only inside this approved job)
-      # and not as GITHUB_TOKEN: bypassing the GitHub Actions app instead would let any workflow on
-      # any branch move a tag. The token is used for this one command only, never handed to
-      # checkout, so it is not in .git/config while third-party package code builds.
-      - name: Commit & retag
+      # The `release tags` ruleset lets only repository admins create a v* tag, so the push goes out
+      # as RELEASE_PLEASE_TOKEN (an admin's token, readable only inside this approved job) and not as
+      # GITHUB_TOKEN: bypassing the GitHub Actions app instead would let any workflow on any branch
+      # write a tag. The token is used for this one command only, never handed to checkout, so it is
+      # not in .git/config while third-party package code builds. The SPM tag is created, never
+      # moved: no --force, so a re-run that finds it already there fails instead of rewriting it.
+      - name: Commit & tag for SPM
         env:
           RELEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Package.swift Sources/*Deps
-          git commit -m "release: ${TAG} — binary targets"
-          git tag -f "${TAG}"
+          git commit -m "release: ${VERSION} — binary targets"
+          git tag "${VERSION}"
           # The empty extraheader drops checkout's GITHUB_TOKEN header, so the URL's token is used.
           git -c http.https://github.com/.extraheader= \
             push "https://x-access-token:${RELEASE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
-            "refs/tags/${TAG}" --force
+            "refs/tags/${VERSION}"
 
       - name: Upload XCFrameworks to release
         run: gh release upload "$TAG" xcframeworks/*.xcframework.zip --clobber
