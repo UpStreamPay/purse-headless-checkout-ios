@@ -56,10 +56,10 @@ jobs:
         env:
           P12: ${{ secrets.APPLE_SIGNING_CERT_P12_BASE64 }}
           P12_PASSWORD: ${{ secrets.APPLE_SIGNING_CERT_P12_PASSWORD }}
-          RELEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          RELEASE_TOKEN: ${{ secrets.TF_REPO_AUTOMATION_PAT }}
         run: |
           missing=""
-          [ -n "$RELEASE_TOKEN" ] || missing="$missing RELEASE_PLEASE_TOKEN"
+          [ -n "$RELEASE_TOKEN" ] || missing="$missing TF_REPO_AUTOMATION_PAT"
           [ -n "$P12" ] || missing="$missing APPLE_SIGNING_CERT_P12_BASE64"
           [ -n "$P12_PASSWORD" ] || missing="$missing APPLE_SIGNING_CERT_P12_PASSWORD"
           [ -z "$missing" ] || { echo "::error::Missing secrets:$missing — see docs/contributing/release.md."; exit 1; }
@@ -122,14 +122,14 @@ jobs:
             "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG" $SPECS
 
       # The `release tags` ruleset lets only repository admins create a v* tag, so the push goes out
-      # as RELEASE_PLEASE_TOKEN (an admin's token, readable only inside this approved job) and not as
+      # as TF_REPO_AUTOMATION_PAT (an admin's token, readable only inside this approved job) and not as
       # GITHUB_TOKEN: bypassing the GitHub Actions app instead would let any workflow on any branch
       # write a tag. The token is used for this one command only, never handed to checkout, so it is
       # not in .git/config while third-party package code builds. The SPM tag is created, never
       # moved: no --force, so a re-run that finds it already there fails instead of rewriting it.
       - name: Commit & tag for SPM
         env:
-          RELEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          RELEASE_TOKEN: ${{ secrets.TF_REPO_AUTOMATION_PAT }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
