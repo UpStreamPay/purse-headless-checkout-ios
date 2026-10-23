@@ -30,7 +30,8 @@ vulnerability. GitHub reads `Package.resolved` directly, so â€” unlike Android â
 submit first. Dependabot alerts come from the same graph.
 
 Dependabot (`.github/dependabot.yml`) proposes weekly updates of the Swift packages and of the
-pinned GitHub Actions. Its Swift job cannot resolve the Klarna package: Klarna's CDN
+pinned GitHub Actions, as two grouped pull requests (one per ecosystem); security updates are
+grouped per ecosystem too. Its Swift job cannot resolve the Klarna package: Klarna's CDN
 (`x.klarnacdn.net`) answers `403` to Dependabot when it downloads the binary targets, while CI
 downloads them fine. Watch Klarna releases by hand until that changes.
 
