@@ -133,10 +133,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
     // MARK: Creation
 
-    /// - Parameters: - widgetData: the base64 `widget.data` string from your backend's Client
-    /// Session response. - lockedEnvironment: overrides whatever `widgetData` declares. It locks the
-    /// tier's host, not the API version: the session's `api_url` is kept when it is `https` on that
-    /// host (an orchestration session's `…/payment/v2`), else the tier's `…/payment/v1` root is used.
+    /// `widgetData`: your backend's base64 `widget.data`. `lockedEnvironment` pins the tier's host
+    /// (a same-host `api_url` such as `…/payment/v2` is kept). The two `…APIRootOverride`s are test
+    /// seams, ignored unless development-signed or in the simulator.
     public convenience init(
         widgetData: String,
         lockedEnvironment: PurseEnvironment? = nil,
@@ -223,9 +222,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
         self.session = built
         self.meansOfPayment = built.meansOfPayment
         self.splitter = PursePaymentSplitter(orderAmount: built.amount)
+        // Test seams: a release-signed app always uses the tier's own hosts (AGENTS.md, no baseURL).
         self.wallet = WalletTokens(
             params: params,
-            walletAPIRoot: walletAPIRootOverride ?? environment.walletAPIRoot,
+            walletAPIRoot: (isDebugHost ? walletAPIRootOverride : nil) ?? environment.walletAPIRoot,
             urlSession: urlSession
         )
 
@@ -252,7 +252,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
         let monitoringClient = MonitoringAPIClient(
             apiKey: params.apiKey,
-            monitoringAPIRoot: monitoringAPIRootOverride ?? environment.monitoringAPIRoot,
+            monitoringAPIRoot: (isDebugHost ? monitoringAPIRootOverride : nil) ?? environment.monitoringAPIRoot,
             envWireValue: environment.wireValue,
             // The injected transport, like every other client here — otherwise tests and the Demo
             // POST real telemetry to the live host, unseen by any stub.
