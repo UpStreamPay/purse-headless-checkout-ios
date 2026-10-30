@@ -184,8 +184,11 @@ extension CardModule {
 @MainActor
 public final class CardFormView: UIStackView {
     private var cancellable: AnyCancellable?
+    /// For tests. Weak, so the form never extends the coordinator's life past its element's.
+    weak var coordinator: CardCoordinator?
 
     public init(coordinator: CardCoordinator) {
+        self.coordinator = coordinator
         let theme = coordinator.theme
         super.init(frame: .zero)
         axis = .vertical
@@ -198,12 +201,8 @@ public final class CardFormView: UIStackView {
             label.text = texts.label
             label.font = theme.label.font
             let message = UILabel()
-            // ponytail: one line that shrinks to fit, because `PaymentElementView` measures the form
-            // once and a message that wrapped later would be clipped. Wrap instead once the view
-            // re-measures on content change.
-            message.numberOfLines = 1
-            message.adjustsFontSizeToFitWidth = true
-            message.minimumScaleFactor = 0.6
+            // Wraps: `PaymentElementView` re-measures when the form grows.
+            message.numberOfLines = 0
             message.font = theme.helperText.font
             message.text = " "
             let column = UIStackView(arrangedSubviews: [label, CardModule.matchingPAN(view, theme: theme), message])
@@ -213,14 +212,19 @@ public final class CardFormView: UIStackView {
             rows.append((field, texts, label, message))
         }
 
-        cancellable = coordinator.$fieldStates.sink { states in
+        cancellable = coordinator.$fieldStates.sink { [weak self] states in
+            var textChanged = false
             for (field, texts, label, message) in rows {
                 let state = states[field] ?? CardFieldState()
                 let invalid = texts.error(for: state) != nil
                 label.textColor = (invalid ? theme.labelInvalid.color : theme.label.color) ?? .label
                 message.textColor = (invalid ? theme.helperTextInvalid.color : theme.helperText.color) ?? .secondaryLabel
-                message.text = texts.message(for: state) ?? " "
+                let text = texts.message(for: state) ?? " "
+                if message.text != text { message.text = text; textChanged = true }
             }
+            // A message that now wraps changes the form's height; `PaymentElementView`'s container
+            // only re-measures on its own layout pass.
+            if textChanged { self?.superview?.setNeedsLayout() }
         }
     }
 
