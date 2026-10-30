@@ -58,8 +58,9 @@ first release after 1.0.0, tags resolve to signed XCFrameworks, like Secure Fiel
 
 - Public enums are not frozen: an exhaustive `switch` over one (`PaymentOutcome`,
   `PaymentSessionStatus`, …) needs an `@unknown default`, so a new case can ship in a minor release.
-- `PurseEnvironment.test` and `.development` fall back to `.production` in a release-signed app
-  (App Store, enterprise); they work in the simulator and in development and ad-hoc builds.
+- `PurseEnvironment.test` and `.development` (or an `api_url` on their hosts) are refused with
+  `ENVIRONMENT_NOT_ALLOWED` unless the app is development-signed or runs in the simulator — ad-hoc,
+  TestFlight, App Store and enterprise builds included. Checked at creation and on `setSession`.
 
 ## Development
 

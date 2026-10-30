@@ -1,6 +1,6 @@
 // Web: packages/sdk/src/types.ts (`Target`) and the per-environment API roots
 // Same: same targets and roots.
-// Differs: a release build can lock the tier, keeping the session's `api_url` only on that tier's host (web keeps it on any host); `.test`/`.development` are refused at runtime in a release-signed app, as Secure Fields iOS does for its `.test` (Android headless not aligned yet).
+// Differs: a release build can lock the tier, keeping the session's `api_url` only on that tier's host (web keeps it on any host); `.test`/`.development` are refused at runtime in a release-signed app with ENVIRONMENT_NOT_ALLOWED (Secure Fields iOS falls back on its `.test` instead; Android aligns in SDK-12577).
 
 import Foundation
 
@@ -52,13 +52,17 @@ public enum PurseEnvironment: String, Sendable, CaseIterable {
         return apiURL
     }
 
-    /// The tier actually used: `.test` and `.development` are internal, and fall back to
-    /// `.production` unless the host app is a development build. Runtime, not `#if DEBUG`: a
-    /// binary release is compiled once, in Release, for every merchant.
-    static func resolve(_ requested: PurseEnvironment, isDebugHost: Bool) -> PurseEnvironment {
+    /// `requested`, unless `.test` / `.development` in a release-signed app: refused, not swapped
+    /// for production. Runtime, not `#if DEBUG`: one Release binary ships to every merchant.
+    static func resolve(_ requested: PurseEnvironment, isDebugHost: Bool) throws -> PurseEnvironment {
         guard requested == .test || requested == .development, !isDebugHost else { return requested }
-        NSLog("PurseHeadlessCheckout: PurseEnvironment.%@ is not allowed in a release-signed app — falling back to production", requested.rawValue)
-        return .production
+        throw PurseSessionError.environmentNotAllowed(requested)
+    }
+
+    /// The tier whose Payment API host `apiURL` names, if it names one.
+    static func of(apiURL: String) -> PurseEnvironment? {
+        guard let host = URLComponents(string: apiURL)?.host?.lowercased() else { return nil }
+        return allCases.first { URLComponents(string: $0.paymentAPIRoot)?.host == host }
     }
 
     /// The simulator, or a binary whose provisioning profile carries `get-task-allow` (Xcode-run,
