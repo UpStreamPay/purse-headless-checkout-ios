@@ -140,6 +140,18 @@ struct CardPluginTests {
         }
     }
 
+    /// Partner wording can quote the shopper; the message reaches monitoring, so it carries the state only.
+    @Test func aRefusedInitKeepsThePartnersWordingOutOfTheMessage() async throws {
+        stubInit(#"{"status":{"state":"ERROR","description":"card of JANE DOE refused"}}"#)
+        do {
+            _ = try await CardPlugin(partner: .other("cybersource")).preValidation(context(collected: [CardPlugin.Collected.token: "t"]))
+            Issue.record("expected a refused init")
+        } catch let error as PaymentAPIError {
+            #expect(error.message.contains("state=ERROR"))
+            #expect(!error.message.contains("JANE DOE"))
+        }
+    }
+
     @Test func anInitWithoutAStepIdIsFine() async throws {
         stubInit(#"{"status":{"state":"SUCCESS"}}"#)
         let payload = try await CardPlugin(partner: .purse).preValidation(

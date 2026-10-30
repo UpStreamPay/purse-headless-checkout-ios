@@ -93,10 +93,8 @@ enum PayPalRequestBuilder {
     static func ensureSucceeded(_ response: JSONValue) throws {
         let state = response["status"]?["state"]?.stringValue ?? ""
         guard state.isEmpty || state == "SUCCESS" else {
-            let description = response["status"]?["description"]?.stringValue ?? ""
             throw PaymentAPIError(
-                "paypal init not successful (state=\(state)) \(description)"
-                    .trimmingCharacters(in: .whitespaces),
+                "paypal init not successful (state=\(state))",
                 path: "/init"
             )
         }

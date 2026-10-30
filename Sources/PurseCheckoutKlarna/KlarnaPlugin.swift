@@ -81,10 +81,8 @@ enum KlarnaRequestBuilder {
     static func parseInitConfig(_ response: JSONValue) throws -> KlarnaConfig {
         let state = response["status"]?["state"]?.stringValue ?? ""
         guard state.isEmpty || state == "SUCCESS" else {
-            let description = response["status"]?["description"]?.stringValue ?? ""
             throw PaymentAPIError(
-                "klarna init not successful (state=\(state)) \(description)"
-                    .trimmingCharacters(in: .whitespaces),
+                "klarna init not successful (state=\(state))",
                 path: "/init"
             )
         }

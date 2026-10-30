@@ -98,10 +98,8 @@ public struct CardPlugin: PartnerUIPlugin {
     private func parseInit(_ response: JSONValue) throws -> Int? {
         let status = response["status"]
         if let state = status?["state"]?.stringValue, !state.isEmpty, state != "SUCCESS" {
-            let description = status?["description"]?.stringValue ?? ""
             throw PaymentAPIError(
-                "creditcard init not successful (state=\(state)) \(description)"
-                    .trimmingCharacters(in: .whitespaces),
+                "creditcard init not successful (state=\(state))",
                 path: "/init"
             )
         }
