@@ -16,6 +16,11 @@ public protocol PartnerUIPlugin: Sendable {
     /// The splitter moved.
     func onAmountUpdate(_ context: PartnerUIContext) async throws
 
+    /// `true` when what the native step prepared is bound to the amount — a wallet sheet's total, a
+    /// widget's `/init`. The checkout then rebuilds the item's element when the remaining amount
+    /// moves, which is how web's re-`/init` in `onAmountUpdate` reaches a coordinator.
+    var reloadsOnAmountUpdate: Bool { get }
+
     /// The payload this item contributes to `/validate`.
     func preValidation(_ context: PartnerUIContext) async throws -> ValidateItemPayload
 
@@ -33,6 +38,7 @@ public protocol PartnerUIPlugin: Sendable {
 public extension PartnerUIPlugin {
     func onSessionSet(_ context: PartnerUIContext) async throws {}
     func onAmountUpdate(_ context: PartnerUIContext) async throws {}
+    var reloadsOnAmountUpdate: Bool { false }
     func postValidation(_ result: ValidationResult, context: PartnerUIContext) async throws {}
     func destroyClient(_ context: PartnerUIContext) async throws {}
     func validateUI(_ context: PartnerUIContext) async throws -> Bool { true }

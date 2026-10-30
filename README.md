@@ -61,6 +61,12 @@ first release after 1.0.0, tags resolve to signed XCFrameworks, like Secure Fiel
 - `PurseEnvironment.test` and `.development` fall back to `.production` in a release-signed app
   (App Store, enterprise); they work in the simulator and in development and ad-hoc builds.
 
+## Rendering a payment element
+
+Key each `PaymentElementView`, and any element you cache, on `checkout.elementID(for: item)`.
+The checkout bumps it when `setSession` changes the item or the rest to pay moves under Apple Pay or
+Klarna; a view keyed on `item.id` alone keeps a stale element that can no longer be submitted.
+
 ## Development
 
 ```sh

@@ -29,6 +29,11 @@ struct KlarnaTests {
 
     // MARK: /init body
 
+    /// SDK-12554: the widget's client token is bound to the prepared amount.
+    @Test func theElementIsRebuiltWhenTheAmountMoves() {
+        #expect(KlarnaPlugin(partner: .klarna).reloadsOnAmountUpdate)
+    }
+
     @Test func initPayloadCarriesTheInstallmentsMethod() {
         let payload = KlarnaRequestBuilder.initPayload(amount: 42, partner: .klarna)
         #expect(payload["partner"]?.stringValue == "klarna")

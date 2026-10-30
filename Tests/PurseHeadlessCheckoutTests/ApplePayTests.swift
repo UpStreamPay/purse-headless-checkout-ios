@@ -13,6 +13,11 @@ struct ApplePayTests {
 
     /// The partner decides the envelope, and it comes from the session — which is why Apple Pay
     /// cannot be PSP-agnostic at the token level, and does not need to be.
+    /// SDK-12554: the sheet's total is bound to the prepared amount.
+    @Test func theElementIsRebuiltWhenTheAmountMoves() {
+        #expect(ApplePayPlugin(partner: .adyen).reloadsOnAmountUpdate)
+    }
+
     @Test func theVariantFollowsThePartner() {
         #expect(ApplePayVariant.of(.adyen) == .adyen)
         #expect(ApplePayVariant.of(.other("ingenico")) == .ingenico)

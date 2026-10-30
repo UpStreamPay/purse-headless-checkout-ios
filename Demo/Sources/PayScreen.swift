@@ -24,7 +24,7 @@ struct PayScreen: View {
                             DemoCard {
                                 PaymentElementView(controller.element(for: item))
                                     .frame(height: 52)
-                                    .id(item.id)
+                                    .id(controller.elementID(for: item))
                                 Text(controller.label(item)).font(.caption).foregroundStyle(.secondary)
                             }
                         }
@@ -142,7 +142,7 @@ private struct ElementBody: View {
                 Text(helper).font(.footnote).foregroundStyle(.secondary)
             }
             if element.hasUI {
-                PaymentElementView(element).id(item.id)
+                PaymentElementView(element).id(controller.elementID(for: item))
             } else {
                 Text(element.isReady ? "Ready — tap Pay to continue." : "Preparing…")
                     .font(.footnote)
