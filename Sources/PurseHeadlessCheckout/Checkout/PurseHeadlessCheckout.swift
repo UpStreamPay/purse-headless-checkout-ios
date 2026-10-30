@@ -370,6 +370,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
             sessionState = .ready
             throw PurseCheckoutError.itemNotFulfilled(itemId: itemId)
         }
+        // What the guards just approved is what is paid: a split change landing during an await
+        // below (a gift card removed mid-submit) must not reshape the `/validate` already under way.
+        let splits = splitter.splits
+        let collected = collectedByItem
+        let registrations = currentRegistrations()
 
         // Every selectable item is locked for the duration, then unlocked whatever happens.
         refresh()
@@ -379,19 +384,19 @@ public final class PurseHeadlessCheckout: ObservableObject {
         }
 
         await eventBus.post(.validationStarted, .info, monitoringPayload([
-            "session_id": .string(session.id), "nb_items": .number(String(splitter.splits.count))
+            "session_id": .string(session.id), "nb_items": .number(String(splits.count))
         ]))
 
         let validator = PaymentValidator(api: try api, registry: registry, configs: configs, eventBus: eventBus)
         let result: ValidationResult
         do {
             result = try await validator.execute(
-                splits: splitter.splits,
+                splits: splits,
                 session: session.source,
-                collectedByItem: collectedByItem,
+                collectedByItem: collected,
                 hooks: hooks,
                 skipOnBeforeValidate: skipOnBeforeValidate,
-                registrationByItem: currentRegistrations()
+                registrationByItem: registrations
             )
         } catch {
             // The session is only spent once /validate actually answered — but there are three
