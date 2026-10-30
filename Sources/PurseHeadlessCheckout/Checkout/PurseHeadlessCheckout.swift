@@ -1185,6 +1185,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
             }
             let context = pluginContext(for: source, api: client)
             return Task { [weak self] in
+                // Runs after `restore` applied its state: never probe (and `/init`) a spent session.
+                guard self?.sessionState == .ready else { return }
                 do {
                     try await plugin.ensureClientCompatibility(context)
                 } catch {
