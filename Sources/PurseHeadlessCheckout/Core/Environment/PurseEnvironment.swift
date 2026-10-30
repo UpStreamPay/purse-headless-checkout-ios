@@ -45,9 +45,9 @@ public enum PurseEnvironment: String, Sendable, CaseIterable {
         return .production
     }
 
-    /// The simulator, or a binary whose provisioning profile carries `get-task-allow` (Xcode-run,
-    /// development and ad-hoc builds). Ported from Secure Fields' `VaultEnvironment.isDebugHost`.
-    static var isDebugHost: Bool {
+    /// The simulator, or a development-signed binary (`get-task-allow`). Ad-hoc, TestFlight, App
+    /// Store and enterprise builds are not. Ported from Secure Fields' `VaultEnvironment.isDebugHost`.
+    static let isDebugHost: Bool = {
         #if targetEnvironment(simulator)
         return true
         #else
@@ -59,7 +59,7 @@ public enum PurseEnvironment: String, Sendable, CaseIterable {
         }
         return text.range(of: "<key>get-task-allow</key>\\s*<true/>", options: .regularExpression) != nil
         #endif
-    }
+    }()
 
     /// `nil` for a missing or unrecognized value — callers decide whether that is fatal.
     public static func fromWire(_ value: String?) -> PurseEnvironment? {

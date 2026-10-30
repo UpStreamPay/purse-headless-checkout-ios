@@ -15,6 +15,8 @@ public struct PaymentAPIClient: Sendable {
     /// Android's `ApiCallMonitor` listener, per client rather than process-wide: the event bus it
     /// feeds belongs to one checkout.
     var monitor: (@Sendable (CheckoutEventCode, EventLevel, JSONValue) -> Void)?
+    /// Whether a refusal carries its body on ``PaymentAPIError/responseBody``.
+    var exposesErrorBodies = PurseEnvironment.isDebugHost
 
     /// - Parameter apiRoot: ``PurseEnvironment/paymentAPIRoot``. A trailing slash is tolerated.
     public init(apiKey: String, apiRoot: String, entityId: String, sessionId: String, session: URLSession = .shared) {
@@ -160,13 +162,15 @@ public struct PaymentAPIClient: Sendable {
         // Web's FetchPaymentAPI treats status < 400 as success.
         if status >= 400 {
             // The body stays out of the message: it is partner wording that ends up in telemetry
-            // and merchant logs. Callers act on the parsed `error` code.
+            // and merchant logs. Callers act on the parsed `error` code; a development build also
+            // gets the body itself, to diagnose the refusal.
             let errorCode = parseErrorCode(data)
             throw PaymentAPIError(
                 "Payment API \(method) \(path) failed: HTTP \(status)" + (errorCode.map { " (\($0))" } ?? ""),
                 status: status,
                 errorCode: errorCode,
-                path: path
+                path: path,
+                responseBody: exposesErrorBodies ? String(decoding: data.prefix(4096), as: UTF8.self) : nil
             )
         }
 
