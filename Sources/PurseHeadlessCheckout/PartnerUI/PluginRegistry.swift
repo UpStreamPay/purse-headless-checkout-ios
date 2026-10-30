@@ -1,6 +1,6 @@
 // Web: packages/partner-ui/src/plugins/index.ts (`getPlugin`) + `partners/partner_plugins.ts`
-// Same: resolution order vault → template → integration_mode=redirection → (partner, method) → method.
-// Differs: registration is explicit — Swift has no `ServiceLoader`, so a merchant calls `install(_:)` for each partner product they link.
+// Same: resolution order vault → template → integration_mode=redirection → (partner, method); an unknown template falls through; an item nothing serves ends PARTNER_UI_FATAL_ERROR at engagement (the checkout's side).
+// Differs: registration is explicit — Swift has no `ServiceLoader`, so a merchant calls `install(_:)` for each partner product they link; a last per-method fallback (Apple Pay whatever the partner), which web lacks.
 
 import Foundation
 
@@ -88,8 +88,8 @@ public final class PluginRegistry {
         vaultPlugins[vendor] = builder
     }
 
-    /// Resolution order, identical to web and Android: vault → template → redirection → (partner,
-    /// method) → method.
+    /// Resolution order: vault → template → redirection → (partner, method) → method. Web's has no
+    /// method fallback; an unknown template falls through on all three.
     public func plugin(
         partner: Partner,
         method: PaymentMethod,

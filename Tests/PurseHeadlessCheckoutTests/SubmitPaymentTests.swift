@@ -334,6 +334,9 @@ struct SubmitPaymentTests {
             #expect(error.code == .methodNotImplemented)
             #expect(error.message.contains("purse-creditcard"))
         }
+        // Retired for the session, as on web, rather than left selectable.
+        #expect(checkout.paymentMethods.first?.disabled?.code == .partnerUIFatalError)
+        #expect(checkout.amountSplit.isEmpty)
     }
 
     // MARK: Session-spending correctness
