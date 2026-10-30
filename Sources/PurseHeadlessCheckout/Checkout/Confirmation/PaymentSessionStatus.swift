@@ -69,7 +69,7 @@ public enum PaymentSessionStatus: Sendable, Equatable {
     private static let moneyActions: Set<String> = ["AUTHORIZE", "CAPTURE"]
     private static let failedStates: Set<String> = ["ERROR", "FAILED"]
 
-    /// Classify a raw ``PurseHeadlessCheckout/sessionTransactions()`` response.
+    /// Classify a raw session transactions list, as your backend reads it.
     ///
     /// Keyed on *any* successful money operation rather than a row count: Payment API v2 lists an
     /// auto-captured payment as both an `AUTHORIZE` and a `CAPTURE`, where v1 sends one row.

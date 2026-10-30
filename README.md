@@ -45,7 +45,7 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | `PrivacyInfo.xcprivacy` (no required-reason APIs; data-type declaration pending a privacy sign-off) | ✅ |
 | `PurseHeadlessCheckout.host(for:)` — the concrete `PluginHost` every coordinator runs through | ✅ |
 | Payment elements — one `hasUI`/`isReady`/`submit()` shape per method, with a sealed `PaymentOutcome` | ✅ |
-| Confirmation — `sessionTransactions()`, `paymentStatus()`, `awaitPaymentOutcome()` over a typed `PaymentSessionStatus` | ✅ |
+| Confirmation — from the merchant's backend. `sessionTransactions()`, `paymentStatus()`, `awaitPaymentOutcome()` are deprecated: the session read answers 401 to the client key | ⚠️ |
 | Payment-method badges — `PurseAssets`, `iconURL(for:)`, `schemeAssets(for:)` (CDN URLs; you render them) | ✅ |
 | Demo app (`Demo/Demo.xcodeproj`) — a playground and a shopper-facing checkout, both over real sessions | ✅ (see below) |
 | Signed XCFrameworks on every release (core, Apple Pay, Klarna; PayPal plugin stays source) | ✅ (`.github/workflows/release.yml`) |

@@ -76,6 +76,7 @@ public struct PaymentAPIClient: Sendable {
     }
 
     /// Every transaction made so far against this session, each with its own `status`.
+    @available(*, deprecated, message: "GET session answers 401 to the client key: confirm the payment from your backend instead")
     public func getSession() async throws -> [JSONValue] {
         let body = try await execute("GET", path: "", body: nil)
         guard let array = body.arrayValue else {

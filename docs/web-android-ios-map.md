@@ -59,7 +59,7 @@ Web paths are under `usp-widget/packages/`. Android paths are under
 | wallet client + rename/delete/favorite/delete-all | `core/api/WalletApiClient.kt`, `checkout/wallet/WalletTokens.kt` | `Core/API/WalletAPIClient.swift`, `Checkout/Wallet/WalletTokens.swift` |
 | `LoanProduct`/`LoanSimulation`/`simulateLoan(s)` | `core/payment/LoanSimulation.kt`, `checkout/simulation/LoanSimulator.kt` | `Core/Payment/LoanSimulation.swift`, `getSimulation`/`getSimulationMulti` on `PaymentAPIClient`, `simulateLoan`/`simulateLoans` on `PurseHeadlessCheckout` |
 | `commons/PartnerUI/theming/*` | `partnerui/PurseTheme.kt`, `ThemeValues` | `PartnerUI/PurseTheme.swift` (`PurseTheme`, `CardFormTexts`) |
-| none — web lands on the merchant's success page | `checkout/confirmation/PaymentSessionStatus.kt`, `sessionTransactions()`/`paymentStatus()`/`awaitPaymentOutcome()` | `Checkout/Confirmation/PaymentSessionStatus.swift`, same three methods on `PurseHeadlessCheckout` |
+| none — web lands on the merchant's success page | `checkout/confirmation/PaymentSessionStatus.kt`, `sessionTransactions()`/`paymentStatus()`/`awaitPaymentOutcome()` | `Checkout/Confirmation/PaymentSessionStatus.swift`, same three methods on `PurseHeadlessCheckout` — deprecated: the read answers 401 to the client key (SDK-12559) |
 
 ## PartnerUI — landed
 
