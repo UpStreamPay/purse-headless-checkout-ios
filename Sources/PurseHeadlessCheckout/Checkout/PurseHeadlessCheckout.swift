@@ -581,7 +581,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
             refresh()
             return
         }
-        try selectPrimary(method, itemId: method.id)
+        try selectPrimary(itemId: method.id)
         postMonitoring(.methodSetPrimary, .info, monitoringPayload([
             "partner": .string(method.partner.wireValue), "method": .string(method.method.wireValue)
         ]))
@@ -590,7 +590,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// Pay with a saved card. When the token ``PaymentToken/requiresCVV``, the fulfilment gate is
     /// armed: the checkout is not fulfilled until the CVV form reports valid.
     public func setPrimaryToken(_ token: PaymentToken) throws {
-        try selectPrimary(token, itemId: token.id)
+        try selectPrimary(itemId: token.id)
         postMonitoring(.primaryTokenSetAsPrimary, .info, monitoringPayload([
             "partner": .string(token.partner.wireValue), "method": .string(token.method.wireValue)
         ]))
@@ -600,11 +600,22 @@ public final class PurseHeadlessCheckout: ObservableObject {
         }
     }
 
-    private func selectPrimary(_ source: any PrimarySource, itemId: String) throws {
-        if let disabled = currentItem(id: itemId)?.disabled {
+    /// Engages the live item, not the caller's copy: a host can outlive a `setSession` (SDK-12349).
+    private func selectPrimary(itemId: String) throws {
+        let current = currentItem(id: itemId)
+        let live: any PrimarySource
+        switch current {
+        case let .primaryMethod(method)?: live = method
+        case let .paymentToken(token)?: live = token
+        default:
+            throw PurseCheckoutError.methodDisabled(
+                itemId: itemId, disabled: .partnerUIFatalError(reason: "not in the current session")
+            )
+        }
+        if let disabled = current?.disabled {
             throw PurseCheckoutError.methodDisabled(itemId: itemId, disabled: disabled)
         }
-        splitter.setPrimary(source)
+        splitter.setPrimary(live)
         refresh()
     }
 
@@ -1042,6 +1053,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
             primaryReach: splitter.primaryReach,
             splitSources: splitter.splits.map(\.source)
         )
+        // Web's SDK-12349: a primary the rest to pay has put out of bounds stops being payable.
+        if let primaryId = splitter.primaryMethod?.id, currentItem(id: primaryId)?.disabled?.requiresUIClear == true {
+            splitter.setPrimary(nil)
+            postMonitoring(.clearPrimarySplit)
+        }
         reportDisabledTransitions(before: before, after: meansOfPayment)
         publishItems()
 
