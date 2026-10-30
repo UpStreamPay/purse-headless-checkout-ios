@@ -14,7 +14,7 @@ struct SimulationPreview: View {
             if let simulation {
                 let currency = controller.checkout?.currency ?? ""
                 // The API gives first / recurring / last and a count, not a list.
-                ForEach(0..<simulation.installmentCount, id: \.self) { index in
+                ForEach(0...simulation.installmentCount, id: \.self) { index in
                     HStack {
                         Text("Instalment \(index + 1)\(index == 0 ? " · today" : "")").font(.footnote)
                         Spacer()
@@ -66,7 +66,7 @@ struct SimulationPreview: View {
 
     private static func amount(at index: Int, of simulation: LoanSimulation) -> Decimal {
         if index == 0 { return simulation.initialInstallmentAmount }
-        if index == simulation.installmentCount - 1 { return simulation.finalInstallmentAmount }
+        if index == simulation.installmentCount { return simulation.finalInstallmentAmount }
         return simulation.installmentAmount
     }
 }

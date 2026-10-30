@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import PurseHeadlessCheckout
 
-/// BNPL loan simulation: the corrected `totalAmount` arithmetic, `/simulation` parsing, and the
+/// BNPL loan simulation: web's `totalAmount` arithmetic, `/simulation` parsing, and the
 /// `simulable`-label gate on `PurseHeadlessCheckout`.
 @MainActor
 @Suite(.serialized)
@@ -18,7 +18,7 @@ struct LoanSimulationTests {
         )
     }
 
-    // MARK: totalAmount arithmetic — Android's fix, not web's double-count
+    // MARK: totalAmount arithmetic — web's (n − 1)
 
     @Test func aSingleInstallmentTotalsJustTheInitial() {
         let result = JSONValue.object([
@@ -29,19 +29,27 @@ struct LoanSimulationTests {
         #expect(simulation.totalAmount == 100)
     }
 
-    /// `instalment_number` counts every instalment, so the total is
-    /// `initial + (count − 2) × recurring + final` — web's formula double-counts one.
-    @Test func multipleInstallmentsUseTheCorrectedTotal() {
+    /// The real SANDBOX `POST /simulation/{entity}/oney/cb3x` answer for a 480 € order (SDK-12553):
+    /// `instalment_number` counts the instalments after the first, so three payments read `2`.
+    @Test func oneyThreeTimesTotalsTheOrderPlusItsCost() {
         let result = JSONValue.object([
-            "initial_instalment_amount": .number("30"),
-            "instalment_amount": .number("20"),
-            "final_instalment_amount": .number("25"),
-            "instalment_number": .number("4")
+            "instalment_number": .number("2"),
+            "initial_instalment_amount": .number("167.63"),
+            "instalment_amount": .number("160.00"),
+            "final_instalment_amount": .number("160.00"),
+            "total_cost": .number("7.63")
         ])
         let simulation = LoanSimulation.fromPluginResult(result)
-        // 30 + (4-2)*20 + 25 = 95, not web's 30 + (4-1)*20 + 25 = 115.
-        #expect(simulation.totalAmount == 95)
-        #expect(simulation.installmentCount == 4)
+        #expect(simulation.totalAmount == Decimal(string: "487.63"))
+        #expect(simulation.totalAmount == 480 + simulation.totalCost)
+    }
+
+    @Test func aZeroCountNeverSubtractsAnInstallment() {
+        let result = JSONValue.object([
+            "initial_instalment_amount": .number("50"), "instalment_number": .number("0"),
+            "instalment_amount": .number("20"), "final_instalment_amount": .number("0")
+        ])
+        #expect(LoanSimulation.fromPluginResult(result).totalAmount == 50)
     }
 
     @Test func totalAmountRoundsHalfUpToTwoDecimals() {
