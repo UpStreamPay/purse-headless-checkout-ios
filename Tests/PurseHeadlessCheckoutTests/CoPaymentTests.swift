@@ -38,7 +38,7 @@ struct CoPaymentTests {
     ]
 
     /// Its own **session id** as well as its own host.
-    private func makeCheckout() throws -> PurseHeadlessCheckout {
+    private func makeCheckout(protocols: [String: Any] = protocols) throws -> PurseHeadlessCheckout {
         let registry = PluginRegistry()
         registry.install(StubModule())
         return try PurseHeadlessCheckout(
@@ -47,7 +47,7 @@ struct CoPaymentTests {
                 paymentSession: TestSessions.paymentSession(
                     id: "co-payment-session",
                     amount: 100,
-                    protocols: Self.protocols
+                    protocols: protocols
                 )
             ),
             registry: registry,
@@ -68,6 +68,34 @@ struct CoPaymentTests {
     """
 
     private let pan = "9250004781234567890"
+
+    /// SDK-12563: the method's save policy reaches the token, so a `PREFER` gift card can be kept.
+    @Test func aTokenizedGiftCardCarriesItsMethodsSavePolicy() async throws {
+        stub(initBody: Self.giftCardInit)
+        var protocols = Self.protocols
+        protocols["illicado"] = ["giftcard": ["configurations": [
+            "stable": true, "labels": ["secondary"], "settings": ["save_token_mode": "PREFER"],
+        ]]]
+        let checkout = try makeCheckout(protocols: protocols)
+
+        let giftMethod = try #require(checkout.secondaryMethods.first)
+        let token = try await checkout.getSecondaryToken(method: giftMethod, pan: pan, cvv: "123")
+
+        #expect(token.saveTokenMode == .prefer)
+        #expect(token.canBeRegistered)
+        try checkout.registerSecondary(token)
+    }
+
+    @Test func aGiftCardOnANeverSaveMethodStaysUnregisterable() async throws {
+        stub(initBody: Self.giftCardInit)
+        let checkout = try makeCheckout()
+
+        let giftMethod = try #require(checkout.secondaryMethods.first)
+        let token = try await checkout.getSecondaryToken(method: giftMethod, pan: pan, cvv: "123")
+
+        #expect(!token.canBeRegistered)
+        #expect(throws: PurseCheckoutError.self) { try checkout.registerSecondary(token) }
+    }
 
     @Test func aGiftCardAndACardSplitOneOrder() async throws {
         stub(initBody: Self.giftCardInit)
