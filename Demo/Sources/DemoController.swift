@@ -381,11 +381,21 @@ final class DemoController: ObservableObject {
         _ = element(for: item)
     }
 
+    /// The SDK's own element identity; it moves when the element must be rebuilt.
+    func elementID(for item: PaymentItem) -> String {
+        checkout?.elementID(for: item) ?? item.id
+    }
+
     /// Built once and kept, keyed on the item's generation — `setSession` bumps that for a method
     /// whose configuration changed.
     func element(for item: PaymentItem) -> PaymentElement {
-        let key = "\(item.id):\(checkout?.itemGenerations[item.id] ?? 0)"
+        let key = elementID(for: item)
         if let existing = elements[key] { return existing }
+        // A superseded generation's element (and its coordinator) is never shown again.
+        for stale in elements.keys where stale.hasPrefix("\(item.id):") {
+            elements[stale] = nil
+            listeners[stale] = nil
+        }
 
         let spy = ElementSpy(controller: self, item: item)
         let element = checkout!.paymentElement(

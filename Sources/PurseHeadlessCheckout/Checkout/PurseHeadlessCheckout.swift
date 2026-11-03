@@ -77,8 +77,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// The submittable set: each applied secondary's slice, plus the primary's remainder.
     @Published public private(set) var amountSplit: [PaymentSplit] = []
 
-    /// Bumped per item id when a `setSession` invalidates it, so UI keyed on
-    /// `(item.id, generation)` rebuilds exactly the elements whose configuration changed.
+    /// Bumped per item id when `setSession` changes its configuration, or when the rest to pay moves
+    /// under an amount-bound element (Apple Pay, Klarna). Key element views on ``elementID(for:)``.
     @Published public private(set) var itemGenerations: [String: Int] = [:]
 
     // MARK: Internal model
@@ -753,6 +753,12 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
     // MARK: Payment element
 
+    /// The identity to give `item`'s ``PaymentElementView`` (`.id(…)`) and to cache its element
+    /// under: it changes whenever the element must be rebuilt.
+    public func elementID(for item: PaymentItem) -> String {
+        "\(item.id):\(itemGenerations[item.id] ?? 0)"
+    }
+
     /// The ``PaymentElement`` for `item` — web's `getPaymentElement`, Android's
     /// `rememberPaymentElement`.
     public func paymentElement(
@@ -762,7 +768,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
         appReturnURL: URL? = nil
     ) -> PaymentElement {
         let wrapped = ElementListener(listener)
-        let key = "\(item.id):\(itemGenerations[item.id] ?? 0)"
+        let key = elementID(for: item)
 
         func failing(_ error: any PurseError) -> PaymentElement {
             PaymentElement(
@@ -829,7 +835,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
     /// The context a plugin sees for `item` right now, against `apiClient` — Android's
     /// `pluginContext`.
-    private func pluginContext(for item: any PrimarySource, api apiClient: PaymentAPIClient) -> PartnerUIContext {
+    /// With `generation`, events from a host built before the item was rebuilt are dropped.
+    private func pluginContext(
+        for item: any PrimarySource, api apiClient: PaymentAPIClient, generation: Int? = nil
+    ) -> PartnerUIContext {
         let registration = (item as? PrimaryMethod).map { registrationOf($0).registered } ?? false
         let token = (item as? PaymentToken).map {
             PayToken(
@@ -850,7 +859,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
             token: token,
             collected: collectedByItem[item.id] ?? [:],
             options: options,
-            dispatchEvent: { [weak self] event in self?.handlePluginEvent(event, from: item) }
+            dispatchEvent: { [weak self] event in
+                guard let self, generation.map({ $0 == self.itemGenerations[item.id] ?? 0 }) ?? true else { return }
+                self.handlePluginEvent(event, from: item)
+            }
         )
     }
 
@@ -874,25 +886,36 @@ public final class PurseHeadlessCheckout: ObservableObject {
         unowned let checkout: PurseHeadlessCheckout
         let item: any PrimarySource
         let apiClient: PaymentAPIClient
+        /// A host whose item was rebuilt since is stale: what its coordinator prepared is dropped.
+        let generation: Int
 
         init(checkout: PurseHeadlessCheckout, item: any PrimarySource, apiClient: PaymentAPIClient) {
             self.checkout = checkout
             self.item = item
             self.apiClient = apiClient
+            self.generation = checkout.itemGenerations[item.id] ?? 0
         }
+
+        private var isCurrent: Bool { (checkout.itemGenerations[item.id] ?? 0) == generation }
 
         var environment: PurseEnvironment { checkout.environment }
         var redirectionReturnURL: String? { checkout.session.source.redirection }
 
         func buildContext() -> PartnerUIContext {
-            checkout.pluginContext(for: item, api: apiClient)
+            checkout.pluginContext(for: item, api: apiClient, generation: generation)
         }
 
         func setCollected(_ data: [String: JSONValue]) {
+            guard isCurrent else { return }
             checkout.setCollected(item.id, data)
         }
 
         func setAsPrimary() throws {
+            guard isCurrent else {
+                throw PurseCheckoutError.methodDisabled(
+                    itemId: item.id, disabled: .partnerUIFatalError(reason: "superseded by a rebuilt element")
+                )
+            }
             switch item {
             case let method as PrimaryMethod:
                 try checkout.setPrimary(method)
@@ -904,6 +927,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
         }
 
         func setFulfilled(_ fulfilled: Bool) {
+            guard isCurrent else { return }
             checkout.setFulfilled(item.id, fulfilled)
         }
 
@@ -994,9 +1018,14 @@ public final class PurseHeadlessCheckout: ObservableObject {
         }
 
         collectedByItem.removeAll()
+        // What an amount-bound element prepared was an `/init` on the old session: unsubmittable
+        // until rebuilt, or `/validate` goes out without its step id.
+        let amountBound = trackedPlugins.filter { $0.value.plugin.reloadsOnAmountUpdate }.map(\.key)
+        for id in amountBound where fulfilledByItem[id] != nil { fulfilledByItem[id] = false }
         validationConsumed = false
         sessionState = .ready
         refresh()
+        amountBound.forEach(rebuildIfWithinBounds)
         resolveSavedSecondaryBalances()
         runEligibilityChecks()
         // The wallet session outlives any one payment session — reapply what it already knows onto
@@ -1064,12 +1093,13 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
         remainingAmountToPay = splitter.primaryReach
         amountSplit = splitter.splits
+        // First: an amount-bound item it rebuilds is unfulfilled until it prepares again.
+        notifyAmountUpdate()
         let fulfilled = splitter.fulfilled && unfulfilledItemId == nil
         if fulfilled != isPaymentFulfilled {
             postMonitoring(.paymentFulfilled, .info, monitoringPayload(["isFulfilled": .bool(fulfilled)]))
         }
         isPaymentFulfilled = fulfilled
-        notifyAmountUpdate()
     }
 
     /// Republish the item lists. On its own, without a recompute, when a state was just set —
@@ -1110,9 +1140,22 @@ public final class PurseHeadlessCheckout: ObservableObject {
         lastNotifiedRemaining = remaining
         guard !isFirst, !trackedPlugins.isEmpty, let client = try? api else { return }
         for (item, plugin) in trackedPlugins.values {
+            if plugin.reloadsOnAmountUpdate {
+                // Drop what was prepared for the old amount; unsubmittable until it prepares again.
+                collectedByItem[item.id] = nil
+                if fulfilledByItem[item.id] != nil { fulfilledByItem[item.id] = false }
+                rebuildIfWithinBounds(item.id)
+            }
             let context = pluginContext(for: item, api: client)
             Task { try? await plugin.onAmountUpdate(context) }
         }
+    }
+
+    /// Not while disabled (out of its amount bounds, say): that `/init` would fail, and the failure
+    /// is final. The amount move that re-enables it rebuilds it; a recoverable state is rebuilt.
+    private func rebuildIfWithinBounds(_ itemId: String) {
+        if let disabled = currentItem(id: itemId)?.disabled, !disabled.isRecoverable { return }
+        itemGenerations[itemId, default: 0] += 1
     }
 
     // MARK: Plugin events

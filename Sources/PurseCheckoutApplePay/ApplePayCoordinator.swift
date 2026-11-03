@@ -71,12 +71,17 @@ public final class ApplePayCoordinator: NSObject {
 
     /// Present the sheet and wait; on success the authorized token is stashed on the checkout.
     public func present() async throws {
-        guard let request, let preparedAmount else {
-            throw PartnerUIError("call prepare() before present() — the sheet has no configuration yet")
-        }
         // One at a time: a second call would overwrite the continuation and strand the first.
         guard pending == nil else {
             throw PartnerUIError("an Apple Pay sheet is already open")
+        }
+        // The checkout rebuilds this element when the amount moves; a stale one never opens a sheet
+        // for a total `/validate` will not carry.
+        if let preparedAmount, preparedAmount != host.buildContext().amount {
+            throw PartnerUIError("the amount changed since this Apple Pay element was prepared — rebuild it")
+        }
+        guard let request, let preparedAmount else {
+            throw PartnerUIError("call prepare() before present() — the sheet has no configuration yet")
         }
 
         let paymentRequest = PKPaymentRequest()

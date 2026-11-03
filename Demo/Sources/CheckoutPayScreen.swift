@@ -45,7 +45,7 @@ struct CheckoutPayScreen: View {
                             PaymentElementView(controller.element(for: item))
                                 .frame(height: 48)
                                 .clipShape(RoundedRectangle(cornerRadius: PurseDS.Radius.control))
-                                .id(item.id)
+                                .id(controller.elementID(for: item))
                         }
                     }
 
@@ -149,7 +149,7 @@ private struct ShopperElementBody: View {
                     .foregroundStyle(PurseDS.textSecondary)
             }
             if element.hasUI {
-                PaymentElementView(element).id(item.id)
+                PaymentElementView(element).id(controller.elementID(for: item))
             } else if !element.isReady {
                 HStack(spacing: PurseDS.Space.s) {
                     ProgressView().controlSize(.small)

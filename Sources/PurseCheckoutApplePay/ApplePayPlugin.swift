@@ -1,6 +1,6 @@
 // Web: packages/partner-ui/src/plugins/generics/applepay/index.ts
 // Same: /init for the sheet configuration; partner_data.session + payment_data.card into /validate.
-// Differs: no merchant-validation round trip (PassKit has no `onvalidatemerchant`).
+// Differs: no merchant-validation round trip (PassKit has no `onvalidatemerchant`); an amount update rebuilds the element (`reloadsOnAmountUpdate`) instead of re-arming a click handler.
 
 import Foundation
 import PassKit
@@ -27,6 +27,9 @@ public struct ApplePayPlugin: PartnerUIPlugin {
     public init(partner: Partner) {
         self.partner = partner
     }
+
+    /// The sheet's total comes from the `/init` made at `prepare()` — web re-inits on an amount update.
+    public var reloadsOnAmountUpdate: Bool { true }
 
     /// A device that cannot pay with Apple Pay at all never offers the method.
     public func ensureClientCompatibility(_ context: PartnerUIContext) async throws {
