@@ -132,8 +132,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
     // MARK: Creation
 
     /// - Parameters: - widgetData: the base64 `widget.data` string from your backend's Client
-    /// Session response. - lockedEnvironment: overrides whatever `widgetData` declares — including
-    /// its `api_url`: the tier's built-in root (`…/payment/v1`) is used instead.
+    /// Session response. - lockedEnvironment: overrides whatever `widgetData` declares. It locks the
+    /// tier's host, not the API version: the session's `api_url` is kept when it is `https` on that
+    /// host (an orchestration session's `…/payment/v2`), else the tier's `…/payment/v1` root is used.
     public convenience init(
         widgetData: String,
         lockedEnvironment: PurseEnvironment? = nil,
@@ -314,16 +315,16 @@ public final class PurseHeadlessCheckout: ObservableObject {
         }
     }
 
-    /// Where this session's Payment API calls go. A build-**locked** (release) environment trusts
-    /// its own known root and ignores whatever `api_url` the session declares — that is the whole
-    /// point of locking, and ``PurseEnvironment``'s own header says so.
+    /// Where this session's Payment API calls go. A build-**locked** (release) environment keeps
+    /// the session's `api_url` only on its own tier's host — the lock pins the host, not the API
+    /// version — see ``PurseEnvironment/lockedPaymentAPIRoot(_:)``.
     private static func resolveAPIRoot(
         _ params: PurseSessionParams,
         locked: Bool,
         environment: PurseEnvironment
     ) -> String {
-        guard !locked, let declared = params.apiURL.nonBlank else { return environment.paymentAPIRoot }
-        return declared
+        if locked { return environment.lockedPaymentAPIRoot(params.apiURL) }
+        return params.apiURL.nonBlank ?? environment.paymentAPIRoot
     }
 
     /// The Payment API client for the session in force. Every network path goes through here, so
@@ -382,7 +383,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
             "session_id": .string(session.id), "nb_items": .number(String(splitter.splits.count))
         ]))
 
-        let validator = PaymentValidator(api: try api, registry: registry, configs: configs, eventBus: eventBus)
+        let validator = PaymentValidator(api: try api, registry: registry, configs: configs, eventBus: eventBus, options: options)
         let result: ValidationResult
         do {
             result = try await validator.execute(
@@ -581,7 +582,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
             refresh()
             return
         }
-        try selectPrimary(method, itemId: method.id)
+        try selectPrimary(itemId: method.id)
         postMonitoring(.methodSetPrimary, .info, monitoringPayload([
             "partner": .string(method.partner.wireValue), "method": .string(method.method.wireValue)
         ]))
@@ -590,7 +591,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// Pay with a saved card. When the token ``PaymentToken/requiresCVV``, the fulfilment gate is
     /// armed: the checkout is not fulfilled until the CVV form reports valid.
     public func setPrimaryToken(_ token: PaymentToken) throws {
-        try selectPrimary(token, itemId: token.id)
+        try selectPrimary(itemId: token.id)
         postMonitoring(.primaryTokenSetAsPrimary, .info, monitoringPayload([
             "partner": .string(token.partner.wireValue), "method": .string(token.method.wireValue)
         ]))
@@ -600,11 +601,22 @@ public final class PurseHeadlessCheckout: ObservableObject {
         }
     }
 
-    private func selectPrimary(_ source: any PrimarySource, itemId: String) throws {
-        if let disabled = currentItem(id: itemId)?.disabled {
+    /// Engages the live item, not the caller's copy: a host can outlive a `setSession` (SDK-12349).
+    private func selectPrimary(itemId: String) throws {
+        let current = currentItem(id: itemId)
+        let live: any PrimarySource
+        switch current {
+        case let .primaryMethod(method)?: live = method
+        case let .paymentToken(token)?: live = token
+        default:
+            throw PurseCheckoutError.methodDisabled(
+                itemId: itemId, disabled: .partnerUIFatalError(reason: "not in the current session")
+            )
+        }
+        if let disabled = current?.disabled {
             throw PurseCheckoutError.methodDisabled(itemId: itemId, disabled: disabled)
         }
-        splitter.setPrimary(source)
+        splitter.setPrimary(live)
         refresh()
     }
 
@@ -1042,6 +1054,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
             primaryReach: splitter.primaryReach,
             splitSources: splitter.splits.map(\.source)
         )
+        // Web's SDK-12349: a primary the rest to pay has put out of bounds stops being payable.
+        if let primaryId = splitter.primaryMethod?.id, currentItem(id: primaryId)?.disabled?.requiresUIClear == true {
+            splitter.setPrimary(nil)
+            postMonitoring(.clearPrimarySplit)
+        }
         reportDisabledTransitions(before: before, after: meansOfPayment)
         publishItems()
 
