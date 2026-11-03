@@ -12,7 +12,7 @@ public enum PaymentOutcome {
     case completed(ValidationResult)
 
     /// The shopper came back from a redirect. **Not** an outcome: the final redirect is built
-    /// server-side and can land on a URL this client cannot read. Confirm against the session.
+    /// server-side and can land on a URL this client cannot read. Confirm from your backend.
     case returnedFromRedirect(url: URL?)
 
     case canceled

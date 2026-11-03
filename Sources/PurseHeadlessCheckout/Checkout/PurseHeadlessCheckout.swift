@@ -1558,10 +1558,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
     // MARK: Confirming the payment
 
-    /// Every transaction so far, raw. Prefer ``paymentStatus()`` unless you need untouched rows.
-    ///
-    /// Uses the **same** session id as `/init` and `/validate` — `payment_session.id`, not
-    /// `legacy_payment_session_id`, which belongs to a different service's key space.
+    /// Every transaction so far, raw, under `payment_session.id` (not `legacy_payment_session_id`).
+    /// Deprecated: the API answers 401 to the client key; confirm from your backend.
+    @available(*, deprecated, message: "GET session answers 401 to the client key: confirm the payment from your backend instead")
     public func sessionTransactions() async throws -> [JSONValue] {
         try await api.getSession()
     }
@@ -1569,7 +1568,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// What the session's transactions say about the payment, right now.
     ///
     /// This is the answer ``PaymentOutcome/returnedFromRedirect(url:)`` is not: a shopper returning
-    /// from a 3-D Secure or PSP page tells you they came back, nothing more. Ask the session.
+    /// from a 3-D Secure or PSP page tells you they came back, nothing more. Ask your backend.
+    @available(*, deprecated, message: "GET session answers 401 to the client key: confirm the payment from your backend instead")
     public func paymentStatus() async throws -> PaymentSessionStatus {
         PaymentSessionStatus.from(try await sessionTransactions())
     }
@@ -1581,6 +1581,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// arrives throws `CancellationError`, never the transport error underneath it, which would read
     /// as a network failure. A genuine transport or teardown failure still throws. Defaults match
     /// Android's 60 s / 3 s.
+    @available(*, deprecated, message: "GET session answers 401 to the client key: confirm the payment from your backend instead")
     public func awaitPaymentOutcome(
         timeout: Duration = .seconds(60),
         pollInterval: Duration = .seconds(3)

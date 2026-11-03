@@ -46,7 +46,7 @@ struct PaymentSessionStatusTests {
     }
 
     private func status() async throws -> PaymentSessionStatus {
-        try await makeCheckout().paymentStatus()
+        try await makeCheckout().sessionRead.paymentStatus()
     }
 
     // MARK: Classification
@@ -117,7 +117,7 @@ struct PaymentSessionStatusTests {
 
     @Test func sessionTransactionsReturnsTheRawRows() async throws {
         stub(row("AUTHORIZE", "SUCCESS"))
-        let rows = try await makeCheckout().sessionTransactions()
+        let rows = try await makeCheckout().sessionRead.sessionTransactions()
         #expect(rows.first?["status"]?["action"]?.stringValue == "AUTHORIZE")
     }
 
@@ -125,7 +125,7 @@ struct PaymentSessionStatusTests {
 
     @Test func awaitReturnsImmediatelyOnASettledStatus() async throws {
         stub(row("AUTHORIZE", "SUCCESS"))
-        let status = try await makeCheckout().awaitPaymentOutcome(
+        let status = try await makeCheckout().sessionRead.awaitPaymentOutcome(
             timeout: .seconds(5), pollInterval: .milliseconds(10)
         )
         #expect(status.verdict == "confirmed")
@@ -137,7 +137,7 @@ struct PaymentSessionStatusTests {
     /// just taken money needs something to show the shopper.
     @Test func awaitReturnsThePendingStatusAtTimeout() async throws {
         stub(row("AUTHORIZE", "WAITING"))
-        let status = try await makeCheckout().awaitPaymentOutcome(
+        let status = try await makeCheckout().sessionRead.awaitPaymentOutcome(
             timeout: .milliseconds(30), pollInterval: .milliseconds(10)
         )
         // Only the returned status is asserted. How many polls fit inside the timeout is the
@@ -154,7 +154,7 @@ struct PaymentSessionStatusTests {
         stub(row("AUTHORIZE", "WAITING"))
         let checkout = try makeCheckout()
         let task = Task {
-            try await checkout.awaitPaymentOutcome(timeout: .seconds(10), pollInterval: .seconds(1))
+            try await checkout.sessionRead.awaitPaymentOutcome(timeout: .seconds(10), pollInterval: .seconds(1))
         }
         task.cancel()
 
@@ -174,10 +174,10 @@ struct PaymentSessionStatusTests {
         let checkout = try makeCheckout()
         checkout.teardown()
 
-        await #expect(throws: PurseCheckoutError.self) { try await checkout.sessionTransactions() }
-        await #expect(throws: PurseCheckoutError.self) { try await checkout.paymentStatus() }
+        await #expect(throws: PurseCheckoutError.self) { try await checkout.sessionRead.sessionTransactions() }
+        await #expect(throws: PurseCheckoutError.self) { try await checkout.sessionRead.paymentStatus() }
         await #expect(throws: PurseCheckoutError.self) {
-            try await checkout.awaitPaymentOutcome(timeout: .milliseconds(10), pollInterval: .milliseconds(5))
+            try await checkout.sessionRead.awaitPaymentOutcome(timeout: .milliseconds(10), pollInterval: .milliseconds(5))
         }
     }
 }
@@ -191,4 +191,17 @@ private extension PaymentSessionStatus {
         case .pending: "pending"
         }
     }
+}
+
+/// The session read is deprecated (401 to the client key) but still shipped, so still tested.
+/// Calling through a protocol keeps the deprecation warnings out of the test build.
+@MainActor
+protocol SessionRead {
+    func sessionTransactions() async throws -> [JSONValue]
+    func paymentStatus() async throws -> PaymentSessionStatus
+    func awaitPaymentOutcome(timeout: Duration, pollInterval: Duration) async throws -> PaymentSessionStatus
+}
+
+extension PurseHeadlessCheckout: SessionRead {
+    var sessionRead: any SessionRead { self }
 }
