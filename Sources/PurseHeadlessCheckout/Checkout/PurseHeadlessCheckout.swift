@@ -132,8 +132,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
     // MARK: Creation
 
     /// - Parameters: - widgetData: the base64 `widget.data` string from your backend's Client
-    /// Session response. - lockedEnvironment: overrides whatever `widgetData` declares — including
-    /// its `api_url`: the tier's built-in root (`…/payment/v1`) is used instead.
+    /// Session response. - lockedEnvironment: overrides whatever `widgetData` declares. It locks the
+    /// tier's host, not the API version: the session's `api_url` is kept when it is `https` on that
+    /// host (an orchestration session's `…/payment/v2`), else the tier's `…/payment/v1` root is used.
     public convenience init(
         widgetData: String,
         lockedEnvironment: PurseEnvironment? = nil,
@@ -314,16 +315,16 @@ public final class PurseHeadlessCheckout: ObservableObject {
         }
     }
 
-    /// Where this session's Payment API calls go. A build-**locked** (release) environment trusts
-    /// its own known root and ignores whatever `api_url` the session declares — that is the whole
-    /// point of locking, and ``PurseEnvironment``'s own header says so.
+    /// Where this session's Payment API calls go. A build-**locked** (release) environment keeps
+    /// the session's `api_url` only on its own tier's host — the lock pins the host, not the API
+    /// version — see ``PurseEnvironment/lockedPaymentAPIRoot(_:)``.
     private static func resolveAPIRoot(
         _ params: PurseSessionParams,
         locked: Bool,
         environment: PurseEnvironment
     ) -> String {
-        guard !locked, let declared = params.apiURL.nonBlank else { return environment.paymentAPIRoot }
-        return declared
+        if locked { return environment.lockedPaymentAPIRoot(params.apiURL) }
+        return params.apiURL.nonBlank ?? environment.paymentAPIRoot
     }
 
     /// The Payment API client for the session in force. Every network path goes through here, so
