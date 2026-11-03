@@ -1,11 +1,12 @@
 // Web: packages/sdk/src/types.ts (`Target`) and the per-environment API roots
 // Same: same targets and roots.
-// Differs: a release build can lock the environment and ignore the session's `api_url`; `.test`/`.development` are refused at runtime in a release-signed app, as Secure Fields iOS does for its `.test` (Android headless not aligned yet).
+// Differs: a release build can lock the tier, keeping the session's `api_url` only on that tier's host (web keeps it on any host); `.test`/`.development` are refused at runtime in a release-signed app, as Secure Fields iOS does for its `.test` (Android headless not aligned yet).
 
 import Foundation
 
 /// Payment API environment tier. A release build should pass a locked ``PurseEnvironment`` when
-/// creating the checkout rather than trusting whatever a session declares.
+/// creating the checkout rather than trusting whatever a session declares. The lock pins the tier's
+/// host, not the API version: see ``lockedPaymentAPIRoot(_:)``.
 public enum PurseEnvironment: String, Sendable, CaseIterable {
     case development
     case test
@@ -35,6 +36,21 @@ public enum PurseEnvironment: String, Sendable, CaseIterable {
 
     /// Web's `WALLET_API_ROOTS`.
     public var walletAPIRoot: String { host + "/wallet/v2" }
+
+    /// The Payment API root a build locked to this tier uses for a session declaring `apiURL`: the
+    /// session's own root when it is `https` on this tier's host with no port or user info (an
+    /// orchestration session declares `…/payment/v2`), otherwise ``paymentAPIRoot``.
+    func lockedPaymentAPIRoot(_ apiURL: String) -> String {
+        guard let declared = URLComponents(string: apiURL),
+              declared.scheme?.lowercased() == "https",
+              declared.host?.lowercased() == URLComponents(string: paymentAPIRoot)?.host,
+              declared.port == nil,
+              declared.user == nil,
+              declared.password == nil else {
+            return paymentAPIRoot
+        }
+        return apiURL
+    }
 
     /// The tier actually used: `.test` and `.development` are internal, and fall back to
     /// `.production` unless the host app is a development build. Runtime, not `#if DEBUG`: a
