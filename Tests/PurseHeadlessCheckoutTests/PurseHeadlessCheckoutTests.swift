@@ -77,6 +77,26 @@ struct PurseHeadlessCheckoutTests {
         #expect(noURL.paymentAPIRoot == PurseEnvironment.sandbox.paymentAPIRoot)
     }
 
+    /// The lock pins the tier's host, not the API version: an orchestration session declares
+    /// `…/payment/v2` on the same host, and `/init` 404s on the tier's `…/payment/v1`.
+    @Test func aLockedEnvironmentKeepsTheSessionsApiURLOnItsOwnHostOnly() throws {
+        func lockedRoot(_ apiURL: String) throws -> String {
+            try PurseHeadlessCheckout(
+                widgetData: TestSessions.widgetData(apiURL: apiURL),
+                lockedEnvironment: .production
+            ).paymentAPIRoot
+        }
+        let tierRoot = PurseEnvironment.production.paymentAPIRoot
+
+        #expect(try lockedRoot("https://api.purse-live.com/payment/v2") == "https://api.purse-live.com/payment/v2")
+        #expect(try lockedRoot("https://api.purse-sandbox.com/payment/v2") == tierRoot)
+        #expect(try lockedRoot("http://api.purse-live.com/payment/v2") == tierRoot)
+        #expect(try lockedRoot("https://api.purse-live.com.evil.com/payment/v2") == tierRoot)
+        #expect(try lockedRoot("https://api.purse-live.com@evil.com/payment/v2") == tierRoot)
+        #expect(try lockedRoot("https://api.purse-live.com:8443/payment/v2") == tierRoot)
+        #expect(try lockedRoot("") == tierRoot)
+    }
+
     /// A release-signed app must not reach TEST through the session's `api_url` either — the
     /// environment gate alone would leave the Payment API calls on the TEST host.
     @Test func aReleaseBuildIgnoresATestSessionsApiURL() throws {
