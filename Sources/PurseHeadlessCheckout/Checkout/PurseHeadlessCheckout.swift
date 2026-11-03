@@ -383,7 +383,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
             "session_id": .string(session.id), "nb_items": .number(String(splitter.splits.count))
         ]))
 
-        let validator = PaymentValidator(api: try api, registry: registry, configs: configs, eventBus: eventBus)
+        let validator = PaymentValidator(api: try api, registry: registry, configs: configs, eventBus: eventBus, options: options)
         let result: ValidationResult
         do {
             result = try await validator.execute(
