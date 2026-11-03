@@ -1,6 +1,6 @@
 // Web: packages/headless-checkout `mapPluginResultToSimulation`
-// Same: field names; counts and amounts only (no per-instalment dates on web either).
-// Differs: `totalAmount` = initial + (n − 2) recurring + final. Web adds (n − 1) recurring, double-counting one instalment when `instalment_number` is the total; iOS takes Android's fix.
+// Same: field names; counts and amounts only (no per-instalment dates on web either); `totalAmount` = initial + (n − 1) recurring + final.
+// Differs: (n − 1) is floored at zero, where web would subtract one recurring instalment for n = 0; Android still uses (n − 2) until its twin ticket (SDK-12566).
 
 import Foundation
 
@@ -29,11 +29,11 @@ public struct LoanSimulation: Sendable, Equatable {
     public let finalInstallmentAmount: Decimal
     /// Each recurring instalment in between — `instalment_amount`.
     public let installmentAmount: Decimal
-    /// `instalment_number`.
+    /// `instalment_number`: the instalments **after** the first, so the schedule has `count + 1` lines.
     public let installmentCount: Int
     /// `total_cost` — excludes the financed amount.
     public let totalCost: Decimal
-    /// `initial + (count − 2) × installmentAmount + final`, rounded to two decimals.
+    /// `initial + (count − 1) × installmentAmount + final`, rounded to two decimals.
     public let totalAmount: Decimal
     /// `legal_text`.
     public let legalText: String?
@@ -73,8 +73,8 @@ public struct LoanSimulation: Sendable, Equatable {
         let recurring = result["instalment_amount"]?.asDecimal ?? 0
         let count = result["instalment_number"]?.intValue ?? 0
 
-        // `instalment_number` counts the initial and final instalments too.
-        let rawTotal: Decimal = count <= 1 ? initial : initial + recurring * Decimal(count - 2) + final
+        // `instalment_number` counts the instalments after the initial one, the final included.
+        let rawTotal = initial + recurring * Decimal(max(count - 1, 0)) + final
 
         return LoanSimulation(
             initialInstallmentAmount: initial,
