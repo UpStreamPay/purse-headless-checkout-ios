@@ -1,6 +1,7 @@
 import Foundation
 import PurseSecureFields
 import Testing
+import UIKit
 @testable import PurseHeadlessCheckout
 
 /// The card plugin's payload shapes. The form itself is exercised by the coordinator; this pins
@@ -345,9 +346,9 @@ struct CardPluginTests {
         }
     }
 
-    /// `PaymentElementView` measures the form once; an error appearing later must not need more
-    /// room, or SwiftUI clips it. The French holder-name error is the longest message.
-    @Test func anErrorAppearingDoesNotResizeTheForm() throws {
+    /// SDK-12564 #4b: a long message takes a second line instead of shrinking to 60 %. The French
+    /// holder-name error is the longest one.
+    @Test func anErrorAppearingWrapsAndGrowsTheForm() throws {
         let coordinator = CardCoordinator(
             host: RecordingHost(context: try context()), tenantId: "tenant-1", supportedBrands: [.visa],
             options: PluginOptions(locale: "fr-FR")
@@ -362,6 +363,38 @@ struct CardPluginTests {
         let before = height()
         (coordinator as any SecureFieldsDelegate).secureFieldsFocusChanged(field: .holderName, isFocused: false)
         #expect(coordinator.errorMessage(for: .holderName) == "Entrez le nom du titulaire comme il apparaît sur la carte.")
-        #expect(height() == before)
+        #expect(height() > before)
+    }
+
+    /// SDK-12564 #14: a host can default a missing state the way the SDK does.
+    @Test func aFieldStateCanBeBuiltFromOutside() {
+        let state = CardFieldState()
+        #expect(!state.isValid && !state.isFocused && !state.hasContent && !state.wasBlurred)
+    }
+
+    /// SDK-12564 #16: one field is erased, the others keep their text.
+    @Test func clearFieldErasesOnlyThatField() throws {
+        let coordinator = try coordinator()
+        func textField(_ field: CardField) throws -> UITextField {
+            let index = try #require(coordinator.fields.firstIndex(of: field))
+            return try #require(Self.firstTextField(in: coordinator.fieldViews[index]))
+        }
+        for field in [CardField.holderName, .expDate] {
+            let input = try textField(field)
+            input.text = field == .holderName ? "JANE DOE" : "12/30"
+        }
+        // What typing fires; `sendActions` delivers nothing without an app to route through.
+        (coordinator as any SecureFieldsDelegate).secureFieldsContentChanged()
+        #expect(coordinator.fieldStates[.holderName]?.hasContent == true)
+
+        coordinator.clearField(.holderName)
+
+        #expect(coordinator.fieldStates[.holderName]?.hasContent == false)
+        #expect(coordinator.fieldStates[.expDate]?.hasContent == true)
+    }
+
+    private static func firstTextField(in view: UIView) -> UITextField? {
+        if let field = view as? UITextField { return field }
+        return view.subviews.lazy.compactMap(firstTextField).first
     }
 }

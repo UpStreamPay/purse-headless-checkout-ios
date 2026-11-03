@@ -30,6 +30,14 @@ public struct CardFieldState: Sendable, Equatable {
     public var isFocused = false
     public var hasContent = false
     public var wasBlurred = false
+
+    /// All `false` by default: a field nothing has happened to yet.
+    public init(isValid: Bool = false, isFocused: Bool = false, hasContent: Bool = false, wasBlurred: Bool = false) {
+        self.isValid = isValid
+        self.isFocused = isFocused
+        self.hasContent = hasContent
+        self.wasBlurred = wasBlurred
+    }
 }
 
 /// Drives the Secure Fields card form for one payment item. Mount a ``CardFormView`` (or the
@@ -206,6 +214,11 @@ public final class CardCoordinator: NSObject, ObservableObject, SecureFieldsDele
     public func selectBrand(_ brand: CardBrand) {
         guard let brand = brand.secureFieldsBrand else { return }
         manager?.selectBrand(brand)
+    }
+
+    /// Erase one field as deleting its text would, leaving the others. Its `wasBlurred` stays set.
+    public func clearField(_ field: CardField) {
+        manager?.clearField(field.secureField)
     }
 
     /// Stash the vault token for `/validate` and re-arm the fulfilment gate.

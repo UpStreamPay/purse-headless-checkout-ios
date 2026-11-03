@@ -1,4 +1,5 @@
 import Foundation
+import PurseSecureFields
 import SwiftUI
 import Testing
 @testable import PurseHeadlessCheckout
@@ -96,6 +97,58 @@ struct PaymentElementTests {
     private static let success = #"{"global_status":"SUCCESS","results":[]}"#
     private static let withRedirect =
         #"{"global_status":"WAITING","results":[],"redirection":{"url":"https://acs.bank.example/3ds"}}"#
+
+    // MARK: Hosting
+
+    /// SDK-12564 #4b: an error wrapping to a second line after mounting grows the SwiftUI frame
+    /// instead of being clipped to the height measured at mount.
+    @Test func theHostedFormGrowsWhenAnErrorWraps() async throws {
+        let checkout = try PurseHeadlessCheckout(
+            widgetData: TestSessions.widgetData(
+                apiURL: "https://\(Self.host)/payment/v1",
+                paymentSession: TestSessions.paymentSession(id: "payment-element-hosting", amount: 100)
+            ),
+            registry: PluginRegistry(),
+            urlSession: StubURLProtocol.session()
+        )
+        let element = checkout.paymentElement(for: try cardItem(checkout), listener: Spy())
+        // A scroll view proposes no height, so the form's own measurement decides.
+        let controller = UIHostingController(rootView: ScrollView {
+            PaymentElementView(element)
+        })
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 160, height: 2000))
+        window.rootViewController = controller
+        window.isHidden = false
+        defer { window.isHidden = true }
+
+        func settle() async {
+            for _ in 0..<5 {
+                controller.view.setNeedsLayout()
+                controller.view.layoutIfNeeded()
+                try? await Task.sleep(for: .milliseconds(20))
+            }
+        }
+        await settle()
+        let form = try #require(Self.first(CardFormView.self, in: controller.view))
+        let container = try #require(form.superview)
+        let before = container.frame.height
+        #expect(before > 0)
+
+        let holder = try #require(form.arrangedSubviews.last as? UIStackView)
+        let message = try #require(holder.arrangedSubviews.last as? UILabel)
+        // The holder-name error, through the coordinator as a blur would raise it.
+        (try #require(form.coordinator) as any SecureFieldsDelegate).secureFieldsFocusChanged(field: .holderName, isFocused: false)
+        #expect(message.text?.isEmpty == false && message.text != " ")
+        await settle()
+
+        #expect(container.frame.height > before)
+        #expect(message.frame.height >= message.intrinsicContentSize.height - 0.5)
+    }
+
+    private static func first<T: UIView>(_ type: T.Type, in view: UIView) -> T? {
+        if let match = view as? T { return match }
+        return view.subviews.lazy.compactMap { first(type, in: $0) }.first
+    }
 
     // MARK: Resolution
 
