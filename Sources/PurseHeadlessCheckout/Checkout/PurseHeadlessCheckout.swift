@@ -410,6 +410,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
                 validationConsumed = true
                 sessionState = .submitted
 
+            case let PurseCheckoutError.noPluginRegistered(itemId):
+                sessionState = .ready
+                deactivateUnserved(itemId)
+
             case _ where Self.isSessionTerminal(error):
                 // Already submitted / expired / gone: every further call against this session is
                 // pointless, so say so rather than leaving it looking submittable.
@@ -802,9 +806,12 @@ public final class PurseHeadlessCheckout: ObservableObject {
             return failing(error.asPurseError())
         }
 
-        guard let plugin = registry.plugin(partner: item.partner, method: item.method, session: session.source),
-              let module = registry.module(rendering: plugin)
-        else {
+        guard let plugin = registry.plugin(partner: item.partner, method: item.method, session: session.source) else {
+            // Deferred: this runs inside a SwiftUI body, which must not publish synchronously.
+            Task { @MainActor [weak self] in self?.deactivateUnserved(item.id) }
+            return failing(PurseCheckoutError.noPluginRegistered(itemId: item.id))
+        }
+        guard let module = registry.module(rendering: plugin) else {
             return failing(PurseCheckoutError.noPluginRegistered(itemId: item.id))
         }
 
@@ -1193,6 +1200,12 @@ public final class PurseHeadlessCheckout: ObservableObject {
     }
 
     static let maxReasonLength = 200
+
+    /// Web's answer to an item no plugin serves (an unknown template, an unlinked product): fatal
+    /// at engagement, out of the split and refused for the rest of the session.
+    private func deactivateUnserved(_ itemId: String) {
+        deactivate(itemId, .partnerUIFatalError(reason: "no plugin serves this method"))
+    }
 
     /// Web's `fatalError` → `clearSplit` + `deactivateMop`.
     private func deactivate(_ itemId: String, _ state: DisabledState) {

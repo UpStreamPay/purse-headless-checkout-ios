@@ -212,6 +212,36 @@ struct PaymentElementTests {
         #expect(error.code == .methodNotImplemented)
     }
 
+    /// SDK-12560, QA's case: axepta wero with `template: 'axepta_wero'`, which nothing serves. As on
+    /// web it is retired at engagement: fatal code, out of the split, refused for the session.
+    @Test func aMethodNothingServesIsRetiredWhenEngaged() async throws {
+        stubValidate(Self.success)
+        let protocols: [String: Any] = ["axepta": ["wero": ["configurations": [
+            "stable": true, "labels": [], "template": "axepta_wero", "settings": [:],
+        ]]]]
+        let checkout = try PurseHeadlessCheckout(
+            widgetData: TestSessions.widgetData(
+                apiURL: "https://\(Self.host)/payment/v1",
+                paymentSession: TestSessions.paymentSession(id: "unserved-template", amount: 100, protocols: protocols)
+            ),
+            registry: PluginRegistry(),
+            urlSession: StubURLProtocol.session()
+        )
+        let wero = try #require(checkout.paymentMethods.first { $0.id == "axepta-wero" })
+        guard case let .primaryMethod(method) = wero else {
+            Issue.record("wero is not a primary method")
+            return
+        }
+        try checkout.setPrimary(method)
+
+        _ = checkout.paymentElement(for: wero, listener: Spy())
+        await Task.yield()
+
+        #expect(checkout.paymentMethods.first { $0.id == "axepta-wero" }?.disabled?.code == .partnerUIFatalError)
+        #expect(checkout.amountSplit.isEmpty)
+        #expect(throws: PurseCheckoutError.self) { try checkout.setPrimary(method) }
+    }
+
     // MARK: The flow
 
     @Test func aHeadlessElementCompletesWithTheAPIVerdict() async throws {
