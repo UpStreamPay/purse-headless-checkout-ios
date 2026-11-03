@@ -53,7 +53,8 @@ struct CardPluginTests {
         #expect(payload.paymentData["vault_vendor"]?.stringValue == "purse")
         #expect(payload.paymentData["card"]?["bin"]?.stringValue == "411111")
         #expect(payload.paymentData["card"]?["selected_network"]?.stringValue == "VISA")
-        #expect(payload.stepId == 7)
+        #expect(payload.stepId == nil)
+        #expect(payload.partnerData["browser"]?["user_agent"]?.stringValue == "MOBILE")
     }
 
     @Test func freshCardWithoutATokenIsRefused() async throws {
@@ -127,14 +128,55 @@ struct CardPluginTests {
         #expect(try await !plugin.validateUI(context(token: PayToken(value: "t", requiresCVV: true))))
     }
 
-    // MARK: /init
+    // MARK: /init — skipped, as web's `skipInit`, except for cybersource
+
+    private func initCalled() -> Bool {
+        StubURLProtocol.paths(host: Self.host).contains { $0.hasSuffix("/init") }
+    }
+
+    /// SDK-12557: worldpay refuses this `/init` ("Session data doesn't meet the partner's
+    /// requirements"), and web stopped sending it.
+    @Test func aVaultCardGoesStraightToValidate() async throws {
+        stubInit()
+        let payload = try await CardPlugin(partner: .other("worldpay")).preValidation(
+            context(collected: [CardPlugin.Collected.token: "t"])
+        )
+        #expect(!initCalled())
+        #expect(payload.stepId == nil)
+        #expect(payload.toJSON()["step_id"] == nil)
+    }
+
+    /// SDK-12556: dalenys refuses a token payment and 3-D Secure never challenges without it.
+    @Test func aSavedCardCarriesBrowserDataWithoutAnInit() async throws {
+        stubInit()
+        let payload = try await CardPlugin(partner: .other("dalenys")).preValidation(
+            context(token: PayToken(value: "saved", requiresCVV: false))
+        )
+        #expect(!initCalled())
+        let browser = try #require(payload.toJSON()["partner_data"]?["browser"])
+        #expect(browser["accept_header"]?.stringValue == "text/html")
+        #expect(browser["screen_width"] != nil)
+    }
+
+    /// Web's `vaultExtras.cybersource.skipInit: false`: its `/3ds/init` fails without one.
+    @Test func cybersourceStillInitsWithBrowserData() async throws {
+        stubInit()
+        let payload = try await CardPlugin(partner: .other("cybersource")).preValidation(
+            context(collected: [CardPlugin.Collected.token: "t"])
+        )
+        #expect(initCalled())
+        #expect(payload.stepId == 7)
+        let initBody = try #require(StubURLProtocol.body(for: "/init", host: Self.host)?.object)
+        #expect(initBody["partner_data"]?["browser"] != nil)
+        #expect(payload.partnerData["browser"] != nil)
+    }
 
     /// A refused init must not be mistaken for a usable step id.
     @Test func aRefusedInitThrows() async throws {
         stubInit(#"{"status":{"state":"FAILED","description":"nope"}}"#)
 
         await #expect(throws: PaymentAPIError.self) {
-            _ = try await CardPlugin(partner: .purse).preValidation(
+            _ = try await CardPlugin(partner: .other("cybersource")).preValidation(
                 try context(collected: [CardPlugin.Collected.token: "t"])
             )
         }
@@ -142,7 +184,7 @@ struct CardPluginTests {
 
     @Test func anInitWithoutAStepIdIsFine() async throws {
         stubInit(#"{"status":{"state":"SUCCESS"}}"#)
-        let payload = try await CardPlugin(partner: .purse).preValidation(
+        let payload = try await CardPlugin(partner: .other("cybersource")).preValidation(
             context(collected: [CardPlugin.Collected.token: "t"])
         )
         #expect(payload.stepId == nil)

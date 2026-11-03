@@ -1,6 +1,6 @@
 // Web: packages/partner-ui/src/plugins/vaults/purse/creditcard + generics/hostedfields
-// Same: token from the vault into /validate; saved token + CVV-only token side by side.
-// Differs: /init runs inside `preValidation`, not at `onSessionSet` (nothing about rendering depends on it — Secure Fields tokenizes independently).
+// Same: token from the vault into /validate with `partner_data.browser`; saved token + CVV-only token side by side; no /init (`skipInit`) except for cybersource (`vaultExtras.skipInit: false`).
+// Differs: cybersource's /init runs inside `preValidation`, not at `onSessionSet` (nothing about rendering depends on it — Secure Fields tokenizes independently); a skipped /init omits `step_id` where web sends `null`, as Android does.
 
 import Combine
 import Foundation
@@ -20,6 +20,10 @@ public struct CardPlugin: PartnerUIPlugin {
 
     static let vaultVendor = "purse"
 
+    /// Web's `vaultExtras` with `skipInit: false`: cybersource's `/init` flags the transaction as
+    /// vault mode. Every other PSP takes `/validate` with no `/init` — worldpay refuses one.
+    static let partnersRequiringInit: Set<String> = ["cybersource"]
+
     public let partner: Partner
     public let method: PaymentMethod = .creditCard
 
@@ -35,15 +39,21 @@ public struct CardPlugin: PartnerUIPlugin {
     }
 
     public func preValidation(_ context: PartnerUIContext) async throws -> ValidateItemPayload {
-        let initResponse = try await context.api.initPayment([
-            "partner": .string(partner.wireValue),
-            "method": .string(method.wireValue),
-            "amount": .number(context.amount.description),
-            "partner_data": .object([:]),
-            "payment_data": .object(["vault_vendor": .string(Self.vaultVendor)]),
-            "payment_preferences": .object([:]),
-        ])
-        let stepId = try parseInit(initResponse)
+        let partnerData: [String: JSONValue] = [
+            "browser": .object(await BrowserData.make(locale: context.options.locale)),
+        ]
+        var stepId: Int?
+        if Self.partnersRequiringInit.contains(partner.wireValue) {
+            let initResponse = try await context.api.initPayment([
+                "partner": .string(partner.wireValue),
+                "method": .string(method.wireValue),
+                "amount": .number(context.amount.description),
+                "partner_data": .object(partnerData),
+                "payment_data": .object(["vault_vendor": .string(Self.vaultVendor)]),
+                "payment_preferences": .object([:]),
+            ])
+            stepId = try parseInit(initResponse)
+        }
 
         if let token = context.token {
             var paymentData = token.patch()
@@ -63,7 +73,8 @@ public struct CardPlugin: PartnerUIPlugin {
                 method: method,
                 amount: context.amount,
                 stepId: stepId,
-                paymentData: paymentData
+                paymentData: paymentData,
+                partnerData: partnerData
             )
         }
 
@@ -90,7 +101,8 @@ public struct CardPlugin: PartnerUIPlugin {
                 "card": .object(card),
                 "vault_vendor_token_id": .string(vaultVendorTokenId),
                 "vault_vendor": .string(Self.vaultVendor),
-            ]
+            ],
+            partnerData: partnerData
         )
     }
 

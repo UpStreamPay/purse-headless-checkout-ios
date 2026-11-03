@@ -37,7 +37,7 @@ public struct SecondaryToken: SplitSource, Sendable, Equatable {
     /// sit in one split; `nil` or zero means unlimited.
     public let usageLimit: Int?
     /// The method's effective save-token policy. Drives ``canBeRegistered``.
-    public let saveTokenMode: SaveTokenMode
+    public internal(set) var saveTokenMode: SaveTokenMode
     /// `true` when this token came from a **saved** instrument (the session's `integrated_tokens`)
     /// rather than a card the shopper just typed — a saved card is never re-registered at `/validate`.
     public let isSaved: Bool

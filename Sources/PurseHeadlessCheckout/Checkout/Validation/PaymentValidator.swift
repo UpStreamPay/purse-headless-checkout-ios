@@ -15,6 +15,8 @@ struct PaymentValidator {
     /// `nil` in tests that construct a validator directly — monitoring is entirely optional to this
     /// type, which otherwise has no Checkout-level concerns at all.
     var eventBus: CheckoutEventBus? = nil
+    /// The merchant's options, so `partner_data.browser` carries their locale.
+    var options = PluginOptions()
 
     private struct Prepared {
         let plugin: any PartnerUIPlugin
@@ -87,7 +89,8 @@ struct PaymentValidator {
                 api: api,
                 register: registration?.registered == true,
                 token: token,
-                collected: collectedByItem[source.id] ?? [:]
+                collected: collectedByItem[source.id] ?? [:],
+                options: options
             )
 
             guard try await plugin.validateUI(context) else {
