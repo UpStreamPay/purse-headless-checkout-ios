@@ -54,14 +54,16 @@ jobs:
           sed -i '' 's/, type: .dynamic, targets: \["PurseCheckoutPayPal"\]/, targets: ["PurseCheckoutPayPal"]/' Package.swift
           grep -q 'path: "Binaries/PurseHeadlessCheckout.xcframework"' Package.swift
 
-      # One orphan commit without .github/: GITHUB_TOKEN may not push workflow changes.
+      # One orphan commit without .github/ (GITHUB_TOKEN may not push workflow changes) and without
+      # the sources the binaries replace, the layout release.yml's verify step builds.
       - name: Push the upcoming-release branch
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           git checkout --quiet --orphan upcoming-release
-          git rm -r --cached --quiet .github
-          git add Package.swift Sources Binaries
+          git rm -r --cached --quiet .github Tests \
+            Sources/PurseHeadlessCheckout Sources/PurseCheckoutApplePay Sources/PurseCheckoutKlarna
+          git add Package.swift Sources/*Deps Binaries
           git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" \
             commit --quiet -m "Upcoming release $VERSION (unsigned, from $GITHUB_SHA)"
           AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64)
