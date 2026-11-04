@@ -1,29 +1,12 @@
 version: 2
 
-# One grouped pull request a week per ecosystem: Swift packages in one, GitHub Actions in another,
-# so a platform bump and a CI bump are reviewed (and pass the required checks) separately. Security
-# updates open their own pull request as soon as an advisory lands, also grouped per ecosystem.
+# GitHub Actions only. The Swift packages are updated by .github/workflows/swift-package-update.yml:
+# Dependabot's Swift job could never resolve Package.swift, because its proxy refuses the host
+# Klarna's binary targets download from (see docs/contributing/ci.md).
 updates:
-  # Package.swift's dependencies (Secure Fields, PayPal, Klarna). A vendor SDK bump lands as a PR,
-  # so CI's library tests and both Demo configurations vet it before merge. Klarna cannot be
-  # resolved by Dependabot (its CDN answers 403, see docs/contributing/ci.md).
-  - package-ecosystem: swift
-    directory: /
-    schedule:
-      interval: weekly
-    labels:
-      - dependencies
-    groups:
-      swift-dependencies:
-        patterns:
-          - "*"
-      swift-security:
-        applies-to: security-updates
-        patterns:
-          - "*"
-
   # Keeps the SHA pins in .github/workflows/ current: Dependabot rewrites both the SHA and its
-  # trailing version comment. The `ci` prefix keeps these bumps out of the changelog.
+  # trailing version comment. The `ci` prefix keeps these bumps out of the changelog. Security
+  # updates get their own group, opened as soon as an advisory lands.
   - package-ecosystem: github-actions
     directory: /
     schedule:

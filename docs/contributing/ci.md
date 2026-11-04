@@ -29,11 +29,17 @@ the change adds or moves a dependency to a version with a known **high** or **cr
 vulnerability. GitHub reads `Package.resolved` directly, so — unlike Android — there is no graph to
 submit first. Dependabot alerts come from the same graph.
 
-Dependabot (`.github/dependabot.yml`) proposes weekly updates of the Swift packages and of the
-pinned GitHub Actions, as two grouped pull requests (one per ecosystem); security updates are
-grouped per ecosystem too. Its Swift job cannot resolve the Klarna package: Klarna's CDN
-(`x.klarnacdn.net`) answers `403` to Dependabot when it downloads the binary targets, while CI
-downloads them fine. Watch Klarna releases by hand until that changes.
+Dependabot (`.github/dependabot.yml`) proposes weekly updates of the pinned GitHub Actions only.
+It used to watch the Swift packages too, but that job never resolved `Package.swift`: Dependabot
+routes a job through a proxy that only reaches the registries it knows, and refuses
+`x.klarnacdn.net`, where Klarna's binary targets download from, with a `403` ("egress not
+allowlisted"). No Dependabot registry type covers a plain download host, so the Swift side moved to
+`.github/workflows/swift-package-update.yml`. Every Monday it runs `swift package update` on a
+regular runner, within the ranges in `Package.swift`. When a pin moves, it opens or refreshes one
+`build(deps): update Swift packages` pull request from `deps/swift-packages`, and CI vets it like
+any other. It uses `TF_REPO_AUTOMATION_PAT` from the `release-please` environment, because a pull
+request opened with `GITHUB_TOKEN` would start no CI. A major version bump still needs a manual
+change to `Package.swift`. Run it on demand from Actions → Swift packages → Run workflow.
 
 `.github/workflows/codeql.yml` scans **Swift**, the release scripts (**Python**) and the **workflows** (`actions`) on every pull
 request, every push to `main` and weekly. It is an advanced setup on purpose: GitHub's default setup

@@ -1,0 +1,85 @@
+name: Swift packages
+
+# Weekly update of Package.resolved, in place of Dependabot's Swift job. That job never worked here:
+# Dependabot's proxy only lets a job reach the registries it knows, and Klarna's binary targets
+# download from x.klarnacdn.net, which no registry type covers ("egress not allowlisted"). A plain
+# runner reaches it fine, so this runs `swift package update` (within Package.swift's ranges) and
+# opens one pull request with the new pins, which CI then vets. See docs/contributing/ci.md.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays, 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swift-package-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Update Package.resolved
+    runs-on: macos-26
+    timeout-minutes: 15
+    # TF_REPO_AUTOMATION_PAT lives only in this environment, deployable from main alone (see
+    # release-please.yml). It is not GITHUB_TOKEN because a pull request opened with GITHUB_TOKEN
+    # starts no workflow, and the required checks must run on this one.
+    environment: release-please
+    env:
+      BRANCH: deps/swift-packages
+      TITLE: "build(deps): update Swift packages"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ secrets.TF_REPO_AUTOMATION_PAT }}
+
+      - name: Update
+        id: update
+        run: |
+          before=$(mktemp)
+          cp Package.resolved "$before"
+          swift package update
+
+          # One line per pin whose version moved. originHash alone changing is not an update.
+          changes=$(jq -rn --slurpfile old "$before" --slurpfile new Package.resolved '
+            ($old[0].pins | map({(.identity): .state.version}) | add) as $was
+            | $new[0].pins[]
+            | select($was[.identity] != .state.version)
+            | "- `\(.identity)`: \($was[.identity] // "new") → \(.state.version)"')
+
+          if [ -z "$changes" ]; then
+            echo "All packages are up to date."
+            exit 0
+          fi
+          {
+            echo "changes<<EOF"
+            echo "$changes"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the pull request
+        if: steps.update.outputs.changes != ''
+        env:
+          GH_TOKEN: ${{ secrets.TF_REPO_AUTOMATION_PAT }}
+          CHANGES: ${{ steps.update.outputs.changes }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$BRANCH"
+          git add Package.resolved
+          git commit -q -m "$TITLE" -m "$CHANGES"
+          git push -q --force origin "$BRANCH"
+
+          body=$(printf '%s\n\n%s\n\n%s' \
+            "Weekly \`swift package update\`, within the ranges in \`Package.swift\`:" \
+            "$CHANGES" \
+            "Opened by \`.github/workflows/swift-package-update.yml\`. Read the vendors' release notes before merging; CI builds the library and both Demo configurations against these pins.")
+
+          if [ "$(gh pr view "$BRANCH" --json state -q .state 2>/dev/null)" = "OPEN" ]; then
+            gh pr edit "$BRANCH" --title "$TITLE" --body "$body"
+          else
+            gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$body" --label dependencies
+          fi
