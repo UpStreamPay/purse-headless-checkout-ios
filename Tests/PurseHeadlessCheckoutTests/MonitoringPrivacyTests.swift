@@ -209,4 +209,25 @@ struct MonitoringPrivacyTests {
         #expect(strings.contains("/init"))
         #expect(!strings.contains { $0.contains(Self.paymentHost) })
     }
+
+    /// The root overrides are test seams: a release-signed app never sends events to another host.
+    @Test func aReleaseBuildIgnoresTheMonitoringRootOverride() async throws {
+        StubURLProtocol.reset(host: Self.monitoringHost)
+        StubURLProtocol.set("headless_checkout", .ok("{}"), host: Self.monitoringHost)
+        let checkout = try PurseHeadlessCheckout(
+            widgetData: TestSessions.widgetData(
+                apiURL: "https://\(Self.paymentHost)/payment/v1",
+                paymentSession: TestSessions.paymentSession(id: "privacy-release", amount: 100)
+            ),
+            urlSession: StubURLProtocol.session(),
+            monitoringAPIRootOverride: "https://\(Self.monitoringHost)/widget/headless_checkout",
+            isDebugHostOverride: false,
+            serverClockOverride: nil
+        )
+        await checkout.pendingMonitoringInstall?.value
+        checkout.teardown()
+        try? await Task.sleep(nanoseconds: 300_000_000)
+
+        #expect(StubURLProtocol.paths(host: Self.monitoringHost).isEmpty)
+    }
 }

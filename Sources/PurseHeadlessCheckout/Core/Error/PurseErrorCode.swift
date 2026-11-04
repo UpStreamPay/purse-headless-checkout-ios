@@ -1,6 +1,6 @@
 // Web: packages/headless-checkout/src/utils/error/error-codes.ts
 // Same: same codes.
-// Differs: SUBMIT_BLOCKED, CHECKOUT_TORN_DOWN and PARTNER_UI_ERROR are thrown here where web only logs (or has no lifecycle end) — carried over from the Android port.
+// Differs: SUBMIT_BLOCKED, CHECKOUT_TORN_DOWN and PARTNER_UI_ERROR are thrown here where web only logs (or has no lifecycle end) — carried over from the Android port; ENVIRONMENT_NOT_ALLOWED is native-only (web is not a signed app), Android adds it in SDK-12577.
 
 import Foundation
 
@@ -9,6 +9,8 @@ public enum PurseErrorCode: String, Sendable, CaseIterable {
     // Session
     case expiredSession = "EXPIRED_SESSION"
     case sessionMalformed = "SESSION_MALFORMED"
+    /// A `.test` / `.development` session in a release-signed app.
+    case environmentNotAllowed = "ENVIRONMENT_NOT_ALLOWED"
     /// Submitting a session that is being submitted, already submitted, or terminated.
     case submitBlocked = "SUBMIT_BLOCKED"
     /// Any operation after `teardown()`.

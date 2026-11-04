@@ -15,6 +15,7 @@ struct PurseErrorCodeCoverageTests {
         let values: [any PurseError] = [
             PurseCheckoutError.sessionExpired(sessionId: "s-1"),
             PurseSessionError.sessionMalformed("not json"),
+            PurseSessionError.environmentNotAllowed(.test),
             PurseCheckoutError.submitBlocked(state: .submitting),
             PurseCheckoutError.checkoutTornDown,
             PurseCheckoutError.validateFailed("validate call failed", nil),

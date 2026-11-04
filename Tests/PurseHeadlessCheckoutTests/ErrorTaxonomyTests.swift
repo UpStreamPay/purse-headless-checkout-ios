@@ -54,7 +54,7 @@ struct ErrorTaxonomyTests {
     }
 
     /// The vocabulary is shared with web and Android, so the whole set is pinned — a size check
-    /// would not notice a rename.
+    /// would not notice a rename. `ENVIRONMENT_NOT_ALLOWED` is ahead of Android until SDK-12577.
     @Test func theCodeSetMatchesAndroid() {
         let android: Set<String> = [
             "EXPIRED_SESSION", "SESSION_MALFORMED", "SUBMIT_BLOCKED", "CHECKOUT_TORN_DOWN",
@@ -69,7 +69,7 @@ struct ErrorTaxonomyTests {
             "TOKEN_NOT_REGISTERABLE", "METHOD_NOT_REGISTERABLE", "FAILED_TO_DELETE_ALL_TOKENS",
             "METHOD_IS_NOT_SIMULABLE", "INVALID_LOAN_SIMULATION", "API_ERROR", "UNKNOWN_ERROR",
         ]
-        #expect(Set(PurseErrorCode.allCases.map(\.rawValue)) == android)
+        #expect(Set(PurseErrorCode.allCases.map(\.rawValue)) == android.union(["ENVIRONMENT_NOT_ALLOWED"]))
     }
 
     /// A request that never left the device created no payment, so it must not claim

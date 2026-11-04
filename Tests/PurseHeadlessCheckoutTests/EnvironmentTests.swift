@@ -34,14 +34,20 @@ struct EnvironmentTests {
 struct EnvironmentGateTests {
 
     @Test(arguments: PurseEnvironment.allCases)
-    func aDevelopmentBuildGetsWhatItAsked(_ environment: PurseEnvironment) {
-        #expect(PurseEnvironment.resolve(environment, isDebugHost: true) == environment)
+    func aDevelopmentBuildGetsWhatItAsked(_ environment: PurseEnvironment) throws {
+        #expect(try PurseEnvironment.resolve(environment, isDebugHost: true) == environment)
     }
 
-    @Test func aReleaseBuildFallsBackToProductionFromTheInternalTiers() {
-        #expect(PurseEnvironment.resolve(.test, isDebugHost: false) == .production)
-        #expect(PurseEnvironment.resolve(.development, isDebugHost: false) == .production)
-        #expect(PurseEnvironment.resolve(.sandbox, isDebugHost: false) == .sandbox)
-        #expect(PurseEnvironment.resolve(.production, isDebugHost: false) == .production)
+    /// SDK-12562: refused out loud, never swapped for production behind the merchant's back.
+    @Test func aReleaseBuildRefusesTheInternalTiers() throws {
+        for tier in [PurseEnvironment.test, .development] {
+            #expect {
+                _ = try PurseEnvironment.resolve(tier, isDebugHost: false)
+            } throws: { error in
+                (error as? any PurseError)?.code == .environmentNotAllowed
+            }
+        }
+        #expect(try PurseEnvironment.resolve(.sandbox, isDebugHost: false) == .sandbox)
+        #expect(try PurseEnvironment.resolve(.production, isDebugHost: false) == .production)
     }
 }
