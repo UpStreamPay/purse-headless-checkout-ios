@@ -1,0 +1,89 @@
+name: Upcoming release
+
+# Builds the open release PR as unsigned <next-version>-SNAPSHOT XCFrameworks and force-pushes them
+# to the `upcoming-release` branch, so the next release can be tested like a merchant would before
+# it is merged. See docs/contributing/release.md#upcoming-release.
+
+on:
+  push:
+    branches: [release-please--branches--main--components--sdk]
+
+permissions:
+  contents: write   # the upcoming-release branch
+
+concurrency:
+  group: upcoming-release
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    # Same Xcode as release.yml, so the .swiftinterface matches what a release ships.
+    runs-on: macos-15
+    timeout-minutes: 60
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      # No token in .git/config while third-party package code builds; the push passes it explicitly.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The release PR has already bumped the manifest to the next version.
+      - name: Set SDK version
+        id: version
+        run: |
+          VERSION="$(jq -r '."."' .release-please-manifest.json)-SNAPSHOT"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # Monitoring must not report this build as the release it precedes.
+          sed -i '' -E "s/\"[^\"]*\"( \/\/ x-release-please-version)/\"$VERSION\"\1/" \
+            Sources/PurseHeadlessCheckout/Core/SDKVersion.swift
+          grep -q "\"$VERSION\" // x-release-please-version" Sources/PurseHeadlessCheckout/Core/SDKVersion.swift
+
+      - name: Build XCFrameworks
+        run: ./scripts/build-xcframeworks.sh
+
+      # Binaries are committed, not attached to a release: the org tag ruleset lets no workflow token
+      # create a tag. Same manifest as release.yml's verify step (PayPal stays a static source target).
+      - name: Point Package.swift at the binaries
+        run: |
+          set -eu
+          mkdir Binaries
+          mv xcframeworks/*.xcframework Binaries/
+          python3 scripts/binary-manifest.py path Binaries PurseHeadlessCheckout PurseCheckoutApplePay PurseCheckoutKlarna
+          sed -i '' 's/, type: .dynamic, targets: \["PurseCheckoutPayPal"\]/, targets: ["PurseCheckoutPayPal"]/' Package.swift
+          grep -q 'path: "Binaries/PurseHeadlessCheckout.xcframework"' Package.swift
+
+      # One orphan commit without .github/: GITHUB_TOKEN may not push workflow changes.
+      - name: Push the upcoming-release branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git checkout --quiet --orphan upcoming-release
+          git rm -r --cached --quiet .github
+          git add Package.swift Sources Binaries
+          git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" \
+            commit --quiet -m "Upcoming release $VERSION (unsigned, from $GITHUB_SHA)"
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64)
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $AUTH" \
+            push --force "https://github.com/$GITHUB_REPOSITORY.git" HEAD:refs/heads/upcoming-release
+
+  notify:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Only this job holds the webhook; the branch is already pushed when it runs.
+    environment: upcoming-release
+    steps:
+      - name: Post to Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          VERSION: ${{ needs.publish.outputs.version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -n "$SLACK_WEBHOOK_URL" ] || { echo "::error::SLACK_WEBHOOK_URL missing from the upcoming-release environment."; exit 1; }
+          payload=$(jq -n --arg v "$VERSION" --arg run "$RUN_URL" '{text: (
+            ":package: *Headless Checkout iOS* upcoming release `" + $v + "` is ready to test\n"
+            + "```.package(url: \"https://github.com/UpStreamPay/purse-headless-checkout-ios.git\", branch: \"upcoming-release\")```\n"
+            + "<" + $run + "|Build>")}')
+          curl --fail -sS -X POST -H "Content-type: application/json" --data "$payload" "$SLACK_WEBHOOK_URL"
