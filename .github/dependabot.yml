@@ -1,37 +1,25 @@
 version: 2
 
-# One pull request a week for every dependency, as in the other three SDKs: Swift packages and
-# GitHub Actions share this group, so a single review (and a single run of the required checks)
-# covers them all. Security updates still open their own pull request as soon as an advisory lands.
-multi-ecosystem-groups:
-  dependencies:
+# GitHub Actions only. The Swift packages are updated by .github/workflows/swift-package-update.yml:
+# Dependabot's Swift job could never resolve Package.swift, because its proxy refuses the host
+# Klarna's binary targets download from (see docs/contributing/ci.md).
+updates:
+  # Keeps the SHA pins in .github/workflows/ current: Dependabot rewrites both the SHA and its
+  # trailing version comment. The `ci` prefix keeps these bumps out of the changelog. Security
+  # updates get their own group, opened as soon as an advisory lands.
+  - package-ecosystem: github-actions
+    directory: /
     schedule:
       interval: weekly
     labels:
       - dependencies
-
-updates:
-  # Package.swift's dependencies (Secure Fields, PayPal, Klarna). A vendor SDK bump lands as a PR,
-  # so CI's library tests and both Demo configurations vet it before merge. Klarna cannot be
-  # resolved by Dependabot (its CDN answers 403, see docs/contributing/ci.md).
-  - package-ecosystem: swift
-    directory: /
-    multi-ecosystem-group: dependencies
-    patterns:
-      - "*"
+    commit-message:
+      prefix: "ci"
     groups:
-      # Security updates are not part of the weekly group; this keeps them in one PR too.
-      swift-security:
+      github-actions:
+        patterns:
+          - "*"
+      github-actions-security:
         applies-to: security-updates
         patterns:
           - "*"
-
-  # Keeps the SHA pins in .github/workflows/ current: Dependabot rewrites both the SHA and its
-  # trailing version comment. The `ci` prefix keeps these bumps out of the changelog.
-  - package-ecosystem: github-actions
-    directory: /
-    multi-ecosystem-group: dependencies
-    patterns:
-      - "*"
-    commit-message:
-      prefix: "ci"
