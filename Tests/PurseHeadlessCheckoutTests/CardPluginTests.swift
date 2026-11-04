@@ -1,6 +1,7 @@
 import Foundation
 import PurseSecureFields
 import Testing
+import UIKit
 @testable import PurseHeadlessCheckout
 
 /// The card plugin's payload shapes. The form itself is exercised by the coordinator; this pins
@@ -53,7 +54,8 @@ struct CardPluginTests {
         #expect(payload.paymentData["vault_vendor"]?.stringValue == "purse")
         #expect(payload.paymentData["card"]?["bin"]?.stringValue == "411111")
         #expect(payload.paymentData["card"]?["selected_network"]?.stringValue == "VISA")
-        #expect(payload.stepId == 7)
+        #expect(payload.stepId == nil)
+        #expect(payload.partnerData["browser"]?["user_agent"]?.stringValue == "MOBILE")
     }
 
     @Test func freshCardWithoutATokenIsRefused() async throws {
@@ -127,22 +129,75 @@ struct CardPluginTests {
         #expect(try await !plugin.validateUI(context(token: PayToken(value: "t", requiresCVV: true))))
     }
 
-    // MARK: /init
+    // MARK: /init — skipped, as web's `skipInit`, except for cybersource
+
+    private func initCalled() -> Bool {
+        StubURLProtocol.paths(host: Self.host).contains { $0.hasSuffix("/init") }
+    }
+
+    /// SDK-12557: worldpay refuses this `/init` ("Session data doesn't meet the partner's
+    /// requirements"), and web stopped sending it.
+    @Test func aVaultCardGoesStraightToValidate() async throws {
+        stubInit()
+        let payload = try await CardPlugin(partner: .other("worldpay")).preValidation(
+            context(collected: [CardPlugin.Collected.token: "t"])
+        )
+        #expect(!initCalled())
+        #expect(payload.stepId == nil)
+        #expect(payload.toJSON()["step_id"] == nil)
+    }
+
+    /// SDK-12556: dalenys refuses a token payment and 3-D Secure never challenges without it.
+    @Test func aSavedCardCarriesBrowserDataWithoutAnInit() async throws {
+        stubInit()
+        let payload = try await CardPlugin(partner: .other("dalenys")).preValidation(
+            context(token: PayToken(value: "saved", requiresCVV: false))
+        )
+        #expect(!initCalled())
+        let browser = try #require(payload.toJSON()["partner_data"]?["browser"])
+        #expect(browser["accept_header"]?.stringValue == "text/html")
+        #expect(browser["screen_width"] != nil)
+    }
+
+    /// Web's `vaultExtras.cybersource.skipInit: false`: its `/3ds/init` fails without one.
+    @Test func cybersourceStillInitsWithBrowserData() async throws {
+        stubInit()
+        let payload = try await CardPlugin(partner: .other("cybersource")).preValidation(
+            context(collected: [CardPlugin.Collected.token: "t"])
+        )
+        #expect(initCalled())
+        #expect(payload.stepId == 7)
+        let initBody = try #require(StubURLProtocol.body(for: "/init", host: Self.host)?.object)
+        #expect(initBody["partner_data"]?["browser"] != nil)
+        #expect(payload.partnerData["browser"] != nil)
+    }
 
     /// A refused init must not be mistaken for a usable step id.
     @Test func aRefusedInitThrows() async throws {
         stubInit(#"{"status":{"state":"FAILED","description":"nope"}}"#)
 
         await #expect(throws: PaymentAPIError.self) {
-            _ = try await CardPlugin(partner: .purse).preValidation(
+            _ = try await CardPlugin(partner: .other("cybersource")).preValidation(
                 try context(collected: [CardPlugin.Collected.token: "t"])
             )
         }
     }
 
+    /// Partner wording can quote the shopper; the message reaches monitoring, so it carries the state only.
+    @Test func aRefusedInitKeepsThePartnersWordingOutOfTheMessage() async throws {
+        stubInit(#"{"status":{"state":"ERROR","description":"card of JANE DOE refused"}}"#)
+        do {
+            _ = try await CardPlugin(partner: .other("cybersource")).preValidation(context(collected: [CardPlugin.Collected.token: "t"]))
+            Issue.record("expected a refused init")
+        } catch let error as PaymentAPIError {
+            #expect(error.message.contains("state=ERROR"))
+            #expect(!error.message.contains("JANE DOE"))
+        }
+    }
+
     @Test func anInitWithoutAStepIdIsFine() async throws {
         stubInit(#"{"status":{"state":"SUCCESS"}}"#)
-        let payload = try await CardPlugin(partner: .purse).preValidation(
+        let payload = try await CardPlugin(partner: .other("cybersource")).preValidation(
             context(collected: [CardPlugin.Collected.token: "t"])
         )
         #expect(payload.stepId == nil)
@@ -291,9 +346,9 @@ struct CardPluginTests {
         }
     }
 
-    /// `PaymentElementView` measures the form once; an error appearing later must not need more
-    /// room, or SwiftUI clips it. The French holder-name error is the longest message.
-    @Test func anErrorAppearingDoesNotResizeTheForm() throws {
+    /// SDK-12564 #4b: a long message takes a second line instead of shrinking to 60 %. The French
+    /// holder-name error is the longest one.
+    @Test func anErrorAppearingWrapsAndGrowsTheForm() throws {
         let coordinator = CardCoordinator(
             host: RecordingHost(context: try context()), tenantId: "tenant-1", supportedBrands: [.visa],
             options: PluginOptions(locale: "fr-FR")
@@ -308,6 +363,38 @@ struct CardPluginTests {
         let before = height()
         (coordinator as any SecureFieldsDelegate).secureFieldsFocusChanged(field: .holderName, isFocused: false)
         #expect(coordinator.errorMessage(for: .holderName) == "Entrez le nom du titulaire comme il apparaît sur la carte.")
-        #expect(height() == before)
+        #expect(height() > before)
+    }
+
+    /// SDK-12564 #14: a host can default a missing state the way the SDK does.
+    @Test func aFieldStateCanBeBuiltFromOutside() {
+        let state = CardFieldState()
+        #expect(!state.isValid && !state.isFocused && !state.hasContent && !state.wasBlurred)
+    }
+
+    /// SDK-12564 #16: one field is erased, the others keep their text.
+    @Test func clearFieldErasesOnlyThatField() throws {
+        let coordinator = try coordinator()
+        func textField(_ field: CardField) throws -> UITextField {
+            let index = try #require(coordinator.fields.firstIndex(of: field))
+            return try #require(Self.firstTextField(in: coordinator.fieldViews[index]))
+        }
+        for field in [CardField.holderName, .expDate] {
+            let input = try textField(field)
+            input.text = field == .holderName ? "JANE DOE" : "12/30"
+        }
+        // What typing fires; `sendActions` delivers nothing without an app to route through.
+        (coordinator as any SecureFieldsDelegate).secureFieldsContentChanged()
+        #expect(coordinator.fieldStates[.holderName]?.hasContent == true)
+
+        coordinator.clearField(.holderName)
+
+        #expect(coordinator.fieldStates[.holderName]?.hasContent == false)
+        #expect(coordinator.fieldStates[.expDate]?.hasContent == true)
+    }
+
+    private static func firstTextField(in view: UIView) -> UITextField? {
+        if let field = view as? UITextField { return field }
+        return view.subviews.lazy.compactMap(firstTextField).first
     }
 }

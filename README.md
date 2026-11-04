@@ -45,7 +45,7 @@ primary/secondary split, `/validate` — and leaves the checkout UI to you. Same
 | `PrivacyInfo.xcprivacy` (no required-reason APIs; data-type declaration pending a privacy sign-off) | ✅ |
 | `PurseHeadlessCheckout.host(for:)` — the concrete `PluginHost` every coordinator runs through | ✅ |
 | Payment elements — one `hasUI`/`isReady`/`submit()` shape per method, with a sealed `PaymentOutcome` | ✅ |
-| Confirmation — `sessionTransactions()`, `paymentStatus()`, `awaitPaymentOutcome()` over a typed `PaymentSessionStatus` | ✅ |
+| Confirmation — from the merchant's backend. `sessionTransactions()`, `paymentStatus()`, `awaitPaymentOutcome()` are deprecated: the session read answers 401 to the client key | ⚠️ |
 | Payment-method badges — `PurseAssets`, `iconURL(for:)`, `schemeAssets(for:)` (CDN URLs; you render them) | ✅ |
 | Demo app (`Demo/Demo.xcodeproj`) — a playground and a shopper-facing checkout, both over real sessions | ✅ (see below) |
 | Signed XCFrameworks on every release (core, Apple Pay, Klarna; PayPal plugin stays source) | ✅ (`.github/workflows/release.yml`) |
@@ -58,8 +58,15 @@ first release after 1.0.0, tags resolve to signed XCFrameworks, like Secure Fiel
 
 - Public enums are not frozen: an exhaustive `switch` over one (`PaymentOutcome`,
   `PaymentSessionStatus`, …) needs an `@unknown default`, so a new case can ship in a minor release.
-- `PurseEnvironment.test` and `.development` fall back to `.production` in a release-signed app
-  (App Store, enterprise); they work in the simulator and in development and ad-hoc builds.
+- `PurseEnvironment.test` and `.development` (or an `api_url` on their hosts) are refused with
+  `ENVIRONMENT_NOT_ALLOWED` unless the app is development-signed or runs in the simulator — ad-hoc,
+  TestFlight, App Store and enterprise builds included. Checked at creation and on `setSession`.
+
+## Rendering a payment element
+
+Key each `PaymentElementView`, and any element you cache, on `checkout.elementID(for: item)`.
+The checkout bumps it when `setSession` changes the item or the rest to pay moves under Apple Pay or
+Klarna; a view keyed on `item.id` alone keeps a stale element that can no longer be submitted.
 
 ## Development
 

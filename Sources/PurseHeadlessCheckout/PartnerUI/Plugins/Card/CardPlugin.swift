@@ -1,6 +1,6 @@
 // Web: packages/partner-ui/src/plugins/vaults/purse/creditcard + generics/hostedfields
-// Same: token from the vault into /validate; saved token + CVV-only token side by side.
-// Differs: /init runs inside `preValidation`, not at `onSessionSet` (nothing about rendering depends on it — Secure Fields tokenizes independently).
+// Same: token from the vault into /validate with `partner_data.browser`; saved token + CVV-only token side by side; no /init (`skipInit`) except for cybersource (`vaultExtras.skipInit: false`).
+// Differs: cybersource's /init runs inside `preValidation`, not at `onSessionSet` (nothing about rendering depends on it — Secure Fields tokenizes independently); a skipped /init omits `step_id` where web sends `null`, as Android does.
 
 import Combine
 import Foundation
@@ -20,6 +20,10 @@ public struct CardPlugin: PartnerUIPlugin {
 
     static let vaultVendor = "purse"
 
+    /// Web's `vaultExtras` with `skipInit: false`: cybersource's `/init` flags the transaction as
+    /// vault mode. Every other PSP takes `/validate` with no `/init` — worldpay refuses one.
+    static let partnersRequiringInit: Set<String> = ["cybersource"]
+
     public let partner: Partner
     public let method: PaymentMethod = .creditCard
 
@@ -35,15 +39,21 @@ public struct CardPlugin: PartnerUIPlugin {
     }
 
     public func preValidation(_ context: PartnerUIContext) async throws -> ValidateItemPayload {
-        let initResponse = try await context.api.initPayment([
-            "partner": .string(partner.wireValue),
-            "method": .string(method.wireValue),
-            "amount": .number(context.amount.description),
-            "partner_data": .object([:]),
-            "payment_data": .object(["vault_vendor": .string(Self.vaultVendor)]),
-            "payment_preferences": .object([:]),
-        ])
-        let stepId = try parseInit(initResponse)
+        let partnerData: [String: JSONValue] = [
+            "browser": .object(await BrowserData.make(locale: context.options.locale)),
+        ]
+        var stepId: Int?
+        if Self.partnersRequiringInit.contains(partner.wireValue) {
+            let initResponse = try await context.api.initPayment([
+                "partner": .string(partner.wireValue),
+                "method": .string(method.wireValue),
+                "amount": .number(context.amount.description),
+                "partner_data": .object(partnerData),
+                "payment_data": .object(["vault_vendor": .string(Self.vaultVendor)]),
+                "payment_preferences": .object([:]),
+            ])
+            stepId = try parseInit(initResponse)
+        }
 
         if let token = context.token {
             var paymentData = token.patch()
@@ -63,7 +73,8 @@ public struct CardPlugin: PartnerUIPlugin {
                 method: method,
                 amount: context.amount,
                 stepId: stepId,
-                paymentData: paymentData
+                paymentData: paymentData,
+                partnerData: partnerData
             )
         }
 
@@ -90,7 +101,8 @@ public struct CardPlugin: PartnerUIPlugin {
                 "card": .object(card),
                 "vault_vendor_token_id": .string(vaultVendorTokenId),
                 "vault_vendor": .string(Self.vaultVendor),
-            ]
+            ],
+            partnerData: partnerData
         )
     }
 
@@ -98,10 +110,8 @@ public struct CardPlugin: PartnerUIPlugin {
     private func parseInit(_ response: JSONValue) throws -> Int? {
         let status = response["status"]
         if let state = status?["state"]?.stringValue, !state.isEmpty, state != "SUCCESS" {
-            let description = status?["description"]?.stringValue ?? ""
             throw PaymentAPIError(
-                "creditcard init not successful (state=\(state)) \(description)"
-                    .trimmingCharacters(in: .whitespaces),
+                "creditcard init not successful (state=\(state))",
                 path: "/init"
             )
         }
@@ -184,8 +194,11 @@ extension CardModule {
 @MainActor
 public final class CardFormView: UIStackView {
     private var cancellable: AnyCancellable?
+    /// For tests. Weak, so the form never extends the coordinator's life past its element's.
+    weak var coordinator: CardCoordinator?
 
     public init(coordinator: CardCoordinator) {
+        self.coordinator = coordinator
         let theme = coordinator.theme
         super.init(frame: .zero)
         axis = .vertical
@@ -198,12 +211,8 @@ public final class CardFormView: UIStackView {
             label.text = texts.label
             label.font = theme.label.font
             let message = UILabel()
-            // ponytail: one line that shrinks to fit, because `PaymentElementView` measures the form
-            // once and a message that wrapped later would be clipped. Wrap instead once the view
-            // re-measures on content change.
-            message.numberOfLines = 1
-            message.adjustsFontSizeToFitWidth = true
-            message.minimumScaleFactor = 0.6
+            // Wraps: `PaymentElementView` re-measures when the form grows.
+            message.numberOfLines = 0
             message.font = theme.helperText.font
             message.text = " "
             let column = UIStackView(arrangedSubviews: [label, CardModule.matchingPAN(view, theme: theme), message])
@@ -213,14 +222,19 @@ public final class CardFormView: UIStackView {
             rows.append((field, texts, label, message))
         }
 
-        cancellable = coordinator.$fieldStates.sink { states in
+        cancellable = coordinator.$fieldStates.sink { [weak self] states in
+            var textChanged = false
             for (field, texts, label, message) in rows {
                 let state = states[field] ?? CardFieldState()
                 let invalid = texts.error(for: state) != nil
                 label.textColor = (invalid ? theme.labelInvalid.color : theme.label.color) ?? .label
                 message.textColor = (invalid ? theme.helperTextInvalid.color : theme.helperText.color) ?? .secondaryLabel
-                message.text = texts.message(for: state) ?? " "
+                let text = texts.message(for: state) ?? " "
+                if message.text != text { message.text = text; textChanged = true }
             }
+            // A message that now wraps changes the form's height; `PaymentElementView`'s container
+            // only re-measures on its own layout pass.
+            if textChanged { self?.superview?.setNeedsLayout() }
         }
     }
 

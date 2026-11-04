@@ -312,6 +312,37 @@ struct SubmitPaymentTests {
     // MARK: Missing plugin
 
     /// A method whose partner product was never installed names itself, rather than failing opaquely.
+    @MainActor private final class LocaleBox { var locale: String? }
+
+    /// `partner_data.browser` reads the merchant's locale off the `preValidation` context.
+    @Test func preValidationSeesTheMerchantsOptions() async throws {
+        StubURLProtocol.reset(host: Self.host)
+        StubURLProtocol.set("/validate", .ok(Self.successBody), host: Self.host)
+        struct LocalePlugin: PartnerUIPlugin {
+            let partner: Partner
+            let method: PaymentMethod
+            let box: LocaleBox
+            func preValidation(_ context: PartnerUIContext) async throws -> ValidateItemPayload {
+                await MainActor.run { box.locale = context.options.locale }
+                return ItemPayload(partner: partner, method: method, amount: context.amount)
+            }
+        }
+        let box = LocaleBox()
+        let registry = PluginRegistry()
+        registry.registerVault(vendor: .purse) { LocalePlugin(partner: $0.partner, method: $0.method, box: box) }
+        let checkout = try PurseHeadlessCheckout(
+            widgetData: TestSessions.widgetData(paymentSession: TestSessions.paymentSession(amount: 100)),
+            registry: registry,
+            urlSession: StubURLProtocol.session(),
+            options: PluginOptions(locale: "fr-FR")
+        )
+        try selectCard(checkout)
+
+        _ = try await checkout.submitPayment()
+
+        #expect(box.locale == "fr-FR")
+    }
+
     @Test func aMissingPluginIsNamed() async throws {
         StubURLProtocol.reset(host: Self.host)
         // Built-ins stripped so the method resolves to nothing, as when a merchant never links the
@@ -334,6 +365,9 @@ struct SubmitPaymentTests {
             #expect(error.code == .methodNotImplemented)
             #expect(error.message.contains("purse-creditcard"))
         }
+        // Retired for the session, as on web, rather than left selectable.
+        #expect(checkout.paymentMethods.first?.disabled?.code == .partnerUIFatalError)
+        #expect(checkout.amountSplit.isEmpty)
     }
 
     // MARK: Session-spending correctness

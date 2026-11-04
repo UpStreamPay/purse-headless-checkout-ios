@@ -9,7 +9,7 @@ public enum PaymentStatus: String, Sendable, CaseIterable {
     case success = "SUCCESS"
     case failed = "FAILED"
     case error = "ERROR"
-    /// Outcome not known yet; confirm against the session.
+    /// Outcome not known yet; confirm from your backend.
     case uncertain = "UNCERTAIN"
     /// Waiting on a later step (an asynchronous partner).
     case waiting = "WAITING"

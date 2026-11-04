@@ -73,6 +73,10 @@ struct SecondaryTokenizer {
             throw classified
         }
 
-        return try config.parseToken(method: method, initResponse: response, pan: pan, cvv: cvv)
+        // Android's `.copy(saveTokenMode = …)`: here rather than in each `parseToken`, so a
+        // merchant-registered config gets it too.
+        var token = try config.parseToken(method: method, initResponse: response, pan: pan, cvv: cvv)
+        token.saveTokenMode = method.configuration.settings.resolvedSaveTokenMode
+        return token
     }
 }

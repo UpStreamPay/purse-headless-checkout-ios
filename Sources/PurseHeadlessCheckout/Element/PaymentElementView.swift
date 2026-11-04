@@ -10,13 +10,19 @@ import UIKit
 public struct PaymentElementView: UIViewRepresentable {
 
     private let element: PaymentElement
+    /// Bumped by the container when the partner view's height changes after mounting — a card
+    /// error wrapping to a second line — so SwiftUI measures again instead of clipping it.
+    @State private var remeasure = 0
 
     public init(_ element: PaymentElement) {
         self.element = element
     }
 
     public func makeUIView(context: Context) -> UIView {
-        let container = UIView()
+        let container = ElementContainer()
+        let remeasure = $remeasure
+        // Deferred: the layout pass may run inside SwiftUI's own view update.
+        container.onHeightChange = { DispatchQueue.main.async { remeasure.wrappedValue += 1 } }
         guard let view = element.makeView() else { return container }
         view.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(view)
@@ -29,7 +35,9 @@ public struct PaymentElementView: UIViewRepresentable {
         return container
     }
 
-    public func updateUIView(_ uiView: UIView, context: Context) {}
+    public func updateUIView(_ uiView: UIView, context: Context) {
+        _ = remeasure
+    }
 
     /// Without this the container reports zero height in a `VStack` and the form collapses.
     public func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIView, context: Context) -> CGSize? {
@@ -45,6 +53,24 @@ public struct PaymentElementView: UIViewRepresentable {
             verticalFittingPriority: .fittingSizeLevel
         )
         return CGSize(width: width, height: fitting.height)
+    }
+
+    final class ElementContainer: UIView {
+        var onHeightChange: (() -> Void)?
+        private var measuredHeight: CGFloat?
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            let height = systemLayoutSizeFitting(
+                CGSize(width: bounds.width, height: UIView.layoutFittingCompressedSize.height),
+                withHorizontalFittingPriority: .required,
+                verticalFittingPriority: .fittingSizeLevel
+            ).height
+            if let measuredHeight, measuredHeight != height {
+                onHeightChange?()
+            }
+            measuredHeight = height
+        }
     }
 
     /// The height a host explicitly asked for, or `nil` for the partner view's own. The partner view

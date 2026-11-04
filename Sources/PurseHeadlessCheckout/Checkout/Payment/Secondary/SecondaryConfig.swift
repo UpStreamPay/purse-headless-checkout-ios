@@ -258,10 +258,8 @@ func requireSuccessfulInit(_ initResponse: JSONValue) throws {
     let status = initResponse["status"]
     let state = status?["state"]?.stringValue ?? ""
     guard state == "SUCCESS" else {
-        let description = status?["description"]?.stringValue ?? ""
         throw PurseCheckoutError.secondaryTokenizationFailed(
-            "secondary init not successful (state=\(state)) \(description)"
-                .trimmingCharacters(in: .whitespaces),
+            "secondary init not successful (state=\(state))",
             .failedToInitSecondaryToken
         )
     }

@@ -12,13 +12,17 @@ struct PluginEventTests {
         nonisolated let partner: Partner
         nonisolated let method: PaymentMethod
         nonisolated let incompatible: Bool
+        nonisolated let reloads: Bool
         private(set) var amountUpdates: [Decimal] = []
 
-        init(partner: Partner, method: PaymentMethod, incompatible: Bool = false) {
+        init(partner: Partner, method: PaymentMethod, incompatible: Bool = false, reloads: Bool = false) {
             self.partner = partner
             self.method = method
             self.incompatible = incompatible
+            self.reloads = reloads
         }
+
+        nonisolated var reloadsOnAmountUpdate: Bool { reloads }
 
         func onAmountUpdate(_ context: PartnerUIContext) async throws {
             amountUpdates.append(context.amount)
@@ -33,13 +37,19 @@ struct PluginEventTests {
         }
     }
 
-    private func makeCheckout(plugin: StubPlugin? = nil, incompatible: Bool = false) throws -> PurseHeadlessCheckout {
+    private func makeCheckout(
+        plugin: StubPlugin? = nil,
+        incompatible: Bool = false,
+        protocols: [String: Any] = TestSessions.cardProtocol()
+    ) throws -> PurseHeadlessCheckout {
         let registry = PluginRegistry()
         registry.registerVault(vendor: .purse) {
             plugin ?? StubPlugin(partner: $0.partner, method: $0.method, incompatible: incompatible)
         }
         return try PurseHeadlessCheckout(
-            widgetData: TestSessions.widgetData(paymentSession: TestSessions.paymentSession(amount: 100)),
+            widgetData: TestSessions.widgetData(
+                paymentSession: TestSessions.paymentSession(amount: 100, protocols: protocols)
+            ),
             registry: registry,
             urlSession: StubURLProtocol.session()
         )
@@ -138,6 +148,125 @@ struct PluginEventTests {
             try await Task.sleep(nanoseconds: 25_000_000)
         }
         #expect(await plugin.amountUpdates == [80])
+    }
+
+    // MARK: Amount-bound elements (SDK-12554)
+
+    private static let cardAndGiftCard: [String: Any] = {
+        var protocols = TestSessions.cardProtocol()
+        protocols["illicado"] = ["giftcard": ["configurations": [
+            "stable": true, "labels": ["secondary"], "settings": [:],
+        ]]]
+        return protocols
+    }()
+
+    private let giftCard = SecondaryToken(
+        id: "illicado-giftcard-1234", partner: .illicado, method: .giftCard,
+        pan: "9250000000001234", cvv: nil, name: "", balance: 1
+    )
+
+    /// Apple Pay and Klarna prepare for one amount. When it moves, the element is rebuilt and what the
+    /// old one prepared can no longer be submitted.
+    @Test func anAmountBoundElementIsRebuiltAndUnsubmittableUntilItPreparesAgain() throws {
+        let plugin = StubPlugin(partner: .purse, method: .creditCard, reloads: true)
+        let checkout = try makeCheckout(plugin: plugin, protocols: Self.cardAndGiftCard)
+        let method = try card(checkout)
+        let host = try checkout.host(for: method)
+        host.setCollected(["stepId": .number("7")])
+        host.setFulfilled(true)
+        try host.setAsPrimary()
+        #expect(checkout.isPaymentFulfilled)
+        let generation = checkout.itemGenerations[method.id] ?? 0
+
+        try checkout.applySecondary(giftCard)
+
+        #expect(checkout.itemGenerations[method.id] == generation + 1)
+        #expect(host.buildContext().collected.isEmpty)
+        #expect(!checkout.isPaymentFulfilled)
+
+        // The old coordinator finishing late (a Klarna widget loading for 100) is ignored…
+        host.setCollected(["stepId": .number("7")])
+        host.setFulfilled(true)
+        #expect(throws: PurseCheckoutError.self) { try host.setAsPrimary() }
+        #expect(!checkout.isPaymentFulfilled)
+        #expect(host.buildContext().collected.isEmpty)
+        // …and so is its widget failing: the rebuilt element is not taken down with it.
+        host.dispatch(.clientError(message: "old widget died"))
+        #expect(disabled(checkout, method.id) == nil)
+
+        // …and the rebuilt element, preparing for 99, is what counts.
+        try checkout.host(for: method).setFulfilled(true)
+        #expect(checkout.isPaymentFulfilled)
+    }
+
+    /// Out of its amount bounds the element is not rebuilt (its `/init` would fail for good), and is
+    /// once the amount brings it back.
+    @Test func anAmountBoundElementWaitsForItsBoundsBeforeRebuilding() throws {
+        let plugin = StubPlugin(partner: .purse, method: .creditCard, reloads: true)
+        let checkout = try makeCheckout(plugin: plugin, protocols: Self.cardAndGiftCard)
+        let method = try card(checkout)
+        let host = try checkout.host(for: method)
+        host.setCollected(["stepId": .number("7")])
+        let wholeOrder = SecondaryToken(
+            id: "illicado-giftcard-9999", partner: .illicado, method: .giftCard,
+            pan: "9250000000009999", cvv: nil, name: "", balance: 100
+        )
+
+        try checkout.applySecondary(wholeOrder)
+        #expect(checkout.paymentMethods.first { $0.id == method.id }?.disabled?.code == .paymentFulfilled)
+        #expect(checkout.itemGenerations[method.id] == nil)
+        #expect(host.buildContext().collected.isEmpty)
+
+        checkout.removeSecondary(wholeOrder)
+        #expect(checkout.itemGenerations[method.id] == 1)
+    }
+
+    /// A new session at the same amount moves nothing, but the old `/init` belongs to the old session.
+    @Test func anAmountBoundElementIsRebuiltOnANewSessionAtTheSameAmount() throws {
+        let plugin = StubPlugin(partner: .purse, method: .creditCard, reloads: true)
+        let checkout = try makeCheckout(plugin: plugin)
+        let method = try card(checkout)
+        let host = try checkout.host(for: method)
+        host.setCollected(["stepId": .number("7")])
+        host.setFulfilled(true)
+        try host.setAsPrimary()
+        #expect(checkout.isPaymentFulfilled)
+
+        try checkout.setSession(TestSessions.widgetData(
+            paymentSession: TestSessions.paymentSession(id: "session-2", amount: 100)
+        ))
+
+        #expect(checkout.itemGenerations[method.id] == 1)
+        #expect(!checkout.isPaymentFulfilled)
+    }
+
+    /// A new session below the item's minimum: unsubmittable, but no doomed `/init` on a rebuild.
+    @Test func aNewSessionOutOfBoundsDoesNotRebuildTheElement() throws {
+        let plugin = StubPlugin(partner: .purse, method: .creditCard, reloads: true)
+        let checkout = try makeCheckout(plugin: plugin, protocols: TestSessions.cardProtocol(settings: ["payment_min_amount": 50]))
+        let method = try card(checkout)
+        _ = try checkout.host(for: method)
+
+        try checkout.setSession(TestSessions.widgetData(paymentSession: TestSessions.paymentSession(
+            id: "session-2", amount: 20, protocols: TestSessions.cardProtocol(settings: ["payment_min_amount": 50])
+        )))
+
+        #expect(checkout.itemGenerations[method.id] == nil)
+    }
+
+    @Test func anElementNotBoundToTheAmountKeepsWhatItPrepared() throws {
+        let checkout = try makeCheckout(protocols: Self.cardAndGiftCard)
+        let method = try card(checkout)
+        let host = try checkout.host(for: method)
+        host.setCollected(["token": "t"])
+        host.setFulfilled(true)
+        try host.setAsPrimary()
+
+        try checkout.applySecondary(giftCard)
+
+        #expect(checkout.itemGenerations[method.id] == nil)
+        #expect(host.buildContext().collected["token"]?.stringValue == "t")
+        #expect(checkout.isPaymentFulfilled)
     }
 
     @Test func eachPartnerMethodNamesTheProductThatShipsIt() {

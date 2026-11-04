@@ -40,9 +40,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// The override as passed, kept apart from the resolved ``environment`` because `setSession`
     /// and `saveState` need the *decision*, not its result.
     private let lockedEnvironment: PurseEnvironment?
-    /// Locked, or downgraded by ``PurseEnvironment/resolve(_:isDebugHost:)``: either way the
-    /// session's `api_url` is not trusted.
+    /// Locked: the session's `api_url` is kept only on the tier's own host.
     private let ignoresDeclaredAPIRoot: Bool
+    /// Whether ``PurseEnvironment/resolve(_:isDebugHost:)`` lets an internal tier through, kept for
+    /// `setSession`.
+    private let isDebugHost: Bool
     /// Kept so `saveState()` can round-trip the exact session `restore` rebuilds from.
     private var widgetData: String
 
@@ -77,8 +79,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// The submittable set: each applied secondary's slice, plus the primary's remainder.
     @Published public private(set) var amountSplit: [PaymentSplit] = []
 
-    /// Bumped per item id when a `setSession` invalidates it, so UI keyed on
-    /// `(item.id, generation)` rebuilds exactly the elements whose configuration changed.
+    /// Bumped per item id when `setSession` changes its configuration, or when the rest to pay moves
+    /// under an amount-bound element (Apple Pay, Klarna). Key element views on ``elementID(for:)``.
     @Published public private(set) var itemGenerations: [String: Int] = [:]
 
     // MARK: Internal model
@@ -131,9 +133,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
     // MARK: Creation
 
-    /// - Parameters: - widgetData: the base64 `widget.data` string from your backend's Client
-    /// Session response. - lockedEnvironment: overrides whatever `widgetData` declares — including
-    /// its `api_url`: the tier's built-in root (`…/payment/v1`) is used instead.
+    /// `widgetData`: your backend's base64 `widget.data`. `lockedEnvironment` pins the tier's host
+    /// (a same-host `api_url` such as `…/payment/v2` is kept). The two `…APIRootOverride`s are test
+    /// seams, ignored unless development-signed or in the simulator.
     public convenience init(
         widgetData: String,
         lockedEnvironment: PurseEnvironment? = nil,
@@ -187,10 +189,12 @@ public final class PurseHeadlessCheckout: ObservableObject {
         self.params = params
         self.widgetData = widgetData
         self.lockedEnvironment = lockedEnvironment
-        let requested = lockedEnvironment ?? params.environment
-        let environment = PurseEnvironment.resolve(requested, isDebugHost: isDebugHostOverride ?? PurseEnvironment.isDebugHost)
+        let isDebugHost = isDebugHostOverride ?? PurseEnvironment.isDebugHost
+        self.isDebugHost = isDebugHost
+        let environment = try PurseEnvironment.resolve(lockedEnvironment ?? params.environment, isDebugHost: isDebugHost)
+        if lockedEnvironment == nil { try Self.gateDeclaredRoot(params, isDebugHost: isDebugHost) }
         self.environment = environment
-        self.ignoresDeclaredAPIRoot = lockedEnvironment != nil || environment != requested
+        self.ignoresDeclaredAPIRoot = lockedEnvironment != nil
         self.paymentAPIRoot = Self.resolveAPIRoot(params, locked: ignoresDeclaredAPIRoot, environment: environment)
         self.disabledMethods = disabledMethods
         self.options = options
@@ -218,9 +222,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
         self.session = built
         self.meansOfPayment = built.meansOfPayment
         self.splitter = PursePaymentSplitter(orderAmount: built.amount)
+        // Test seams: a release-signed app always uses the tier's own hosts (AGENTS.md, no baseURL).
         self.wallet = WalletTokens(
             params: params,
-            walletAPIRoot: walletAPIRootOverride ?? environment.walletAPIRoot,
+            walletAPIRoot: (isDebugHost ? walletAPIRootOverride : nil) ?? environment.walletAPIRoot,
             urlSession: urlSession
         )
 
@@ -247,7 +252,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
         let monitoringClient = MonitoringAPIClient(
             apiKey: params.apiKey,
-            monitoringAPIRoot: monitoringAPIRootOverride ?? environment.monitoringAPIRoot,
+            monitoringAPIRoot: (isDebugHost ? monitoringAPIRootOverride : nil) ?? environment.monitoringAPIRoot,
             envWireValue: environment.wireValue,
             // The injected transport, like every other client here — otherwise tests and the Demo
             // POST real telemetry to the live host, unseen by any stub.
@@ -314,16 +319,23 @@ public final class PurseHeadlessCheckout: ObservableObject {
         }
     }
 
-    /// Where this session's Payment API calls go. A build-**locked** (release) environment trusts
-    /// its own known root and ignores whatever `api_url` the session declares — that is the whole
-    /// point of locking, and ``PurseEnvironment``'s own header says so.
+    /// An unlocked checkout calls the blob's `api_url`: a TEST / DEV host there is refused like the
+    /// tier itself, whatever `environment` the blob declares.
+    private static func gateDeclaredRoot(_ params: PurseSessionParams, isDebugHost: Bool) throws {
+        guard let tier = PurseEnvironment.of(apiURL: params.apiURL) else { return }
+        _ = try PurseEnvironment.resolve(tier, isDebugHost: isDebugHost)
+    }
+
+    /// Where this session's Payment API calls go. A build-**locked** (release) environment keeps
+    /// the session's `api_url` only on its own tier's host — the lock pins the host, not the API
+    /// version — see ``PurseEnvironment/lockedPaymentAPIRoot(_:)``.
     private static func resolveAPIRoot(
         _ params: PurseSessionParams,
         locked: Bool,
         environment: PurseEnvironment
     ) -> String {
-        guard !locked, let declared = params.apiURL.nonBlank else { return environment.paymentAPIRoot }
-        return declared
+        if locked { return environment.lockedPaymentAPIRoot(params.apiURL) }
+        return params.apiURL.nonBlank ?? environment.paymentAPIRoot
     }
 
     /// The Payment API client for the session in force. Every network path goes through here, so
@@ -370,6 +382,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
             sessionState = .ready
             throw PurseCheckoutError.itemNotFulfilled(itemId: itemId)
         }
+        // What the guards just approved is what is paid: a split change landing during an await
+        // below (a gift card removed mid-submit) must not reshape the `/validate` already under way.
+        let splits = splitter.splits
+        let collected = collectedByItem
+        let registrations = currentRegistrations()
 
         // Every selectable item is locked for the duration, then unlocked whatever happens.
         refresh()
@@ -379,19 +396,19 @@ public final class PurseHeadlessCheckout: ObservableObject {
         }
 
         await eventBus.post(.validationStarted, .info, monitoringPayload([
-            "session_id": .string(session.id), "nb_items": .number(String(splitter.splits.count))
+            "session_id": .string(session.id), "nb_items": .number(String(splits.count))
         ]))
 
-        let validator = PaymentValidator(api: try api, registry: registry, configs: configs, eventBus: eventBus)
+        let validator = PaymentValidator(api: try api, registry: registry, configs: configs, eventBus: eventBus, options: options)
         let result: ValidationResult
         do {
             result = try await validator.execute(
-                splits: splitter.splits,
+                splits: splits,
                 session: session.source,
-                collectedByItem: collectedByItem,
+                collectedByItem: collected,
                 hooks: hooks,
                 skipOnBeforeValidate: skipOnBeforeValidate,
-                registrationByItem: currentRegistrations()
+                registrationByItem: registrations
             )
         } catch {
             // The session is only spent once /validate actually answered — but there are three
@@ -408,6 +425,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
                 // No answer came back, so the payment may exist: a retry could double-charge.
                 validationConsumed = true
                 sessionState = .submitted
+
+            case let PurseCheckoutError.noPluginRegistered(itemId):
+                sessionState = .ready
+                deactivateUnserved(itemId)
 
             case _ where Self.isSessionTerminal(error):
                 // Already submitted / expired / gone: every further call against this session is
@@ -581,7 +602,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
             refresh()
             return
         }
-        try selectPrimary(method, itemId: method.id)
+        try selectPrimary(itemId: method.id)
         postMonitoring(.methodSetPrimary, .info, monitoringPayload([
             "partner": .string(method.partner.wireValue), "method": .string(method.method.wireValue)
         ]))
@@ -590,7 +611,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// Pay with a saved card. When the token ``PaymentToken/requiresCVV``, the fulfilment gate is
     /// armed: the checkout is not fulfilled until the CVV form reports valid.
     public func setPrimaryToken(_ token: PaymentToken) throws {
-        try selectPrimary(token, itemId: token.id)
+        try selectPrimary(itemId: token.id)
         postMonitoring(.primaryTokenSetAsPrimary, .info, monitoringPayload([
             "partner": .string(token.partner.wireValue), "method": .string(token.method.wireValue)
         ]))
@@ -600,11 +621,22 @@ public final class PurseHeadlessCheckout: ObservableObject {
         }
     }
 
-    private func selectPrimary(_ source: any PrimarySource, itemId: String) throws {
-        if let disabled = currentItem(id: itemId)?.disabled {
+    /// Engages the live item, not the caller's copy: a host can outlive a `setSession` (SDK-12349).
+    private func selectPrimary(itemId: String) throws {
+        let current = currentItem(id: itemId)
+        let live: any PrimarySource
+        switch current {
+        case let .primaryMethod(method)?: live = method
+        case let .paymentToken(token)?: live = token
+        default:
+            throw PurseCheckoutError.methodDisabled(
+                itemId: itemId, disabled: .partnerUIFatalError(reason: "not in the current session")
+            )
+        }
+        if let disabled = current?.disabled {
             throw PurseCheckoutError.methodDisabled(itemId: itemId, disabled: disabled)
         }
-        splitter.setPrimary(source)
+        splitter.setPrimary(live)
         refresh()
     }
 
@@ -741,6 +773,12 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
     // MARK: Payment element
 
+    /// The identity to give `item`'s ``PaymentElementView`` (`.id(…)`) and to cache its element
+    /// under: it changes whenever the element must be rebuilt.
+    public func elementID(for item: PaymentItem) -> String {
+        "\(item.id):\(itemGenerations[item.id] ?? 0)"
+    }
+
     /// The ``PaymentElement`` for `item` — web's `getPaymentElement`, Android's
     /// `rememberPaymentElement`.
     public func paymentElement(
@@ -750,7 +788,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
         appReturnURL: URL? = nil
     ) -> PaymentElement {
         let wrapped = ElementListener(listener)
-        let key = "\(item.id):\(itemGenerations[item.id] ?? 0)"
+        let key = elementID(for: item)
 
         func failing(_ error: any PurseError) -> PaymentElement {
             PaymentElement(
@@ -784,9 +822,12 @@ public final class PurseHeadlessCheckout: ObservableObject {
             return failing(error.asPurseError())
         }
 
-        guard let plugin = registry.plugin(partner: item.partner, method: item.method, session: session.source),
-              let module = registry.module(rendering: plugin)
-        else {
+        guard let plugin = registry.plugin(partner: item.partner, method: item.method, session: session.source) else {
+            // Deferred: this runs inside a SwiftUI body, which must not publish synchronously.
+            Task { @MainActor [weak self] in self?.deactivateUnserved(item.id) }
+            return failing(PurseCheckoutError.noPluginRegistered(itemId: item.id))
+        }
+        guard let module = registry.module(rendering: plugin) else {
             return failing(PurseCheckoutError.noPluginRegistered(itemId: item.id))
         }
 
@@ -817,7 +858,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
     /// The context a plugin sees for `item` right now, against `apiClient` — Android's
     /// `pluginContext`.
-    private func pluginContext(for item: any PrimarySource, api apiClient: PaymentAPIClient) -> PartnerUIContext {
+    /// With `generation`, events from a host built before the item was rebuilt are dropped.
+    private func pluginContext(
+        for item: any PrimarySource, api apiClient: PaymentAPIClient, generation: Int? = nil
+    ) -> PartnerUIContext {
         let registration = (item as? PrimaryMethod).map { registrationOf($0).registered } ?? false
         let token = (item as? PaymentToken).map {
             PayToken(
@@ -838,7 +882,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
             token: token,
             collected: collectedByItem[item.id] ?? [:],
             options: options,
-            dispatchEvent: { [weak self] event in self?.handlePluginEvent(event, from: item) }
+            dispatchEvent: { [weak self] event in
+                guard let self, generation.map({ $0 == self.itemGenerations[item.id] ?? 0 }) ?? true else { return }
+                self.handlePluginEvent(event, from: item)
+            }
         )
     }
 
@@ -862,25 +909,36 @@ public final class PurseHeadlessCheckout: ObservableObject {
         unowned let checkout: PurseHeadlessCheckout
         let item: any PrimarySource
         let apiClient: PaymentAPIClient
+        /// A host whose item was rebuilt since is stale: what its coordinator prepared is dropped.
+        let generation: Int
 
         init(checkout: PurseHeadlessCheckout, item: any PrimarySource, apiClient: PaymentAPIClient) {
             self.checkout = checkout
             self.item = item
             self.apiClient = apiClient
+            self.generation = checkout.itemGenerations[item.id] ?? 0
         }
+
+        private var isCurrent: Bool { (checkout.itemGenerations[item.id] ?? 0) == generation }
 
         var environment: PurseEnvironment { checkout.environment }
         var redirectionReturnURL: String? { checkout.session.source.redirection }
 
         func buildContext() -> PartnerUIContext {
-            checkout.pluginContext(for: item, api: apiClient)
+            checkout.pluginContext(for: item, api: apiClient, generation: generation)
         }
 
         func setCollected(_ data: [String: JSONValue]) {
+            guard isCurrent else { return }
             checkout.setCollected(item.id, data)
         }
 
         func setAsPrimary() throws {
+            guard isCurrent else {
+                throw PurseCheckoutError.methodDisabled(
+                    itemId: item.id, disabled: .partnerUIFatalError(reason: "superseded by a rebuilt element")
+                )
+            }
             switch item {
             case let method as PrimaryMethod:
                 try checkout.setPrimary(method)
@@ -892,6 +950,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
         }
 
         func setFulfilled(_ fulfilled: Bool) {
+            guard isCurrent else { return }
             checkout.setFulfilled(item.id, fulfilled)
         }
 
@@ -915,6 +974,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
         let newParams = try SessionCodec.decode(widgetData)
         let incoming = newParams.paymentSession
+        if lockedEnvironment == nil {
+            _ = try PurseEnvironment.resolve(newParams.environment, isDebugHost: isDebugHost)
+            try Self.gateDeclaredRoot(newParams, isDebugHost: isDebugHost)
+        }
 
         // The device clock, deliberately: this path is synchronous, and the check that actually
         // gates a payment is the server-corrected one in `acquireSubmitLock`. A device clock wrong
@@ -982,9 +1045,14 @@ public final class PurseHeadlessCheckout: ObservableObject {
         }
 
         collectedByItem.removeAll()
+        // What an amount-bound element prepared was an `/init` on the old session: unsubmittable
+        // until rebuilt, or `/validate` goes out without its step id.
+        let amountBound = trackedPlugins.filter { $0.value.plugin.reloadsOnAmountUpdate }.map(\.key)
+        for id in amountBound where fulfilledByItem[id] != nil { fulfilledByItem[id] = false }
         validationConsumed = false
         sessionState = .ready
         refresh()
+        amountBound.forEach(rebuildIfWithinBounds)
         resolveSavedSecondaryBalances()
         runEligibilityChecks()
         // The wallet session outlives any one payment session — reapply what it already knows onto
@@ -1042,17 +1110,23 @@ public final class PurseHeadlessCheckout: ObservableObject {
             primaryReach: splitter.primaryReach,
             splitSources: splitter.splits.map(\.source)
         )
+        // Web's SDK-12349: a primary the rest to pay has put out of bounds stops being payable.
+        if let primaryId = splitter.primaryMethod?.id, currentItem(id: primaryId)?.disabled?.requiresUIClear == true {
+            splitter.setPrimary(nil)
+            postMonitoring(.clearPrimarySplit)
+        }
         reportDisabledTransitions(before: before, after: meansOfPayment)
         publishItems()
 
         remainingAmountToPay = splitter.primaryReach
         amountSplit = splitter.splits
+        // First: an amount-bound item it rebuilds is unfulfilled until it prepares again.
+        notifyAmountUpdate()
         let fulfilled = splitter.fulfilled && unfulfilledItemId == nil
         if fulfilled != isPaymentFulfilled {
             postMonitoring(.paymentFulfilled, .info, monitoringPayload(["isFulfilled": .bool(fulfilled)]))
         }
         isPaymentFulfilled = fulfilled
-        notifyAmountUpdate()
     }
 
     /// Republish the item lists. On its own, without a recompute, when a state was just set —
@@ -1093,9 +1167,22 @@ public final class PurseHeadlessCheckout: ObservableObject {
         lastNotifiedRemaining = remaining
         guard !isFirst, !trackedPlugins.isEmpty, let client = try? api else { return }
         for (item, plugin) in trackedPlugins.values {
+            if plugin.reloadsOnAmountUpdate {
+                // Drop what was prepared for the old amount; unsubmittable until it prepares again.
+                collectedByItem[item.id] = nil
+                if fulfilledByItem[item.id] != nil { fulfilledByItem[item.id] = false }
+                rebuildIfWithinBounds(item.id)
+            }
             let context = pluginContext(for: item, api: client)
             Task { try? await plugin.onAmountUpdate(context) }
         }
+    }
+
+    /// Not while disabled (out of its amount bounds, say): that `/init` would fail, and the failure
+    /// is final. The amount move that re-enables it rebuilds it; a recoverable state is rebuilt.
+    private func rebuildIfWithinBounds(_ itemId: String) {
+        if let disabled = currentItem(id: itemId)?.disabled, !disabled.isRecoverable { return }
+        itemGenerations[itemId, default: 0] += 1
     }
 
     // MARK: Plugin events
@@ -1133,6 +1220,12 @@ public final class PurseHeadlessCheckout: ObservableObject {
     }
 
     static let maxReasonLength = 200
+
+    /// Web's answer to an item no plugin serves (an unknown template, an unlinked product): fatal
+    /// at engagement, out of the split and refused for the rest of the session.
+    private func deactivateUnserved(_ itemId: String) {
+        deactivate(itemId, .partnerUIFatalError(reason: "no plugin serves this method"))
+    }
 
     /// Web's `fatalError` → `clearSplit` + `deactivateMop`.
     private func deactivate(_ itemId: String, _ state: DisabledState) {
@@ -1185,6 +1278,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
             }
             let context = pluginContext(for: source, api: client)
             return Task { [weak self] in
+                // Runs after `restore` applied its state: never probe (and `/init`) a spent session.
+                guard self?.sessionState == .ready else { return }
                 do {
                     try await plugin.ensureClientCompatibility(context)
                 } catch {
@@ -1541,10 +1636,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
     // MARK: Confirming the payment
 
-    /// Every transaction so far, raw. Prefer ``paymentStatus()`` unless you need untouched rows.
-    ///
-    /// Uses the **same** session id as `/init` and `/validate` — `payment_session.id`, not
-    /// `legacy_payment_session_id`, which belongs to a different service's key space.
+    /// Every transaction so far, raw, under `payment_session.id` (not `legacy_payment_session_id`).
+    /// Deprecated: the API answers 401 to the client key; confirm from your backend.
+    @available(*, deprecated, message: "GET session answers 401 to the client key: confirm the payment from your backend instead")
     public func sessionTransactions() async throws -> [JSONValue] {
         try await api.getSession()
     }
@@ -1552,7 +1646,8 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// What the session's transactions say about the payment, right now.
     ///
     /// This is the answer ``PaymentOutcome/returnedFromRedirect(url:)`` is not: a shopper returning
-    /// from a 3-D Secure or PSP page tells you they came back, nothing more. Ask the session.
+    /// from a 3-D Secure or PSP page tells you they came back, nothing more. Ask your backend.
+    @available(*, deprecated, message: "GET session answers 401 to the client key: confirm the payment from your backend instead")
     public func paymentStatus() async throws -> PaymentSessionStatus {
         PaymentSessionStatus.from(try await sessionTransactions())
     }
@@ -1564,6 +1659,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// arrives throws `CancellationError`, never the transport error underneath it, which would read
     /// as a network failure. A genuine transport or teardown failure still throws. Defaults match
     /// Android's 60 s / 3 s.
+    @available(*, deprecated, message: "GET session answers 401 to the client key: confirm the payment from your backend instead")
     public func awaitPaymentOutcome(
         timeout: Duration = .seconds(60),
         pollInterval: Duration = .seconds(3)

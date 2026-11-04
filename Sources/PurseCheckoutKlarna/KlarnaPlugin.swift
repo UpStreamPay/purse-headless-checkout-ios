@@ -1,6 +1,6 @@
 // Web: packages/partner-ui/src/plugins/partners/klarna-installments/index.ts
 // Same: /init; /validate carries only the step_id; authorize() runs in postValidation after /validate succeeds, so one submit both pays and opens Klarna's step.
-// Differs: `collected` is wire-safe JSONValue only, so the live authorize callback can't travel through it as it does on Android — KlarnaCoordinator registers the closure in KlarnaAuthorizationRegistry under a token stashed in `collected` instead.
+// Differs: `collected` is wire-safe JSONValue only, so the live authorize callback can't travel through it as it does on Android — KlarnaCoordinator registers the closure in KlarnaAuthorizationRegistry under a token stashed in `collected` instead; an amount update rebuilds the element (`reloadsOnAmountUpdate`), whose coordinator re-inits.
 
 import Foundation
 import UIKit
@@ -37,6 +37,9 @@ public struct KlarnaPlugin: PartnerUIPlugin {
     public init(partner: Partner) {
         self.partner = partner
     }
+
+    /// The widget's client token comes from an `/init` for one amount — web re-inits on an update.
+    public var reloadsOnAmountUpdate: Bool { true }
 
     public func preValidation(_ context: PartnerUIContext) async throws -> ValidateItemPayload {
         ItemPayload(
@@ -81,10 +84,8 @@ enum KlarnaRequestBuilder {
     static func parseInitConfig(_ response: JSONValue) throws -> KlarnaConfig {
         let state = response["status"]?["state"]?.stringValue ?? ""
         guard state.isEmpty || state == "SUCCESS" else {
-            let description = response["status"]?["description"]?.stringValue ?? ""
             throw PaymentAPIError(
-                "klarna init not successful (state=\(state)) \(description)"
-                    .trimmingCharacters(in: .whitespaces),
+                "klarna init not successful (state=\(state))",
                 path: "/init"
             )
         }

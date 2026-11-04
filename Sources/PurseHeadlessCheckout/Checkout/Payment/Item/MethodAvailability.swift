@@ -68,7 +68,8 @@ public enum MethodAvailability {
             if let current = item.disabled, !current.isRecomputable {
                 return item
             }
-            let isInSplit = splitSources.contains {
+            // Only an engaged secondary is exempt: an engaged primary is cleared instead (SDK-12349).
+            let isInSplit = item.configuration.isSecondary && splitSources.contains {
                 $0.partner == item.partner && $0.method == item.method
             }
             return item.withDisabled(

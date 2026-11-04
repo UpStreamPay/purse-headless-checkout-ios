@@ -110,8 +110,10 @@ Same keys on all three platforms; each is a config, not a plugin.
   there is no cross-platform theme config to share).
 - **Every row's badge now resolves.** `PurseAssets` ports web's `@upstreampay/assets`, so a method or
   card scheme has a CDN badge URL on all three platforms; rendering stays the integrator's job.
-- **Whatever the method, the outcome is confirmable.** `awaitPaymentOutcome()` reads the session's own
-  transactions, which is the only honest way to resolve a redirection method's return.
+- **A redirection method's outcome is confirmed server-side.** Returning from a redirect proves only
+  that the shopper came back. The merchant's backend reads the session with its own credentials; the
+  SDK cannot, since the Payment API answers 401 to the client key. `sessionTransactions()`,
+  `paymentStatus()` and `awaitPaymentOutcome()` are deprecated for that reason.
 - **The three gaps Android and iOS share**, worth a deliberate decision rather than silent scope
   creep: `pci_proxy` cards, `ancv-connect`, and the PayPal BNPL / vaulting pair. The rest of the ❌
   column is "works if the merchant switches the method to `redirection` mode".
