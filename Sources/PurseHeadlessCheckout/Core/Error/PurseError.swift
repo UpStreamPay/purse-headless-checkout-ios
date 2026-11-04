@@ -24,12 +24,22 @@ public extension PurseError {
 /// (``PaymentAPIError``).
 public enum PurseSessionError: PurseError {
     case sessionMalformed(String)
+    /// A `.test` or `.development` session in a release-signed app.
+    case environmentNotAllowed(PurseEnvironment)
 
-    public var code: PurseErrorCode { .sessionMalformed }
+    public var code: PurseErrorCode {
+        switch self {
+        case .sessionMalformed: .sessionMalformed
+        case .environmentNotAllowed: .environmentNotAllowed
+        }
+    }
 
     public var message: String {
         switch self {
         case let .sessionMalformed(detail): detail
+        case let .environmentNotAllowed(environment):
+            "PurseEnvironment.\(environment.rawValue) is internal and not allowed in a release-signed app: "
+                + "create the session on sandbox or production"
         }
     }
 }

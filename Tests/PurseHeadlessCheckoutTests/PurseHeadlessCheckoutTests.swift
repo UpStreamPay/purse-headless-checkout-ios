@@ -97,22 +97,56 @@ struct PurseHeadlessCheckoutTests {
         #expect(try lockedRoot("") == tierRoot)
     }
 
-    /// A release-signed app must not reach TEST through the session's `api_url` either — the
-    /// environment gate alone would leave the Payment API calls on the TEST host.
-    @Test func aReleaseBuildIgnoresATestSessionsApiURL() throws {
+    /// SDK-12562: a release-signed app refuses a TEST session when the checkout is created, and
+    /// again when `setSession` hands one in, rather than reaching TEST through its `api_url` or
+    /// silently paying on production.
+    @Test func aReleaseBuildRefusesATestSession() throws {
         let testSession = TestSessions.widgetData(environment: "test")
-        let release = try PurseHeadlessCheckout(
-            widgetData: testSession, isDebugHostOverride: false, serverClockOverride: nil
-        )
-        #expect(release.paymentAPIRoot == PurseEnvironment.production.paymentAPIRoot)
+        #expect {
+            _ = try PurseHeadlessCheckout(widgetData: testSession, isDebugHostOverride: false, serverClockOverride: nil)
+        } throws: { error in
+            (error as? any PurseError)?.code == .environmentNotAllowed
+        }
 
-        try release.setSession(testSession)
-        #expect(release.paymentAPIRoot == PurseEnvironment.production.paymentAPIRoot)
+        let release = try PurseHeadlessCheckout(
+            widgetData: TestSessions.widgetData(), isDebugHostOverride: false, serverClockOverride: nil
+        )
+        #expect {
+            try release.setSession(TestSessions.widgetData(
+                environment: "test", paymentSession: TestSessions.paymentSession(id: "session-2")
+            ))
+        } throws: { error in
+            (error as? any PurseError)?.code == .environmentNotAllowed
+        }
+        #expect(release.paymentAPIRoot == PurseEnvironment.sandbox.paymentAPIRoot)
 
         let debug = try PurseHeadlessCheckout(
             widgetData: testSession, isDebugHostOverride: true, serverClockOverride: nil
         )
         #expect(debug.paymentAPIRoot == PurseEnvironment.test.paymentAPIRoot)
+    }
+
+    /// The blob's `environment` alone is not the gate: an unlocked checkout calls its `api_url`.
+    @Test func aReleaseBuildRefusesATestApiURLUnderAProductionLabel() throws {
+        let disguised = TestSessions.widgetData(
+            environment: "production", apiURL: PurseEnvironment.test.paymentAPIRoot
+        )
+        #expect {
+            _ = try PurseHeadlessCheckout(widgetData: disguised, isDebugHostOverride: false, serverClockOverride: nil)
+        } throws: { error in
+            (error as? any PurseError)?.code == .environmentNotAllowed
+        }
+        #expect(PurseEnvironment.of(apiURL: "https://API.purse-dev.com/payment/v2") == .development)
+        #expect(PurseEnvironment.of(apiURL: "https://tenant.example/payment/v1") == nil)
+    }
+
+    /// A merchant that locked the tier has already decided: the session's own tier is not checked.
+    @Test func aLockedReleaseBuildAcceptsATestBlob() throws {
+        let locked = try PurseHeadlessCheckout(
+            widgetData: TestSessions.widgetData(environment: "test"),
+            lockedEnvironment: .production, isDebugHostOverride: false, serverClockOverride: nil
+        )
+        #expect(locked.paymentAPIRoot == PurseEnvironment.production.paymentAPIRoot)
     }
 
     /// A new blob can name a different host, so the root cannot be resolved once at init.

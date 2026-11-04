@@ -40,9 +40,11 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// The override as passed, kept apart from the resolved ``environment`` because `setSession`
     /// and `saveState` need the *decision*, not its result.
     private let lockedEnvironment: PurseEnvironment?
-    /// Locked, or downgraded by ``PurseEnvironment/resolve(_:isDebugHost:)``: either way the
-    /// session's `api_url` is not trusted.
+    /// Locked: the session's `api_url` is kept only on the tier's own host.
     private let ignoresDeclaredAPIRoot: Bool
+    /// Whether ``PurseEnvironment/resolve(_:isDebugHost:)`` lets an internal tier through, kept for
+    /// `setSession`.
+    private let isDebugHost: Bool
     /// Kept so `saveState()` can round-trip the exact session `restore` rebuilds from.
     private var widgetData: String
 
@@ -131,10 +133,9 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
     // MARK: Creation
 
-    /// - Parameters: - widgetData: the base64 `widget.data` string from your backend's Client
-    /// Session response. - lockedEnvironment: overrides whatever `widgetData` declares. It locks the
-    /// tier's host, not the API version: the session's `api_url` is kept when it is `https` on that
-    /// host (an orchestration session's `…/payment/v2`), else the tier's `…/payment/v1` root is used.
+    /// `widgetData`: your backend's base64 `widget.data`. `lockedEnvironment` pins the tier's host
+    /// (a same-host `api_url` such as `…/payment/v2` is kept). The two `…APIRootOverride`s are test
+    /// seams, ignored unless development-signed or in the simulator.
     public convenience init(
         widgetData: String,
         lockedEnvironment: PurseEnvironment? = nil,
@@ -188,10 +189,12 @@ public final class PurseHeadlessCheckout: ObservableObject {
         self.params = params
         self.widgetData = widgetData
         self.lockedEnvironment = lockedEnvironment
-        let requested = lockedEnvironment ?? params.environment
-        let environment = PurseEnvironment.resolve(requested, isDebugHost: isDebugHostOverride ?? PurseEnvironment.isDebugHost)
+        let isDebugHost = isDebugHostOverride ?? PurseEnvironment.isDebugHost
+        self.isDebugHost = isDebugHost
+        let environment = try PurseEnvironment.resolve(lockedEnvironment ?? params.environment, isDebugHost: isDebugHost)
+        if lockedEnvironment == nil { try Self.gateDeclaredRoot(params, isDebugHost: isDebugHost) }
         self.environment = environment
-        self.ignoresDeclaredAPIRoot = lockedEnvironment != nil || environment != requested
+        self.ignoresDeclaredAPIRoot = lockedEnvironment != nil
         self.paymentAPIRoot = Self.resolveAPIRoot(params, locked: ignoresDeclaredAPIRoot, environment: environment)
         self.disabledMethods = disabledMethods
         self.options = options
@@ -219,9 +222,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
         self.session = built
         self.meansOfPayment = built.meansOfPayment
         self.splitter = PursePaymentSplitter(orderAmount: built.amount)
+        // Test seams: a release-signed app always uses the tier's own hosts (AGENTS.md, no baseURL).
         self.wallet = WalletTokens(
             params: params,
-            walletAPIRoot: walletAPIRootOverride ?? environment.walletAPIRoot,
+            walletAPIRoot: (isDebugHost ? walletAPIRootOverride : nil) ?? environment.walletAPIRoot,
             urlSession: urlSession
         )
 
@@ -248,7 +252,7 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
         let monitoringClient = MonitoringAPIClient(
             apiKey: params.apiKey,
-            monitoringAPIRoot: monitoringAPIRootOverride ?? environment.monitoringAPIRoot,
+            monitoringAPIRoot: (isDebugHost ? monitoringAPIRootOverride : nil) ?? environment.monitoringAPIRoot,
             envWireValue: environment.wireValue,
             // The injected transport, like every other client here — otherwise tests and the Demo
             // POST real telemetry to the live host, unseen by any stub.
@@ -313,6 +317,13 @@ public final class PurseHeadlessCheckout: ObservableObject {
                 }
             }
         }
+    }
+
+    /// An unlocked checkout calls the blob's `api_url`: a TEST / DEV host there is refused like the
+    /// tier itself, whatever `environment` the blob declares.
+    private static func gateDeclaredRoot(_ params: PurseSessionParams, isDebugHost: Bool) throws {
+        guard let tier = PurseEnvironment.of(apiURL: params.apiURL) else { return }
+        _ = try PurseEnvironment.resolve(tier, isDebugHost: isDebugHost)
     }
 
     /// Where this session's Payment API calls go. A build-**locked** (release) environment keeps
@@ -963,6 +974,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
 
         let newParams = try SessionCodec.decode(widgetData)
         let incoming = newParams.paymentSession
+        if lockedEnvironment == nil {
+            _ = try PurseEnvironment.resolve(newParams.environment, isDebugHost: isDebugHost)
+            try Self.gateDeclaredRoot(newParams, isDebugHost: isDebugHost)
+        }
 
         // The device clock, deliberately: this path is synchronous, and the check that actually
         // gates a payment is the server-corrected one in `acquireSubmitLock`. A device clock wrong
