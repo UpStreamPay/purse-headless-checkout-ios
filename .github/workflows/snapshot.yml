@@ -1,0 +1,82 @@
+name: Snapshot
+
+# Builds the open release PR as <next-version>-SNAPSHOT XCFrameworks and force-pushes a `snapshot`
+# branch whose Package.swift points at them, so the next release can be tested before it is merged.
+# Unsigned, no approval: nothing here is a release. See docs/contributing/release.md#snapshots.
+
+on:
+  push:
+    branches: [release-please--branches--main--components--sdk]
+
+permissions:
+  contents: write   # the snapshot release and branch
+
+concurrency:
+  group: snapshot
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    # Same Xcode as release.yml, so the snapshot's .swiftinterface matches what a release ships.
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      # No token in .git/config while third-party package code builds; the push passes it explicitly.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The release PR has already bumped the manifest to the next version. `snapshot-…`, not
+      # `sdk-v…`: release-please must not read it as a release, and the tag ruleset does not cover it.
+      - name: Set SDK version
+        run: |
+          VERSION="$(jq -r '."."' .release-please-manifest.json)-SNAPSHOT"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "SNAPSHOT_TAG=snapshot-$VERSION-$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          # Monitoring must not report a snapshot as the release it precedes.
+          sed -i '' -E "s/\"[^\"]*\"( \/\/ x-release-please-version)/\"$VERSION\"\1/" \
+            Sources/PurseHeadlessCheckout/Core/SDKVersion.swift
+          grep -q "\"$VERSION\" // x-release-please-version" Sources/PurseHeadlessCheckout/Core/SDKVersion.swift
+
+      - name: Build XCFrameworks
+        run: ./scripts/build-xcframeworks.sh
+
+      - name: Zip, checksum
+        run: |
+          set -eu
+          SPECS=""
+          for module in PurseHeadlessCheckout PurseCheckoutApplePay PurseCheckoutKlarna; do
+            (cd xcframeworks && zip -qr "$module.xcframework.zip" "$module.xcframework")
+            SPECS="$SPECS $module=$(swift package compute-checksum "xcframeworks/$module.xcframework.zip")"
+          done
+          echo "SPECS=$SPECS" >> "$GITHUB_ENV"
+
+      # A new release per run: SPM caches a binary by URL, so reusing one URL with new contents
+      # would fail the checksum.
+      - name: Publish the snapshot release
+        run: |
+          gh release create "$SNAPSHOT_TAG" xcframeworks/*.xcframework.zip \
+            --prerelease --latest=false --target "$GITHUB_SHA" \
+            --title "$VERSION (#$GITHUB_RUN_NUMBER)" \
+            --notes "Unsigned snapshot of the open release PR. Not a release. Use \`.package(url: …, branch: \"snapshot\")\`."
+
+      - name: Push the snapshot branch
+        run: |
+          # shellcheck disable=SC2086
+          python3 scripts/binary-manifest.py url \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/$SNAPSHOT_TAG" $SPECS
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Package.swift Sources/*Deps Sources/PurseHeadlessCheckout/Core/SDKVersion.swift
+          git commit -m "snapshot: $VERSION — binary targets"
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64)
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $AUTH" \
+            push --force "https://github.com/$GITHUB_REPOSITORY.git" HEAD:refs/heads/snapshot
+
+      - name: Delete older snapshot releases
+        run: |
+          old=$(gh release list --limit 100 --json tagName -q '.[].tagName' \
+            | grep '^snapshot-' | grep -vx "$SNAPSHOT_TAG" || true)
+          for tag in $old; do gh release delete "$tag" --cleanup-tag --yes; done

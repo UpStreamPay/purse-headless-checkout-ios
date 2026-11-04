@@ -131,6 +131,21 @@ reason). `bootstrap-sha` in `release-please-config.json` tells release-please wh
 `main`, since the old tags are not in its format; it is only used until the first `sdk-v*` release
 exists.
 
+## Snapshots
+
+Every update of the open release PR runs `snapshot.yml`. It builds unsigned XCFrameworks stamped
+`<next-version>-SNAPSHOT`, attaches them to a `snapshot-<version>-<run>` prerelease, and
+force-pushes a `snapshot` branch whose `Package.swift` points at them. Older snapshot releases are
+deleted. To test the next release before merging it:
+
+```swift
+.package(url: "https://github.com/UpStreamPay/purse-headless-checkout-ios.git", branch: "snapshot")
+```
+
+Then run `swift package update` (or **File → Packages → Update to Latest Package Versions**) to pick
+up a newer snapshot. Nothing here is signed or approved, and SPM never resolves it from a version
+requirement.
+
 ## Local verification
 
 ```sh
