@@ -61,7 +61,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           git checkout --quiet --orphan upcoming-release
-          git rm -r --cached --quiet .github Tests \
+          # -f: the version stamp left SDKVersion.swift modified, which git rm --cached refuses otherwise.
+          git rm -r --cached --quiet -f .github Tests \
             Sources/PurseHeadlessCheckout Sources/PurseCheckoutApplePay Sources/PurseCheckoutKlarna
           git add Package.swift Sources/*Deps Binaries
           git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" \
