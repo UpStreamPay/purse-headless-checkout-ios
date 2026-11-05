@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.3.0](https://github.com/UpStreamPay/purse-headless-checkout-ios/compare/sdk-v1.2.1...sdk-v1.3.0) (2026-11-05)
+
+
+### Features
+
+* **api:** expose a refused call's body in development builds (SDK-12565) ([#54](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/54)) ([4e66cbb](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/4e66cbb0ec37912224a1893a4ae2a63fb12948d6))
+* **card:** public CardFieldState init, CardCoordinator.clearField, wrapping field messages (SDK-12564) ([#50](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/50)) ([3c7ed2a](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/3c7ed2a18d58e910a78efae2f822276433095eae))
+* deprecate the client-side session read; confirm payments from the backend (SDK-12559) ([#51](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/51)) ([954cc3e](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/954cc3ecd9165012ab8bcc46d8a02a119db86440))
+* **environment:** refuse TEST / DEVELOPMENT in a release-signed app instead of switching to production (SDK-12562) ([#56](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/56)) ([8e24f01](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/8e24f0123c23d948c00cbd02908d70af80b6ff91))
+* **paypal:** withdraw an ineligible PayPal bnpl in redirection mode (SDK-12561) ([#53](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/53)) ([73b47ba](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/73b47ba6e3bdfeb172fa033b1956853bfaf1f2e9))
+* **wallets:** rebuild the Apple Pay and Klarna elements when the rest to pay moves (SDK-12554) ([#52](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/52)) ([499d4c0](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/499d4c086755243de2aa6a9c4a6c7b35ebe95e09))
+
+
+### Bug Fixes
+
+* **bnpl:** count every instalment in the loan simulation total (SDK-12553) ([#46](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/46)) ([26a18fa](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/26a18fa322931326e562c58678dce8ed76d7a47c))
+* **card:** skip the vault card /init and send partner_data.browser (SDK-12556, SDK-12557) ([#48](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/48)) ([ebea21d](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/ebea21d57db6bf2db1cd5c2aa06f51eaf0700c13))
+* lock the environment tier, not the Payment API root (SDK-12558) ([#45](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/45)) ([838dbe7](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/838dbe71ff4ae966c39a1a2dac35e096263f4be1))
+* **partner-ui:** retire a method no plugin serves when it is engaged (SDK-12560) ([#55](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/55)) ([d5d4660](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/d5d4660d228a6072cbc9771eeb920aee5f0aaa56))
+* **privacy:** keep partner status wording out of error messages (SDK-12633) ([#59](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/59)) ([c5c6815](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/c5c6815fff99c806e9351fc84094aeb1f152ccbb))
+* **secondaries:** carry the method's save policy onto a tokenized secondary (SDK-12563) ([#47](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/47)) ([0cb7817](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/0cb78174fa1b0d57fe297e6501c4d12acebb072f))
+* **split:** take a primary out of the split when its amount bounds suspend it (SDK-12555) ([#49](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/49)) ([bda089b](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/bda089b5d2e517080d9890120c0935e2872b64e5))
+* **submit:** pay the split the guards approved, not one changed mid-submit (SDK-12632) ([#58](https://github.com/UpStreamPay/purse-headless-checkout-ios/issues/58)) ([f8a46f2](https://github.com/UpStreamPay/purse-headless-checkout-ios/commit/f8a46f2202b3b41dc8d68d592b345080596a27c2))
+
 ## [1.2.1](https://github.com/UpStreamPay/purse-headless-checkout-ios/compare/v1.2.0...v1.2.1) (2026-10-05)
 
 
