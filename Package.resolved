@@ -1,0 +1,33 @@
+{
+  "originHash" : "4ab8b5ea112e5622ec658073bcef5b21c039f065874cd458f36a750426114c6a",
+  "pins" : [
+    {
+      "identity" : "klarna-mobile-sdk-spm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/klarna/klarna-mobile-sdk-spm.git",
+      "state" : {
+        "revision" : "f72fa33f386cc1d7de8a78571475d971c02e1e40",
+        "version" : "2.13.2"
+      }
+    },
+    {
+      "identity" : "paypal-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/paypal/paypal-ios.git",
+      "state" : {
+        "revision" : "13865f9ddd1403a1c156df3bd3d27508ecb1931d",
+        "version" : "1.5.0"
+      }
+    },
+    {
+      "identity" : "purse-securefields-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/UpStreamPay/purse-securefields-ios.git",
+      "state" : {
+        "revision" : "55d5c7dbfc7f5b2ed2c4c70075766189e337f8cb",
+        "version" : "1.9.0"
+      }
+    }
+  ],
+  "version" : 3
+}

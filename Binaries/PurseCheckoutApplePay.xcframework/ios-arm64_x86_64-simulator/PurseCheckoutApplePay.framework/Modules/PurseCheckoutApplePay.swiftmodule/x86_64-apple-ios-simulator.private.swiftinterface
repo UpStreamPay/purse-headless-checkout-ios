@@ -1,0 +1,55 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Apple Swift version 6.1.2 (swiftlang-6.1.2.1.2 clang-1700.0.13.5)
+// swift-module-flags: -target x86_64-apple-ios16.0-simulator -enable-objc-interop -enable-library-evolution -swift-version 6 -enforce-exclusivity=checked -O -enable-experimental-feature DebugDescriptionMacro -module-name PurseCheckoutApplePay -module-alias Module___PurseCheckoutApplePay=PurseCheckoutApplePay -module-alias Module____StringProcessing=_StringProcessing -module-alias Module____SwiftConcurrencyShims=_SwiftConcurrencyShims -module-alias Module____Concurrency=_Concurrency -module-alias Module___PassKit=PassKit -module-alias Module___PurseHeadlessCheckout=PurseHeadlessCheckout -module-alias Module___UIKit=UIKit
+// swift-module-flags-ignorable:  -interface-compiler-version 6.1.2
+import Foundation
+import Module___PassKit
+import Module___PurseHeadlessCheckout
+import Swift
+import Module___UIKit
+import Module____Concurrency
+import Module____StringProcessing
+import Module____SwiftConcurrencyShims
+public struct ApplePayConfiguration : Swift.Sendable {
+  public let merchantIdentifier: Swift.String
+  public let merchantName: Swift.String
+  public init(merchantIdentifier: Swift.String, merchantName: Swift.String)
+}
+@objc @Module____Concurrency.MainActor final public class ApplePayCoordinator : ObjectiveC.NSObject {
+  @Module____Concurrency.MainActor public init(host: any Module___PurseHeadlessCheckout.PluginHost, configuration: Module___PurseCheckoutApplePay.ApplePayConfiguration)
+  @Module____Concurrency.MainActor public static var canPay: Swift.Bool {
+    get
+  }
+  @Module____Concurrency.MainActor final public func canPayWithConfiguredNetworks() -> Swift.Bool
+  @Module____Concurrency.MainActor final public func prepare() async throws
+  @Module____Concurrency.MainActor final public func present() async throws
+  @objc deinit
+}
+extension Module___PurseCheckoutApplePay.ApplePayCoordinator : Module___PassKit.PKPaymentAuthorizationControllerDelegate {
+  @objc nonisolated final public func paymentAuthorizationController(_ controller: Module___PassKit.PKPaymentAuthorizationController, didAuthorizePayment payment: Module___PassKit.PKPayment, handler completion: @escaping (Module___PassKit.PKPaymentAuthorizationResult) -> Swift.Void)
+  @objc nonisolated final public func paymentAuthorizationControllerDidFinish(_ controller: Module___PassKit.PKPaymentAuthorizationController)
+}
+public struct ApplePayPlugin : Module___PurseHeadlessCheckout.PartnerUIPlugin {
+  public enum Collected {
+    public static let session: Swift.String
+    public static let fingerprint: Swift.String
+    public static let network: Swift.String
+  }
+  public let partner: Module___PurseHeadlessCheckout.Partner
+  public let method: Module___PurseHeadlessCheckout.PaymentMethod
+  public init(partner: Module___PurseHeadlessCheckout.Partner)
+  public var reloadsOnAmountUpdate: Swift.Bool {
+    get
+  }
+  public func ensureClientCompatibility(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws
+  public func validateUI(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws -> Swift.Bool
+  public func preValidation(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws -> Module___PurseHeadlessCheckout.ValidateItemPayload
+}
+public struct ApplePayModule : Module___PurseHeadlessCheckout.PartnerModule {
+  public let id: Swift.String
+  public init(configuration: Module___PurseCheckoutApplePay.ApplePayConfiguration? = nil)
+  @Module____Concurrency.MainActor public func register(into registry: Module___PurseHeadlessCheckout.PluginRegistry)
+  @Module____Concurrency.MainActor public func renders(_ plugin: any Module___PurseHeadlessCheckout.PartnerUIPlugin) -> Swift.Bool
+  @Module____Concurrency.MainActor public func surface(for plugin: any Module___PurseHeadlessCheckout.PartnerUIPlugin, request: Module___PurseHeadlessCheckout.SurfaceRequest) -> Module___PurseHeadlessCheckout.PaymentSurface?
+}
+extension Module___PurseCheckoutApplePay.ApplePayCoordinator : Swift.Sendable {}
