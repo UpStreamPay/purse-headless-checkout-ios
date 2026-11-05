@@ -131,6 +131,26 @@ reason). `bootstrap-sha` in `release-please-config.json` tells release-please wh
 `main`, since the old tags are not in its format; it is only used until the first `sdk-v*` release
 exists.
 
+## Upcoming release
+
+Every update of the open release PR runs `upcoming-release.yml`. It builds unsigned XCFrameworks
+stamped `<next-version>-SNAPSHOT` (including `SDKVersion.value`) and force-pushes them, committed, to the `upcoming-release`
+branch (one orphan commit, rebuilt each time). Binaries are committed rather than attached to a
+release because the org tag ruleset lets no workflow token create a tag.
+
+Test the next release the way a merchant integrates it, before it is merged:
+
+```swift
+.package(url: "https://github.com/UpStreamPay/purse-headless-checkout-ios.git", branch: "upcoming-release")
+```
+
+Read access to this repository is all it takes. Run `swift package update` to pick up a newer
+build. Nothing here is signed or approved, and SPM never resolves it from a version requirement.
+
+A Slack message announces each build. One-time setup: an `upcoming-release` environment holding
+`SLACK_WEBHOOK_URL` (an incoming webhook for the channel), deployment branches limited to
+`release-please--branches--main--components--sdk`.
+
 ## Local verification
 
 ```sh
