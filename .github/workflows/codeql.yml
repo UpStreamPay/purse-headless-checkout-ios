@@ -55,6 +55,9 @@ jobs:
 
       # Each product through its own scheme: an unbuilt target in a multi-product package does not
       # fail the umbrella build, and an unbuilt target is an unscanned one.
+      # arm64 only: a generic simulator destination compiles every simulator architecture, so the
+      # same sources were compiled twice. No source here is
+      # conditional on the architecture (`#if arch`), so the scanned code is the same.
       - name: Build every product
         if: matrix.language == 'swift'
         run: |
@@ -63,6 +66,7 @@ jobs:
             xcodebuild build \
               -scheme "$scheme" \
               -destination "generic/platform=iOS Simulator" \
+              ONLY_ACTIVE_ARCH=YES ARCHS=arm64 \
               CODE_SIGNING_ALLOWED=NO \
               | grep --line-buffered -E "(error:|BUILD)"
           done

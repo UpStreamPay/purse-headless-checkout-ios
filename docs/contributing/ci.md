@@ -44,7 +44,8 @@ change to `Package.swift`. Run it on demand from Actions → Swift packages → 
 `.github/workflows/codeql.yml` scans **Swift**, the release scripts (**Python**) and the **workflows** (`actions`) on every pull
 request, every push to `main` and weekly. It is an advanced setup on purpose: GitHub's default setup
 builds Swift with `swift build`, which fails for an iOS-only package, so the Swift job builds each
-product's own scheme for the simulator instead. Code scanning must be enabled on the repository with
+product's own scheme for the simulator instead, for arm64 only (a generic destination would compile
+every architecture, which doubles the build for the same sources). Code scanning must be enabled on the repository with
 **default setup off** — GitHub rejects advanced-setup results while default setup is on. The `main`
 ruleset blocks a merge on a high or critical code scanning alert.
 
