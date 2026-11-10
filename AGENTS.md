@@ -348,6 +348,10 @@ places at once: the git tag, `.release-please-manifest.json` and the `x-release-
 annotation in `SDKVersion.swift`. All three move in the commit release-please merges, so the tagged
 commit already reports its own version.
 
+A release is frozen by running Release Please by hand: it opens the release PR, whose upcoming-release
+build is tested (NRT). While it is open only `fix:`/`revert:` PRs can be merged into `main`
+(`release-freeze.yml`). Merging it releases; closing it lifts the freeze.
+
 `SDKVersion.value` is not decoration — it is the `version` field on every monitoring event. A build
 that reports the wrong one makes it impossible to tell which SDK a payment problem came from.
 

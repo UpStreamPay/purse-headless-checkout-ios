@@ -22,6 +22,14 @@ release-please reads it to decide the next version and the changelog section. `P
 `revert`, `docs`, `refactor`, `test`, `ci`, `build`, `chore` or `style`. It reruns when the title is
 edited. A title that would fail here — `Feat/monitoring`, a branch name — releases nothing.
 
+## Release freeze
+
+`.github/workflows/release-freeze.yml` runs `Release freeze` on every pull request into `main`. While
+a release PR (label `autorelease: pending`) is open, it fails unless the title is `fix:` or
+`revert:`, so only NRT fixes reach the release; the release PR itself passes. When the release PR
+opens or closes, it re-runs the check on every other open pull request. See
+[release.md](release.md#release-freeze).
+
 ## Dependencies
 
 `.github/workflows/dependencies.yml` runs `Dependency review` on every pull request: it fails when
@@ -72,7 +80,7 @@ for that to apply.
 - no deletion, no force-push, no bypass
 - pull request required, **1 approval**, **review from a code owner**, approvals dismissed on a new push
 - status checks, **strict** (branch up to date with `main`): `Library Tests`, `Demo App`,
-  `Dependency review`, `CodeQL (swift)`, `CodeQL (python)`, `CodeQL (actions)`
+  `Dependency review`, `CodeQL (swift)`, `CodeQL (python)`, `CodeQL (actions)`, `Release freeze`
 - code scanning: CodeQL, blocking on high or critical security alerts and on errors
 
 **`release tags` ruleset** on `refs/tags/v*` and `refs/tags/sdk-v*`: creation, update and deletion
