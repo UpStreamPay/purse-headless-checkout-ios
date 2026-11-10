@@ -41,7 +41,7 @@ let package = Package(
         // and the mismatch surfaces as `Undefined symbol:
         // PurseSecureFields.SecureFieldsStyle.default.unsafeMutableAddressor` — which reads exactly
         // like a broken release. Wipe DerivedData before concluding anything about an artifact.
-        .package(url: "https://github.com/UpStreamPay/purse-securefields-ios.git", from: "1.9.0"),
+        .package(url: "https://github.com/UpStreamPay/purse-securefields-ios.git", from: "1.11.0"),
         // Public repo, real tagged releases. Verified: `swift package resolve` against this URL
         // succeeds and pulls in the PayPalCheckout binary target transitively.
         .package(url: "https://github.com/paypal/paypal-ios.git", from: "1.5.0"),

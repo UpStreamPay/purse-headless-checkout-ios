@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/UpStreamPay/purse-securefields-ios.git",
       "state" : {
-        "revision" : "55d5c7dbfc7f5b2ed2c4c70075766189e337f8cb",
-        "version" : "1.9.0"
+        "revision" : "67565cea7bb2c0c100b80b3ea9946356885aeb16",
+        "version" : "1.11.0"
       }
     }
   ],
