@@ -27,7 +27,7 @@ edited. A title that would fail here — `Feat/monitoring`, a branch name — re
 `.github/workflows/release-freeze.yml` runs `Release freeze` on every pull request into `main`. While
 a release PR (label `autorelease: pending`) is open, it fails unless the title is `fix:` or
 `revert:`, so only NRT fixes reach the release; the release PR itself passes. When the release PR
-opens or closes, it re-runs the check on every other open pull request. See
+opens, reopens or closes, it re-runs the check on every other open pull request. See
 [release.md](release.md#release-freeze).
 
 ## Dependencies

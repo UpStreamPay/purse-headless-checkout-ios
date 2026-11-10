@@ -23,7 +23,7 @@ the run opens no release PR.
 1. **Freeze**: Actions → Release Please → Run workflow (on `main`). It opens the release PR, and
    `upcoming-release.yml` builds it for NRT.
 2. While the release PR is open, `release-freeze.yml` fails the `Release freeze` check on every PR
-   into `main` whose title is not `fix:` or `revert:`. When the release PR opens or closes, the last
+   into `main` whose title is not `fix:` or `revert:` (breaking `fix!:` included). When the release PR opens, reopens or closes, the last
    check of every other open PR is re-run.
 3. **A bug found in NRT**: a normal fix PR into `main`. Merging it updates the release PR, which
    rebuilds the upcoming release; run the NRT again.
