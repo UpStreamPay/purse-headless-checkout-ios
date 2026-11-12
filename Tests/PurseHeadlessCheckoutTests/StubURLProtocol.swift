@@ -17,6 +17,7 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) private static var handlers: [String: Response] = [:]
     nonisolated(unsafe) private static var requestedPaths: [String] = []
     nonisolated(unsafe) private static var bodies: [String: Data] = [:]
+    nonisolated(unsafe) private static var bodyLog: [String: [Data]] = [:]
 
     /// Keyed by **host** as well as path suffix: this state is global and suites run in parallel,
     /// so two suites on different API roots would otherwise share handlers.
@@ -31,6 +32,7 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
         handlers = handlers.filter { !$0.key.hasPrefix("\(host)|") }
         requestedPaths = requestedPaths.filter { !$0.hasPrefix("\(host)|") }
         bodies = bodies.filter { !$0.key.hasPrefix("\(host)|") }
+        bodyLog = bodyLog.filter { !$0.key.hasPrefix("\(host)|") }
     }
 
     /// Paths requested against `host`, in order — lets a test assert a call did *not* happen.
@@ -46,6 +48,13 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         guard let data = bodies[key(host, suffix)] else { return nil }
         return JSONValueBox(data: data)
+    }
+
+    /// Every body posted against `host` whose path ends with `suffix`, in order — for a collector
+    /// that may receive more than one batch.
+    static func bodies(for suffix: String, host: String) -> [JSONValueBox] {
+        lock.lock(); defer { lock.unlock() }
+        return (bodyLog[key(host, suffix)] ?? []).map(JSONValueBox.init(data:))
     }
 
     private static func key(_ host: String, _ suffix: String) -> String { "\(host)|\(suffix)" }
@@ -73,6 +82,7 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
         if let matchedKey = match?.key {
             if let body = request.httpBody {
                 Self.bodies[matchedKey] = body
+                Self.bodyLog[matchedKey, default: []].append(body)
             } else if let stream = request.httpBodyStream {
                 stream.open()
                 var data = Data()
@@ -84,6 +94,7 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
                 }
                 stream.close()
                 Self.bodies[matchedKey] = data
+                Self.bodyLog[matchedKey, default: []].append(data)
             }
         }
         Self.lock.unlock()

@@ -37,6 +37,9 @@ public enum CheckoutEventCode: String, Sendable, CaseIterable {
     case primaryTokenGetPaymentElement = "HEADLESS_CHECKOUT_PRIMARY_TOKEN_GET_PAYMENT_ELEMENT"
     case primaryTokenSetAsPrimary = "HEADLESS_CHECKOUT_PRIMARY_TOKEN_SET_AS_PRIMARY"
     case reactiveValueSubscribe = "HEADLESS_CHECKOUT_REACTIVE_VALUE_SUBSCRIBE"
+    /// The shopper is sent out of the checkout: a PSP page, a 3-D Secure page, or the session's
+    /// success/failure page. Hostname only — see `redirectionPayload(for:delegated:)`.
+    case redirection = "HEADLESS_CHECKOUT_REDIRECTION"
     case ready = "HEADLESS_CHECKOUT_READY"
     case secondaryTokenRegister = "HEADLESS_CHECKOUT_SECONDARY_TOKEN_REGISTER"
     case secondaryTokenRemoveFromSplit = "HEADLESS_CHECKOUT_SECONDARY_TOKEN_REMOVE_FROM_SPLIT"
