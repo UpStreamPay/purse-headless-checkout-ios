@@ -1,13 +1,13 @@
 {
-  "originHash" : "4ab8b5ea112e5622ec658073bcef5b21c039f065874cd458f36a750426114c6a",
+  "originHash" : "0d4649589ca900ba276c257e91640470df978046e5459d373da8b130cc923ca1",
   "pins" : [
     {
       "identity" : "klarna-mobile-sdk-spm",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/klarna/klarna-mobile-sdk-spm.git",
       "state" : {
-        "revision" : "f72fa33f386cc1d7de8a78571475d971c02e1e40",
-        "version" : "2.13.2"
+        "revision" : "b57da321d9f8c41e9ddda682f7e0e5ac4cc3cce6",
+        "version" : "2.16.1"
       }
     },
     {
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/UpStreamPay/purse-securefields-ios.git",
       "state" : {
-        "revision" : "55d5c7dbfc7f5b2ed2c4c70075766189e337f8cb",
-        "version" : "1.9.0"
+        "revision" : "67565cea7bb2c0c100b80b3ea9946356885aeb16",
+        "version" : "1.11.0"
       }
     }
   ],
