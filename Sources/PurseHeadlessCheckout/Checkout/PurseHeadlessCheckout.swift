@@ -483,10 +483,18 @@ public final class PurseHeadlessCheckout: ObservableObject {
     ) async throws -> RedirectOutcome? {
         guard let action = pendingRedirect(for: result) else { return nil }
 
+        // Every exit is logged here, once: the response's own redirect and the session's
+        // success/failure fallback (a refused payment included) both come through this method.
+        // `delegated` is the hook's answer, so it is only known once the hook returns — a hook
+        // that declines leaves the SDK to present, which is not a delegation. A throwing hook
+        // sends the shopper nowhere; `CLIENT_HOOK_ERROR` reports it instead.
         if let onRedirection = hooks?.onRedirection {
             do {
                 // `true` means the merchant took it over: the SDK opens nothing.
-                if try await onRedirection(action) { return nil }
+                if try await onRedirection(action) {
+                    logRedirection(action, delegated: true)
+                    return nil
+                }
             } catch {
                 await eventBus.post(.clientHookError, .error, monitoringPayload([
                     "hook": .string("onRedirection"), "message": .string(error.localizedDescription)
@@ -499,7 +507,18 @@ public final class PurseHeadlessCheckout: ObservableObject {
             }
         }
 
+        // Before presenting: `present` only returns once the shopper is back.
+        logRedirection(action, delegated: false)
         return try await presenter.present(action)
+    }
+
+    /// Posts `HEADLESS_CHECKOUT_REDIRECTION` without awaiting it. Synchronous and non-throwing, so
+    /// the redirect is neither delayed by the bus — whose `add` can flush a full batch over the
+    /// network inline — nor blocked by it, whatever the URL holds.
+    private func logRedirection(_ action: RedirectAction, delegated: Bool) {
+        pendingRedirectionLog = postMonitoring(
+            .redirection, .info, redirectionPayload(for: action, delegated: delegated)
+        )
     }
 
     /// The redirect the last `/validate` asked for, if any. Reaching the returned action's
@@ -1078,7 +1097,12 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// Fire-and-forget an event from a synchronous context — every mutating method here is
     /// synchronous, but `CheckoutEventBus` is an actor. A failure inside `post` cannot happen (it
     /// never throws), so this never needs to surface anything back to the caller.
-    private func postMonitoring(_ code: CheckoutEventCode, _ type: EventLevel = .info, _ payload: JSONValue? = nil) {
+    @discardableResult
+    private func postMonitoring(
+        _ code: CheckoutEventCode,
+        _ type: EventLevel = .info,
+        _ payload: JSONValue? = nil
+    ) -> Task<Void, Never> {
         Task { await self.eventBus.post(code, type, payload) }
     }
 
@@ -1400,6 +1424,10 @@ public final class PurseHeadlessCheckout: ObservableObject {
     /// Exposed at `internal` access only so tests can `await` the monitoring install fired at
     /// construction (`CREATE`/`SET_SESSION`/`READY`) — a merchant has no need to touch it.
     private(set) var pendingMonitoringInstall: Task<Void, Never>?
+
+    /// Test seam: the last `HEADLESS_CHECKOUT_REDIRECTION` post, fire-and-forget in production, so
+    /// a test can `await` it reaching the bus instead of racing it.
+    private(set) var pendingRedirectionLog: Task<Void, Never>?
 
     // MARK: Wallet session
 
