@@ -1,0 +1,62 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Apple Swift version 6.1.2 (swiftlang-6.1.2.1.2 clang-1700.0.13.5)
+// swift-module-flags: -target arm64-apple-ios16.0 -enable-objc-interop -enable-library-evolution -swift-version 6 -enforce-exclusivity=checked -O -enable-experimental-feature DebugDescriptionMacro -module-name PurseCheckoutKlarna -module-alias Module___PurseCheckoutKlarna=PurseCheckoutKlarna -module-alias Module____StringProcessing=_StringProcessing -module-alias Module____SwiftConcurrencyShims=_SwiftConcurrencyShims -module-alias Module____Concurrency=_Concurrency -module-alias Module___KlarnaCore=KlarnaCore -module-alias Module___KlarnaPayments=KlarnaPayments -module-alias Module___PurseHeadlessCheckout=PurseHeadlessCheckout -module-alias Module___UIKit=UIKit
+// swift-module-flags-ignorable:  -interface-compiler-version 6.1.2
+import Foundation
+import Module___KlarnaCore
+import Module___KlarnaPayments
+import Module___PurseHeadlessCheckout
+import Swift
+import Module___UIKit
+import Module____Concurrency
+import Module____StringProcessing
+import Module____SwiftConcurrencyShims
+@objc @Module____Concurrency.MainActor final public class KlarnaCoordinator : ObjectiveC.NSObject {
+  @Module____Concurrency.MainActor public init(host: any Module___PurseHeadlessCheckout.PluginHost)
+  @Module____Concurrency.MainActor final public func prepare(into container: Module___UIKit.UIView, returnURL: Foundation.URL) async throws
+  @objc deinit
+}
+extension Module___PurseCheckoutKlarna.KlarnaCoordinator : Module___KlarnaPayments.KlarnaPaymentEventListener {
+  @objc nonisolated final public func klarnaInitialized(paymentView: Module___KlarnaPayments.KlarnaPaymentView)
+  @objc nonisolated final public func klarnaLoaded(paymentView: Module___KlarnaPayments.KlarnaPaymentView)
+  @objc nonisolated final public func klarnaLoadedPaymentReview(paymentView: Module___KlarnaPayments.KlarnaPaymentView)
+  @objc nonisolated final public func klarnaAuthorized(paymentView: Module___KlarnaPayments.KlarnaPaymentView, approved: Swift.Bool, authToken: Swift.String?, finalizeRequired: Swift.Bool)
+  @objc nonisolated final public func klarnaReauthorized(paymentView: Module___KlarnaPayments.KlarnaPaymentView, approved: Swift.Bool, authToken: Swift.String?)
+  @objc nonisolated final public func klarnaFinalized(paymentView: Module___KlarnaPayments.KlarnaPaymentView, approved: Swift.Bool, authToken: Swift.String?)
+  @objc nonisolated final public func klarnaResized(paymentView: Module___KlarnaPayments.KlarnaPaymentView, to newHeight: CoreFoundation.CGFloat)
+  @objc nonisolated final public func klarnaFailed(inPaymentView paymentView: Module___KlarnaPayments.KlarnaPaymentView, withError error: Module___KlarnaCore.KlarnaPaymentError)
+}
+public struct KlarnaAuthorizationDeclined : Module___PurseHeadlessCheckout.PurseError {
+  public var code: Module___PurseHeadlessCheckout.PurseErrorCode {
+    get
+  }
+  public var message: Swift.String {
+    get
+  }
+  public var underlying: (any Swift.Error)? {
+    get
+  }
+  public init()
+}
+public struct KlarnaPlugin : Module___PurseHeadlessCheckout.PartnerUIPlugin {
+  public enum Collected {
+    public static let stepId: Swift.String
+    public static let authorizeToken: Swift.String
+  }
+  public let partner: Module___PurseHeadlessCheckout.Partner
+  public let method: Module___PurseHeadlessCheckout.PaymentMethod
+  public init(partner: Module___PurseHeadlessCheckout.Partner)
+  public var reloadsOnAmountUpdate: Swift.Bool {
+    get
+  }
+  public func preValidation(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws -> Module___PurseHeadlessCheckout.ValidateItemPayload
+  public func postValidation(_ result: Module___PurseHeadlessCheckout.ValidationResult, context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws
+}
+public struct KlarnaModule : Module___PurseHeadlessCheckout.PartnerModule {
+  public let id: Swift.String
+  public init()
+  @Module____Concurrency.MainActor public func register(into registry: Module___PurseHeadlessCheckout.PluginRegistry)
+  @Module____Concurrency.MainActor public func renders(_ plugin: any Module___PurseHeadlessCheckout.PartnerUIPlugin) -> Swift.Bool
+  @Module____Concurrency.MainActor public func surface(for plugin: any Module___PurseHeadlessCheckout.PartnerUIPlugin, request: Module___PurseHeadlessCheckout.SurfaceRequest) -> Module___PurseHeadlessCheckout.PaymentSurface?
+}
+extension Module___PurseCheckoutKlarna.KlarnaCoordinator : Swift.Sendable {}

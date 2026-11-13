@@ -1,0 +1,1845 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Apple Swift version 6.1.2 (swiftlang-6.1.2.1.2 clang-1700.0.13.5)
+// swift-module-flags: -target arm64-apple-ios16.0 -enable-objc-interop -enable-library-evolution -swift-version 6 -enforce-exclusivity=checked -O -enable-experimental-feature DebugDescriptionMacro -module-name PurseHeadlessCheckout -module-alias Module___PurseHeadlessCheckout=PurseHeadlessCheckout -module-alias Module____StringProcessing=_StringProcessing -module-alias Module____SwiftConcurrencyShims=_SwiftConcurrencyShims -module-alias Module____Concurrency=_Concurrency -module-alias Module___UIKit=UIKit -module-alias Module___Combine=Combine -module-alias Module___SwiftUI=SwiftUI -module-alias Module___PurseSecureFields=PurseSecureFields -module-alias Module___AuthenticationServices=AuthenticationServices -module-alias Module___WebKit=WebKit
+// swift-module-flags-ignorable:  -interface-compiler-version 6.1.2
+import Module___AuthenticationServices
+import Module___Combine
+import Foundation
+import Foundation/*.Bundle*/
+import Foundation/*.ProcessInfo*/
+import Foundation/*.URL*/
+import Module___PurseSecureFields
+import Swift
+import Module___SwiftUI
+import Module___UIKit
+import Module___WebKit
+import Module____Concurrency
+import Module____StringProcessing
+import Module____SwiftConcurrencyShims
+public struct TransactionOperation : Swift.Sendable, Swift.Equatable {
+  public let partner: Swift.String
+  public let method: Swift.String
+  public let action: Swift.String
+  public let state: Swift.String
+  public let code: Swift.String?
+  public let id: Swift.String?
+  public let parentTransactionId: Swift.String?
+  public let partnerReference: Swift.String?
+  public init(partner: Swift.String, method: Swift.String, action: Swift.String, state: Swift.String, code: Swift.String? = nil, id: Swift.String? = nil, parentTransactionId: Swift.String? = nil, partnerReference: Swift.String? = nil)
+  public static func == (a: Module___PurseHeadlessCheckout.TransactionOperation, b: Module___PurseHeadlessCheckout.TransactionOperation) -> Swift.Bool
+}
+public enum PaymentSessionStatus : Swift.Sendable, Swift.Equatable {
+  case confirmed([Module___PurseHeadlessCheckout.TransactionOperation])
+  case failed([Module___PurseHeadlessCheckout.TransactionOperation])
+  case pending([Module___PurseHeadlessCheckout.TransactionOperation])
+  public var operations: [Module___PurseHeadlessCheckout.TransactionOperation] {
+    get
+  }
+  public static func from(_ transactions: [Module___PurseHeadlessCheckout.JSONValue]) -> Module___PurseHeadlessCheckout.PaymentSessionStatus
+  public static func parse(_ transactions: [Module___PurseHeadlessCheckout.JSONValue]) -> [Module___PurseHeadlessCheckout.TransactionOperation]
+  public static func == (a: Module___PurseHeadlessCheckout.PaymentSessionStatus, b: Module___PurseHeadlessCheckout.PaymentSessionStatus) -> Swift.Bool
+}
+public enum DisabledState : Swift.Sendable, Swift.Equatable {
+  case methodUnstable
+  case amountConditionUnreachable(minAmount: Foundation.Decimal, maxAmount: Foundation.Decimal?, orderAmount: Foundation.Decimal)
+  case paymentFulfilled
+  case minAmountNotMet(minAmount: Foundation.Decimal, restToPay: Foundation.Decimal)
+  case maxAmountExceeded(maxAmount: Foundation.Decimal, restToPay: Foundation.Decimal?)
+  case pluginIncompatible
+  case tokenInitFailed
+  case partnerUIFatalError(reason: Swift.String?)
+  case partnerUIRecoverableError(reason: Swift.String?)
+  case fatalErrorBeforeRender(reason: Swift.String?)
+  case submitting
+  public enum Code : Swift.String, Swift.Sendable, Swift.CaseIterable {
+    case methodUnstable
+    case amountConditionUnreachable
+    case paymentFulfilled
+    case minAmountNotMet
+    case maxAmountExceeded
+    case pluginIncompatible
+    case tokenInitFailed
+    case partnerUIFatalError
+    case partnerUIRecoverableError
+    case fatalErrorBeforeRender
+    case submitting
+    public init?(rawValue: Swift.String)
+    public typealias AllCases = [Module___PurseHeadlessCheckout.DisabledState.Code]
+    public typealias RawValue = Swift.String
+    nonisolated public static var allCases: [Module___PurseHeadlessCheckout.DisabledState.Code] {
+      get
+    }
+    public var rawValue: Swift.String {
+      get
+    }
+  }
+  public var code: Module___PurseHeadlessCheckout.DisabledState.Code {
+    get
+  }
+  public var message: Swift.String {
+    get
+  }
+  public var isFiltered: Swift.Bool {
+    get
+  }
+  public var isTechnicallyDisabled: Swift.Bool {
+    get
+  }
+  public var requiresUIClear: Swift.Bool {
+    get
+  }
+  public var isRecoverable: Swift.Bool {
+    get
+  }
+  public var isRecomputable: Swift.Bool {
+    get
+  }
+  public static let filteredCodes: Swift.Set<Module___PurseHeadlessCheckout.DisabledState.Code>
+  public static let technicallyDisabledCodes: Swift.Set<Module___PurseHeadlessCheckout.DisabledState.Code>
+  public static let shouldClearUICodes: Swift.Set<Module___PurseHeadlessCheckout.DisabledState.Code>
+  public static let recoverableCodes: Swift.Set<Module___PurseHeadlessCheckout.DisabledState.Code>
+  public static let recomputableCodes: Swift.Set<Module___PurseHeadlessCheckout.DisabledState.Code>
+  public static func == (a: Module___PurseHeadlessCheckout.DisabledState, b: Module___PurseHeadlessCheckout.DisabledState) -> Swift.Bool
+}
+public enum MethodAvailability {
+  public static func buildTimeDisabled(for configuration: Module___PurseHeadlessCheckout.MethodConfiguration, orderAmount: Foundation.Decimal) -> Module___PurseHeadlessCheckout.DisabledState?
+  public static func disabled(for configuration: Module___PurseHeadlessCheckout.MethodConfiguration, isInformationRequest: Swift.Bool, primaryReach: Foundation.Decimal, isInSplit: Swift.Bool = false) -> Module___PurseHeadlessCheckout.DisabledState?
+  public static func recompute(_ methods: [Module___PurseHeadlessCheckout.PaymentItem], isInformationRequest: Swift.Bool, primaryReach: Foundation.Decimal, splitSources: [any Module___PurseHeadlessCheckout.SplitSource] = []) -> [Module___PurseHeadlessCheckout.PaymentItem]
+}
+public enum PaymentItem : Swift.Sendable, Swift.Equatable {
+  case primaryMethod(Module___PurseHeadlessCheckout.PrimaryMethod)
+  case secondaryMethod(Module___PurseHeadlessCheckout.SecondaryMethod)
+  case paymentToken(Module___PurseHeadlessCheckout.PaymentToken)
+  case savedSecondaryToken(Module___PurseHeadlessCheckout.SavedSecondaryToken)
+  public var id: Swift.String {
+    get
+  }
+  public var partner: Module___PurseHeadlessCheckout.Partner {
+    get
+  }
+  public var method: Module___PurseHeadlessCheckout.PaymentMethod {
+    get
+  }
+  public var configuration: Module___PurseHeadlessCheckout.MethodConfiguration {
+    get
+  }
+  public var disabled: Module___PurseHeadlessCheckout.DisabledState? {
+    get
+  }
+  public var isSecondary: Swift.Bool {
+    get
+  }
+  public var minAmount: Foundation.Decimal? {
+    get
+  }
+  public var maxAmount: Foundation.Decimal? {
+    get
+  }
+  public func withDisabled(_ disabled: Module___PurseHeadlessCheckout.DisabledState?) -> Module___PurseHeadlessCheckout.PaymentItem
+  public static func == (a: Module___PurseHeadlessCheckout.PaymentItem, b: Module___PurseHeadlessCheckout.PaymentItem) -> Swift.Bool
+}
+public struct PrimaryMethod : Module___PurseHeadlessCheckout.PrimarySource, Swift.Sendable, Swift.Equatable {
+  public let id: Swift.String
+  public let partner: Module___PurseHeadlessCheckout.Partner
+  public let method: Module___PurseHeadlessCheckout.PaymentMethod
+  public let configuration: Module___PurseHeadlessCheckout.MethodConfiguration
+  public var disabled: Module___PurseHeadlessCheckout.DisabledState? {
+    get
+  }
+  public let integrationType: Module___PurseHeadlessCheckout.IntegrationMode?
+  public let supportedBrands: [Module___PurseHeadlessCheckout.CardBrand]
+  public var saveTokenMode: Module___PurseHeadlessCheckout.SaveTokenMode {
+    get
+  }
+  public var canBeRegistered: Swift.Bool {
+    get
+  }
+  public var simulable: Swift.Bool {
+    get
+  }
+  public static func == (a: Module___PurseHeadlessCheckout.PrimaryMethod, b: Module___PurseHeadlessCheckout.PrimaryMethod) -> Swift.Bool
+}
+public struct SecondaryMethod : Swift.Sendable, Swift.Equatable {
+  public let id: Swift.String
+  public let partner: Module___PurseHeadlessCheckout.Partner
+  public let method: Module___PurseHeadlessCheckout.PaymentMethod
+  public let configuration: Module___PurseHeadlessCheckout.MethodConfiguration
+  public var disabled: Module___PurseHeadlessCheckout.DisabledState? {
+    get
+  }
+  public var saveTokenMode: Module___PurseHeadlessCheckout.SaveTokenMode {
+    get
+  }
+  public var canBeRegistered: Swift.Bool {
+    get
+  }
+  public static func == (a: Module___PurseHeadlessCheckout.SecondaryMethod, b: Module___PurseHeadlessCheckout.SecondaryMethod) -> Swift.Bool
+}
+public struct PaymentToken : Module___PurseHeadlessCheckout.PrimarySource, Swift.Sendable, Swift.Equatable {
+  public let id: Swift.String
+  public let partner: Module___PurseHeadlessCheckout.Partner
+  public let method: Module___PurseHeadlessCheckout.PaymentMethod
+  public let configuration: Module___PurseHeadlessCheckout.MethodConfiguration
+  public var disabled: Module___PurseHeadlessCheckout.DisabledState? {
+    get
+  }
+  public let value: Swift.String
+  public var name: Swift.String {
+    get
+  }
+  public let label: Swift.String
+  public let brand: Swift.String
+  public let holderName: Swift.String
+  public let maskedPAN: Swift.String
+  public let expirationDate: Swift.String?
+  public var favorite: Swift.Bool {
+    get
+  }
+  public let tokenSource: Module___PurseHeadlessCheckout.TokenSource
+  public let createdAt: Swift.String?
+  public let networkTokenAvailable: Swift.Bool
+  public var methodId: Swift.String {
+    get
+  }
+  public var isVaultedCard: Swift.Bool {
+    get
+  }
+  public var paysWithoutCVV: Swift.Bool {
+    get
+  }
+  public var requiresCVV: Swift.Bool {
+    get
+  }
+  public static func == (a: Module___PurseHeadlessCheckout.PaymentToken, b: Module___PurseHeadlessCheckout.PaymentToken) -> Swift.Bool
+}
+public struct SavedSecondaryToken : Swift.Sendable, Swift.Equatable {
+  public let id: Swift.String
+  public let partner: Module___PurseHeadlessCheckout.Partner
+  public let method: Module___PurseHeadlessCheckout.PaymentMethod
+  public let configuration: Module___PurseHeadlessCheckout.MethodConfiguration
+  public var disabled: Module___PurseHeadlessCheckout.DisabledState? {
+    get
+  }
+  public let pan: Swift.String
+  public let cvv: Swift.String?
+  public var name: Swift.String {
+    get
+  }
+  public let expirationDate: Swift.String?
+  public let createdAt: Swift.String?
+  public var favorite: Swift.Bool {
+    get
+  }
+  public var balance: Foundation.Decimal {
+    get
+  }
+  public var totalBalance: Foundation.Decimal {
+    get
+  }
+  public var balanceResolved: Swift.Bool {
+    get
+  }
+  public let takePolicy: Module___PurseHeadlessCheckout.SecondaryTakePolicy
+  public var maxAmount: Foundation.Decimal? {
+    get
+  }
+  public func asSecondaryToken() -> Module___PurseHeadlessCheckout.SecondaryToken
+  public static func == (a: Module___PurseHeadlessCheckout.SavedSecondaryToken, b: Module___PurseHeadlessCheckout.SavedSecondaryToken) -> Swift.Bool
+}
+public struct RegistrationState : Swift.Sendable, Swift.Equatable {
+  public let registered: Swift.Bool
+  public let name: Swift.String?
+  public init(registered: Swift.Bool, name: Swift.String? = nil)
+  public static func == (a: Module___PurseHeadlessCheckout.RegistrationState, b: Module___PurseHeadlessCheckout.RegistrationState) -> Swift.Bool
+}
+public protocol SecondaryConfig : Swift.Sendable {
+  var takePolicy: Module___PurseHeadlessCheckout.SecondaryTakePolicy { get }
+  var nameLogKey: Swift.String? { get }
+  func requiresCVV(pan: Swift.String) -> Swift.Bool
+  func validatePAN(_ pan: Swift.String) -> Swift.Bool
+  func validateCVV(_ cvv: Swift.String) -> Swift.Bool
+  func buildInitPaymentData(pan: Swift.String, cvv: Swift.String?) -> [Swift.String : Module___PurseHeadlessCheckout.JSONValue]
+  func buildValidatePaymentData(_ token: Module___PurseHeadlessCheckout.SecondaryToken) -> [Swift.String : Module___PurseHeadlessCheckout.JSONValue]
+  func parseToken(method: Module___PurseHeadlessCheckout.SecondaryMethod, initResponse: Module___PurseHeadlessCheckout.JSONValue, pan: Swift.String, cvv: Swift.String?) throws -> Module___PurseHeadlessCheckout.SecondaryToken
+  func shouldPoll(_ initResponse: Module___PurseHeadlessCheckout.JSONValue) -> Swift.Bool
+  func classifyInitError(_ initResponse: Module___PurseHeadlessCheckout.JSONValue) -> Module___PurseHeadlessCheckout.PurseCheckoutError?
+}
+extension Module___PurseHeadlessCheckout.SecondaryConfig {
+  public var nameLogKey: Swift.String? {
+    get
+  }
+  public func validateCVV(_ cvv: Swift.String) -> Swift.Bool
+  public func buildInitPaymentData(pan: Swift.String, cvv: Swift.String?) -> [Swift.String : Module___PurseHeadlessCheckout.JSONValue]
+  public func buildValidatePaymentData(_ token: Module___PurseHeadlessCheckout.SecondaryToken) -> [Swift.String : Module___PurseHeadlessCheckout.JSONValue]
+  public func parseToken(method: Module___PurseHeadlessCheckout.SecondaryMethod, initResponse: Module___PurseHeadlessCheckout.JSONValue, pan: Swift.String, cvv: Swift.String?) throws -> Module___PurseHeadlessCheckout.SecondaryToken
+  public func shouldPoll(_ initResponse: Module___PurseHeadlessCheckout.JSONValue) -> Swift.Bool
+  public func classifyInitError(_ initResponse: Module___PurseHeadlessCheckout.JSONValue) -> Module___PurseHeadlessCheckout.PurseCheckoutError?
+}
+public struct IllicadoConfig : Module___PurseHeadlessCheckout.SecondaryConfig {
+  public let takePolicy: Module___PurseHeadlessCheckout.SecondaryTakePolicy
+  public let nameLogKey: Swift.String?
+  public init()
+  public func requiresCVV(pan: Swift.String) -> Swift.Bool
+  public func validatePAN(_ pan: Swift.String) -> Swift.Bool
+  public func validateCVV(_ cvv: Swift.String) -> Swift.Bool
+}
+public struct BuyboxConfig : Module___PurseHeadlessCheckout.SecondaryConfig {
+  public let takePolicy: Module___PurseHeadlessCheckout.SecondaryTakePolicy
+  public let nameLogKey: Swift.String?
+  public init()
+  public func requiresCVV(pan: Swift.String) -> Swift.Bool
+  public func validatePAN(_ pan: Swift.String) -> Swift.Bool
+}
+public struct MaxxingConfig : Module___PurseHeadlessCheckout.SecondaryConfig {
+  public let takePolicy: Module___PurseHeadlessCheckout.SecondaryTakePolicy
+  public init()
+  public func requiresCVV(pan: Swift.String) -> Swift.Bool
+  public func validatePAN(_ pan: Swift.String) -> Swift.Bool
+  public func parseToken(method: Module___PurseHeadlessCheckout.SecondaryMethod, initResponse: Module___PurseHeadlessCheckout.JSONValue, pan: Swift.String, cvv: Swift.String?) throws -> Module___PurseHeadlessCheckout.SecondaryToken
+}
+public struct OglobaConfig : Module___PurseHeadlessCheckout.SecondaryConfig {
+  public let takePolicy: Module___PurseHeadlessCheckout.SecondaryTakePolicy
+  public let nameLogKey: Swift.String?
+  public init()
+  public func requiresCVV(pan: Swift.String) -> Swift.Bool
+  public func validatePAN(_ pan: Swift.String) -> Swift.Bool
+}
+public struct MybeezboxConfig : Module___PurseHeadlessCheckout.SecondaryConfig {
+  public let takePolicy: Module___PurseHeadlessCheckout.SecondaryTakePolicy
+  public let nameLogKey: Swift.String?
+  public init()
+  public func requiresCVV(pan: Swift.String) -> Swift.Bool
+  public func validatePAN(_ pan: Swift.String) -> Swift.Bool
+}
+public struct Easy2playGiftcardConfig : Module___PurseHeadlessCheckout.SecondaryConfig {
+  public let takePolicy: Module___PurseHeadlessCheckout.SecondaryTakePolicy
+  public let nameLogKey: Swift.String?
+  public init()
+  public func requiresCVV(pan: Swift.String) -> Swift.Bool
+  public func validatePAN(_ pan: Swift.String) -> Swift.Bool
+  public func validateCVV(_ cvv: Swift.String) -> Swift.Bool
+}
+public struct Easy2playVoucherConfig : Module___PurseHeadlessCheckout.SecondaryConfig {
+  public let takePolicy: Module___PurseHeadlessCheckout.SecondaryTakePolicy
+  public init()
+  public func requiresCVV(pan: Swift.String) -> Swift.Bool
+  public func validatePAN(_ pan: Swift.String) -> Swift.Bool
+  public func buildInitPaymentData(pan: Swift.String, cvv: Swift.String?) -> [Swift.String : Module___PurseHeadlessCheckout.JSONValue]
+  public func buildValidatePaymentData(_ token: Module___PurseHeadlessCheckout.SecondaryToken) -> [Swift.String : Module___PurseHeadlessCheckout.JSONValue]
+}
+@Module____Concurrency.MainActor final public class SecondaryConfigs {
+  @Module____Concurrency.MainActor public static let shared: Module___PurseHeadlessCheckout.SecondaryConfigs
+  @Module____Concurrency.MainActor public init()
+  @Module____Concurrency.MainActor final public func config(partner: Module___PurseHeadlessCheckout.Partner, method: Module___PurseHeadlessCheckout.PaymentMethod) -> (any Module___PurseHeadlessCheckout.SecondaryConfig)?
+  @Module____Concurrency.MainActor final public func config(for method: Module___PurseHeadlessCheckout.SecondaryMethod) -> (any Module___PurseHeadlessCheckout.SecondaryConfig)?
+  @Module____Concurrency.MainActor final public func register(partner: Module___PurseHeadlessCheckout.Partner, method: Module___PurseHeadlessCheckout.PaymentMethod, config: any Module___PurseHeadlessCheckout.SecondaryConfig)
+  @Module____Concurrency.MainActor final public func unregister(partner: Module___PurseHeadlessCheckout.Partner, method: Module___PurseHeadlessCheckout.PaymentMethod)
+  @Module____Concurrency.MainActor final public func isRegistered(partner: Module___PurseHeadlessCheckout.Partner, method: Module___PurseHeadlessCheckout.PaymentMethod) -> Swift.Bool
+  @Module____Concurrency.MainActor final public func reset()
+  @objc deinit
+}
+public enum SecondaryTakePolicy : Swift.String, Swift.Sendable, Swift.CaseIterable {
+  case none
+  case max
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [Module___PurseHeadlessCheckout.SecondaryTakePolicy]
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [Module___PurseHeadlessCheckout.SecondaryTakePolicy] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public struct SecondaryToken : Module___PurseHeadlessCheckout.SplitSource, Swift.Sendable, Swift.Equatable {
+  public let id: Swift.String
+  public let partner: Module___PurseHeadlessCheckout.Partner
+  public let method: Module___PurseHeadlessCheckout.PaymentMethod
+  public let pan: Swift.String
+  public let cvv: Swift.String?
+  public let name: Swift.String
+  public let balance: Foundation.Decimal
+  public let totalBalance: Foundation.Decimal
+  public let expirationDate: Swift.String
+  public let takePolicy: Module___PurseHeadlessCheckout.SecondaryTakePolicy
+  public let limit: Foundation.Decimal?
+  public let usageLimit: Swift.Int?
+  public var saveTokenMode: Module___PurseHeadlessCheckout.SaveTokenMode {
+    get
+  }
+  public let isSaved: Swift.Bool
+  public init(id: Swift.String, partner: Module___PurseHeadlessCheckout.Partner, method: Module___PurseHeadlessCheckout.PaymentMethod, pan: Swift.String, cvv: Swift.String?, name: Swift.String, balance: Foundation.Decimal, totalBalance: Foundation.Decimal? = nil, expirationDate: Swift.String = "", takePolicy: Module___PurseHeadlessCheckout.SecondaryTakePolicy = .none, limit: Foundation.Decimal? = nil, usageLimit: Swift.Int? = nil, saveTokenMode: Module___PurseHeadlessCheckout.SaveTokenMode = .never, isSaved: Swift.Bool = false)
+  public var canBeRegistered: Swift.Bool {
+    get
+  }
+  public static func == (a: Module___PurseHeadlessCheckout.SecondaryToken, b: Module___PurseHeadlessCheckout.SecondaryToken) -> Swift.Bool
+}
+public struct PursePaymentSplitter : Swift.Sendable {
+  public init(orderAmount: Foundation.Decimal)
+  public var orderAmount: Foundation.Decimal {
+    get
+  }
+  public var secondaryContribution: Foundation.Decimal {
+    get
+  }
+  public var primaryReach: Foundation.Decimal {
+    get
+  }
+  public var remaining: Foundation.Decimal {
+    get
+  }
+  public var primaryMethod: (any Module___PurseHeadlessCheckout.PrimarySource)? {
+    get
+  }
+  public var appliedSecondaries: [Module___PurseHeadlessCheckout.SecondaryToken] {
+    get
+  }
+  public var fulfilled: Swift.Bool {
+    get
+  }
+  public var splits: [Module___PurseHeadlessCheckout.PaymentSplit] {
+    get
+  }
+  public mutating func setPrimary(_ source: (any Module___PurseHeadlessCheckout.PrimarySource)?)
+  public mutating func takeSplit(_ token: Module___PurseHeadlessCheckout.SecondaryToken, requestedAmount: Foundation.Decimal? = nil) throws
+  public mutating func clearSplit(_ token: Module___PurseHeadlessCheckout.SecondaryToken)
+  public mutating func reset(orderAmount: Foundation.Decimal)
+}
+public protocol SplitSource : Swift.Sendable {
+  var id: Swift.String { get }
+  var partner: Module___PurseHeadlessCheckout.Partner { get }
+  var method: Module___PurseHeadlessCheckout.PaymentMethod { get }
+}
+public protocol PrimarySource : Module___PurseHeadlessCheckout.SplitSource {
+}
+public struct PaymentSplit : Swift.Sendable {
+  public let amount: Foundation.Decimal
+  public let source: any Module___PurseHeadlessCheckout.SplitSource
+  public init(amount: Foundation.Decimal, source: any Module___PurseHeadlessCheckout.SplitSource)
+}
+extension Module___PurseHeadlessCheckout.PaymentSplit : Swift.Equatable {
+  public static func == (lhs: Module___PurseHeadlessCheckout.PaymentSplit, rhs: Module___PurseHeadlessCheckout.PaymentSplit) -> Swift.Bool
+}
+public enum PurseCheckoutError : Module___PurseHeadlessCheckout.PurseError {
+  case paymentNotFulfilled(Swift.String)
+  case methodDisabled(itemId: Swift.String, disabled: Module___PurseHeadlessCheckout.DisabledState)
+  case invalidTake(Swift.String, Module___PurseHeadlessCheckout.PurseErrorCode)
+  case sessionExpired(sessionId: Swift.String)
+  case submitBlocked(state: Module___PurseHeadlessCheckout.SessionState)
+  case noPluginRegistered(itemId: Swift.String)
+  case noSecondaryConfig(itemId: Swift.String)
+  case itemNotFulfilled(itemId: Swift.String)
+  case validateFailed(Swift.String, (any Swift.Error)?)
+  case hookFailed(hook: Swift.String, underlying: any Swift.Error, code: Module___PurseHeadlessCheckout.PurseErrorCode)
+  case postValidationFailed(result: Module___PurseHeadlessCheckout.ValidationResult, underlying: any Swift.Error)
+  case secondaryTokenizationFailed(Swift.String, Module___PurseHeadlessCheckout.PurseErrorCode, underlying: (any Swift.Error)? = nil)
+  case invalidSecondaryCard(Swift.String, Module___PurseHeadlessCheckout.PurseErrorCode)
+  case walletOperationFailed(Swift.String, Module___PurseHeadlessCheckout.PurseErrorCode)
+  case methodNotSimulable(itemId: Swift.String)
+  case loanSimulationFailed(Swift.String, underlying: (any Swift.Error)?)
+  case checkoutTornDown
+  public var code: Module___PurseHeadlessCheckout.PurseErrorCode {
+    get
+  }
+  public var underlying: (any Swift.Error)? {
+    get
+  }
+  public var message: Swift.String {
+    get
+  }
+}
+@_hasMissingDesignatedInitializers @Module____Concurrency.MainActor final public class PurseHeadlessCheckout : Module___Combine.ObservableObject {
+  @Module____Concurrency.MainActor final public let instanceId: Swift.String
+  @Module____Concurrency.MainActor final public var params: Module___PurseHeadlessCheckout.PurseSessionParams {
+    get
+  }
+  @Module____Concurrency.MainActor final public let disabledMethods: Swift.Set<Module___PurseHeadlessCheckout.MethodKey>
+  @Module____Concurrency.MainActor final public let options: Module___PurseHeadlessCheckout.PluginOptions
+  @Module____Concurrency.MainActor final public var paymentAPIRoot: Swift.String {
+    get
+  }
+  @Module____Concurrency.MainActor final public var currency: Swift.String {
+    get
+  }
+  @Module____Concurrency.MainActor final public var isInformationRequest: Swift.Bool {
+    get
+  }
+  @Module____Concurrency.MainActor final public var currentSessionId: Swift.String {
+    get
+  }
+  @Module___Combine.Published @_projectedValueProperty($session) @Module____Concurrency.MainActor final public var session: Module___PurseHeadlessCheckout.PaymentSession {
+    get
+  }
+  @Module____Concurrency.MainActor final public var $session: Module___Combine.Published<Module___PurseHeadlessCheckout.PaymentSession>.Publisher {
+    get
+  }
+  @Module___Combine.Published @_projectedValueProperty($sessionState) @Module____Concurrency.MainActor final public var sessionState: Module___PurseHeadlessCheckout.SessionState {
+    get
+  }
+  @Module____Concurrency.MainActor final public var $sessionState: Module___Combine.Published<Module___PurseHeadlessCheckout.SessionState>.Publisher {
+    get
+  }
+  @Module___Combine.Published @_projectedValueProperty($isTornDown) @Module____Concurrency.MainActor final public var isTornDown: Swift.Bool {
+    get
+  }
+  @Module____Concurrency.MainActor final public var $isTornDown: Module___Combine.Published<Swift.Bool>.Publisher {
+    get
+  }
+  @Module___Combine.Published @_projectedValueProperty($paymentMethods) @Module____Concurrency.MainActor final public var paymentMethods: [Module___PurseHeadlessCheckout.PaymentItem] {
+    get
+  }
+  @Module____Concurrency.MainActor final public var $paymentMethods: Module___Combine.Published<[Module___PurseHeadlessCheckout.PaymentItem]>.Publisher {
+    get
+  }
+  @Module___Combine.Published @_projectedValueProperty($paymentTokens) @Module____Concurrency.MainActor final public var paymentTokens: [Module___PurseHeadlessCheckout.PaymentToken] {
+    get
+  }
+  @Module____Concurrency.MainActor final public var $paymentTokens: Module___Combine.Published<[Module___PurseHeadlessCheckout.PaymentToken]>.Publisher {
+    get
+  }
+  @Module___Combine.Published @_projectedValueProperty($savedSecondaryTokens) @Module____Concurrency.MainActor final public var savedSecondaryTokens: [Module___PurseHeadlessCheckout.SavedSecondaryToken] {
+    get
+  }
+  @Module____Concurrency.MainActor final public var $savedSecondaryTokens: Module___Combine.Published<[Module___PurseHeadlessCheckout.SavedSecondaryToken]>.Publisher {
+    get
+  }
+  @Module___Combine.Published @_projectedValueProperty($remainingAmountToPay) @Module____Concurrency.MainActor final public var remainingAmountToPay: Foundation.Decimal {
+    get
+  }
+  @Module____Concurrency.MainActor final public var $remainingAmountToPay: Module___Combine.Published<Foundation.Decimal>.Publisher {
+    get
+  }
+  @Module___Combine.Published @_projectedValueProperty($isPaymentFulfilled) @Module____Concurrency.MainActor final public var isPaymentFulfilled: Swift.Bool {
+    get
+  }
+  @Module____Concurrency.MainActor final public var $isPaymentFulfilled: Module___Combine.Published<Swift.Bool>.Publisher {
+    get
+  }
+  @Module___Combine.Published @_projectedValueProperty($amountSplit) @Module____Concurrency.MainActor final public var amountSplit: [Module___PurseHeadlessCheckout.PaymentSplit] {
+    get
+  }
+  @Module____Concurrency.MainActor final public var $amountSplit: Module___Combine.Published<[Module___PurseHeadlessCheckout.PaymentSplit]>.Publisher {
+    get
+  }
+  @Module___Combine.Published @_projectedValueProperty($itemGenerations) @Module____Concurrency.MainActor final public var itemGenerations: [Swift.String : Swift.Int] {
+    get
+  }
+  @Module____Concurrency.MainActor final public var $itemGenerations: Module___Combine.Published<[Swift.String : Swift.Int]>.Publisher {
+    get
+  }
+  @Module____Concurrency.MainActor final public var onPluginEvent: ((Module___PurseHeadlessCheckout.CheckoutPluginEvent) -> Swift.Void)?
+  @Module____Concurrency.MainActor convenience public init(widgetData: Swift.String, lockedEnvironment: Module___PurseHeadlessCheckout.PurseEnvironment? = nil, disabledMethods: Swift.Set<Module___PurseHeadlessCheckout.MethodKey> = [], hooks: Module___PurseHeadlessCheckout.PurseCheckoutHooks? = nil, registry: Module___PurseHeadlessCheckout.PluginRegistry = .shared, secondaryConfigs: Module___PurseHeadlessCheckout.SecondaryConfigs = .shared, instanceId: Swift.String = UUID().uuidString, urlSession: Foundation.URLSession = .shared, walletAPIRootOverride: Swift.String? = nil, monitoringAPIRootOverride: Swift.String? = nil, restored: Swift.Bool = false, options: Module___PurseHeadlessCheckout.PluginOptions = PluginOptions()) throws
+  @discardableResult
+  @Module____Concurrency.MainActor final public func submitPayment(skipOnBeforeValidate: Swift.Bool = false) async throws -> Module___PurseHeadlessCheckout.ValidationResult
+  @discardableResult
+  @Module____Concurrency.MainActor final public func presentRedirectIfNeeded(for result: Module___PurseHeadlessCheckout.ValidationResult, using presenter: any Module___PurseHeadlessCheckout.RedirectPresenter) async throws -> Module___PurseHeadlessCheckout.RedirectOutcome?
+  @Module____Concurrency.MainActor final public func pendingRedirect(for result: Module___PurseHeadlessCheckout.ValidationResult) -> Module___PurseHeadlessCheckout.RedirectAction?
+  @Module____Concurrency.MainActor final public func setCollected(_ itemId: Swift.String, _ data: [Swift.String : Module___PurseHeadlessCheckout.JSONValue])
+  @Module____Concurrency.MainActor final public func syncServerClock() async
+  @Module____Concurrency.MainActor final public func setPrimary(_ method: Module___PurseHeadlessCheckout.PrimaryMethod?) throws
+  @Module____Concurrency.MainActor final public func setPrimaryToken(_ token: Module___PurseHeadlessCheckout.PaymentToken) throws
+  @Module____Concurrency.MainActor final public func clearPrimarySplit()
+  @Module____Concurrency.MainActor final public var secondaryMethods: [Module___PurseHeadlessCheckout.SecondaryMethod] {
+    get
+  }
+  @Module____Concurrency.MainActor final public func secondaryConfig(for method: Module___PurseHeadlessCheckout.SecondaryMethod) -> (any Module___PurseHeadlessCheckout.SecondaryConfig)?
+  @Module____Concurrency.MainActor final public func getSecondaryToken(method: Module___PurseHeadlessCheckout.SecondaryMethod, pan: Swift.String, cvv: Swift.String? = nil) async throws -> Module___PurseHeadlessCheckout.SecondaryToken
+  @Module____Concurrency.MainActor final public func applySecondary(_ token: Module___PurseHeadlessCheckout.SecondaryToken, amount: Foundation.Decimal? = nil) throws
+  @Module____Concurrency.MainActor final public func applySecondary(_ token: Module___PurseHeadlessCheckout.SavedSecondaryToken, amount: Foundation.Decimal? = nil) throws
+  @Module____Concurrency.MainActor final public func removeSecondary(_ token: Module___PurseHeadlessCheckout.SecondaryToken)
+  @Module____Concurrency.MainActor final public func removeSecondary(_ token: Module___PurseHeadlessCheckout.SavedSecondaryToken)
+  @Module____Concurrency.MainActor final public var appliedSecondaries: [Module___PurseHeadlessCheckout.SecondaryToken] {
+    get
+  }
+  @Module____Concurrency.MainActor final public func setFulfilled(_ itemId: Swift.String, _ fulfilled: Swift.Bool)
+  @Module____Concurrency.MainActor final public var unfulfilledItemId: Swift.String? {
+    get
+  }
+  @Module____Concurrency.MainActor final public func host(for item: any Module___PurseHeadlessCheckout.PrimarySource) throws -> any Module___PurseHeadlessCheckout.PluginHost
+  @Module____Concurrency.MainActor final public func elementID(for item: Module___PurseHeadlessCheckout.PaymentItem) -> Swift.String
+  @Module____Concurrency.MainActor final public func paymentElement(for item: Module___PurseHeadlessCheckout.PaymentItem, listener: any Module___PurseHeadlessCheckout.PaymentElementListener, redirect: (any Module___PurseHeadlessCheckout.RedirectPresenter)? = nil, appReturnURL: Foundation.URL? = nil) -> Module___PurseHeadlessCheckout.PaymentElement
+  @Module____Concurrency.MainActor final public func setSession(_ widgetData: Swift.String) throws
+  @Module____Concurrency.MainActor final public func registrationOf(_ method: Module___PurseHeadlessCheckout.PrimaryMethod) -> Module___PurseHeadlessCheckout.RegistrationState
+  @Module____Concurrency.MainActor final public func register(_ method: Module___PurseHeadlessCheckout.PrimaryMethod, registered: Swift.Bool = true, name: Swift.String? = nil) throws
+  @Module____Concurrency.MainActor final public func registrationOf(_ token: Module___PurseHeadlessCheckout.SecondaryToken) -> Module___PurseHeadlessCheckout.RegistrationState
+  @Module____Concurrency.MainActor final public func registerSecondary(_ token: Module___PurseHeadlessCheckout.SecondaryToken, registered: Swift.Bool = true, name: Swift.String? = nil) throws
+  @Module____Concurrency.MainActor final public func editToken(_ token: Module___PurseHeadlessCheckout.PaymentToken, name: Swift.String) async throws
+  @Module____Concurrency.MainActor final public func editToken(_ token: Module___PurseHeadlessCheckout.SavedSecondaryToken, name: Swift.String) async throws
+  @Module____Concurrency.MainActor final public func deleteToken(_ token: Module___PurseHeadlessCheckout.PaymentToken) async throws
+  @Module____Concurrency.MainActor final public func setTokenFavorite(_ token: Module___PurseHeadlessCheckout.PaymentToken) async throws
+  @Module____Concurrency.MainActor final public func deleteAllTokens() async throws
+  @Module____Concurrency.MainActor final public func iconURL(for item: Module___PurseHeadlessCheckout.PaymentItem) -> Swift.String
+  @Module____Concurrency.MainActor final public func schemeAssets(for method: Module___PurseHeadlessCheckout.PrimaryMethod) -> [Module___PurseHeadlessCheckout.PurseAssets.CardSchemeAsset]
+  @available(*, deprecated, message: "GET session answers 401 to the client key: confirm the payment from your backend instead")
+  @Module____Concurrency.MainActor final public func sessionTransactions() async throws -> [Module___PurseHeadlessCheckout.JSONValue]
+  @available(*, deprecated, message: "GET session answers 401 to the client key: confirm the payment from your backend instead")
+  @Module____Concurrency.MainActor final public func paymentStatus() async throws -> Module___PurseHeadlessCheckout.PaymentSessionStatus
+  @available(*, deprecated, message: "GET session answers 401 to the client key: confirm the payment from your backend instead")
+  @Module____Concurrency.MainActor final public func awaitPaymentOutcome(timeout: Swift.Duration = .seconds(60), pollInterval: Swift.Duration = .seconds(3)) async throws -> Module___PurseHeadlessCheckout.PaymentSessionStatus
+  @Module____Concurrency.MainActor final public func simulateLoan(_ method: Module___PurseHeadlessCheckout.PrimaryMethod, product: Module___PurseHeadlessCheckout.LoanProduct) async throws -> Module___PurseHeadlessCheckout.LoanSimulation
+  @Module____Concurrency.MainActor final public func simulateLoans(_ method: Module___PurseHeadlessCheckout.PrimaryMethod, product: Module___PurseHeadlessCheckout.LoanProduct) async throws -> [Module___PurseHeadlessCheckout.LoanSimulation]
+  @Module____Concurrency.MainActor final public func saveState() throws -> Module___PurseHeadlessCheckout.CheckoutSavedState
+  @Module____Concurrency.MainActor public static func restore(_ state: Module___PurseHeadlessCheckout.CheckoutSavedState, hooks: Module___PurseHeadlessCheckout.PurseCheckoutHooks? = nil, registry: Module___PurseHeadlessCheckout.PluginRegistry = .shared, secondaryConfigs: Module___PurseHeadlessCheckout.SecondaryConfigs = .shared, urlSession: Foundation.URLSession = .shared, options: Module___PurseHeadlessCheckout.PluginOptions = PluginOptions()) throws -> Module___PurseHeadlessCheckout.PurseHeadlessCheckout
+  @Module____Concurrency.MainActor final public func teardown()
+  public typealias ObjectWillChangePublisher = Module___Combine.ObservableObjectPublisher
+  @objc deinit
+}
+public struct PaymentSession : Swift.Sendable, Swift.Equatable {
+  public let id: Swift.String
+  public let source: Module___PurseHeadlessCheckout.LegacyPaymentSession
+  public let amount: Foundation.Decimal
+  public let amountCents: Swift.Int64
+  public let isInformationRequest: Swift.Bool
+  public let currency: Swift.String
+  public let expirationDate: Foundation.Date
+  public let vaultsConfiguration: Module___PurseHeadlessCheckout.VendorFrontData?
+  public let meansOfPayment: [Module___PurseHeadlessCheckout.PaymentItem]
+  public static func == (a: Module___PurseHeadlessCheckout.PaymentSession, b: Module___PurseHeadlessCheckout.PaymentSession) -> Swift.Bool
+}
+public enum SessionState : Swift.String, Swift.Sendable, Swift.CaseIterable {
+  case ready
+  case expired
+  case submitting
+  case submitted
+  case terminated
+  case error
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [Module___PurseHeadlessCheckout.SessionState]
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [Module___PurseHeadlessCheckout.SessionState] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
+@Module____Concurrency.MainActor public enum PaymentSessionBuilder {
+  @Module____Concurrency.MainActor public static func build(_ session: Module___PurseHeadlessCheckout.LegacyPaymentSession, disabledMethods: Swift.Set<Module___PurseHeadlessCheckout.MethodKey> = [], configs: Module___PurseHeadlessCheckout.SecondaryConfigs? = nil) -> Module___PurseHeadlessCheckout.PaymentSession
+}
+public struct CheckoutSavedState : Swift.Sendable, Swift.Equatable {
+  public let savedAt: Foundation.Date
+  public static func == (lhs: Module___PurseHeadlessCheckout.CheckoutSavedState, rhs: Module___PurseHeadlessCheckout.CheckoutSavedState) -> Swift.Bool
+  public func toJSON() -> Swift.String
+  public static func fromJSON(_ json: Swift.String) throws -> Module___PurseHeadlessCheckout.CheckoutSavedState
+}
+public struct PurseCheckoutHooks : Swift.Sendable {
+  public let onBeforeValidate: (@Sendable ([Module___PurseHeadlessCheckout.PaymentSplit]) async throws -> Swift.Void)?
+  public let onAfterValidate: (@Sendable () async throws -> Swift.Void)?
+  public let onRedirection: (@Sendable (Module___PurseHeadlessCheckout.RedirectAction) async throws -> Swift.Bool)?
+  public init(onBeforeValidate: (@Sendable ([Module___PurseHeadlessCheckout.PaymentSplit]) async throws -> Swift.Void)? = nil, onAfterValidate: (@Sendable () async throws -> Swift.Void)? = nil, onRedirection: (@Sendable (Module___PurseHeadlessCheckout.RedirectAction) async throws -> Swift.Bool)? = nil)
+}
+public actor InitGuard {
+  public static let shared: Module___PurseHeadlessCheckout.InitGuard
+  public static let maxAttempts: Swift.Int
+  public static let backoffNanoseconds: [Swift.UInt64]
+  public static let maxTrackedKeys: Swift.Int
+  public init()
+  nonisolated public static func key(sessionId: Swift.String, payload: [Swift.String : Module___PurseHeadlessCheckout.JSONValue]) -> Swift.String
+  public func run(key: Swift.String, call: @escaping @Sendable () async throws -> Module___PurseHeadlessCheckout.JSONValue) async throws -> Module___PurseHeadlessCheckout.JSONValue
+  public func reset()
+  @objc deinit
+  @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
+  @_semantics("defaultActor") nonisolated final public var unownedExecutor: Module____Concurrency.UnownedSerialExecutor {
+    get
+  }
+}
+public struct PaymentAPIClient : Swift.Sendable {
+  public init(apiKey: Swift.String, apiRoot: Swift.String, entityId: Swift.String, sessionId: Swift.String, session: Foundation.URLSession = .shared)
+  public func initPayment(_ payload: [Swift.String : Module___PurseHeadlessCheckout.JSONValue]) async throws -> Module___PurseHeadlessCheckout.JSONValue
+  public func validate(_ payload: [Module___PurseHeadlessCheckout.JSONValue]) async throws -> Module___PurseHeadlessCheckout.JSONValue
+  public func validate(items: [Module___PurseHeadlessCheckout.ValidateItemPayload]) async throws -> Module___PurseHeadlessCheckout.ValidationResult
+  public func getSimulation(partner: Module___PurseHeadlessCheckout.Partner, method: Module___PurseHeadlessCheckout.PaymentMethod, product: Module___PurseHeadlessCheckout.LoanProduct) async throws -> Module___PurseHeadlessCheckout.LoanSimulation
+  public func getSimulationMulti(partner: Module___PurseHeadlessCheckout.Partner, method: Module___PurseHeadlessCheckout.PaymentMethod, product: Module___PurseHeadlessCheckout.LoanProduct) async throws -> [Module___PurseHeadlessCheckout.LoanSimulation]
+  @available(*, deprecated, message: "GET session answers 401 to the client key: confirm the payment from your backend instead")
+  public func getSession() async throws -> [Module___PurseHeadlessCheckout.JSONValue]
+}
+public struct WalletAPIClient : Swift.Sendable {
+  public struct WalletToken : Swift.Sendable, Swift.Equatable {
+    public let id: Swift.String
+    public let name: Swift.String?
+    public let favorite: Swift.Bool?
+    public static func == (a: Module___PurseHeadlessCheckout.WalletAPIClient.WalletToken, b: Module___PurseHeadlessCheckout.WalletAPIClient.WalletToken) -> Swift.Bool
+  }
+  public init(apiKey: Swift.String, walletAPIRoot: Swift.String, ownerReference: Swift.String, walletSessionId: Swift.String, merchantId: Swift.String, session: Foundation.URLSession = .shared)
+  public func getTokens(vault: Swift.Bool = true) async -> [Module___PurseHeadlessCheckout.WalletAPIClient.WalletToken]
+  public func deleteToken(_ tokenId: Swift.String) async throws
+  public func deleteAllTokens() async throws
+  public func editTokenName(_ tokenId: Swift.String, name: Swift.String, reason: Swift.String = "") async throws
+  public func setAsFavorite(_ tokenId: Swift.String, favorite: Swift.Bool) async throws
+}
+public enum PurseAssets {
+  public struct CardSchemeAsset : Swift.Sendable, Swift.Equatable {
+    public let url: Swift.String
+    public let label: Swift.String
+    public init(url: Swift.String, label: Swift.String)
+    public static func == (a: Module___PurseHeadlessCheckout.PurseAssets.CardSchemeAsset, b: Module___PurseHeadlessCheckout.PurseAssets.CardSchemeAsset) -> Swift.Bool
+  }
+  public static func cdnBase(_ environment: Module___PurseHeadlessCheckout.PurseEnvironment) -> Swift.String
+  public static func badgeURL(_ environment: Module___PurseHeadlessCheckout.PurseEnvironment, badgeName: Swift.String) -> Swift.String
+  public static func resolveIconURL(partner: Module___PurseHeadlessCheckout.Partner, method: Module___PurseHeadlessCheckout.PaymentMethod, isSecondary: Swift.Bool, environment: Module___PurseHeadlessCheckout.PurseEnvironment) -> Swift.String
+  public static func buildCardSchemeAssets(brands: [Module___PurseHeadlessCheckout.CardBrand], environment: Module___PurseHeadlessCheckout.PurseEnvironment) -> [Module___PurseHeadlessCheckout.PurseAssets.CardSchemeAsset]
+}
+public struct DatetimeAPIClient : Swift.Sendable {
+  public init(apiKey: Swift.String, datetimeAPIRoot: Swift.String, session: Foundation.URLSession = .shared)
+  public func datetime() async throws -> Foundation.Date
+}
+public actor ServerDatetimeChecker {
+  public var synced: Swift.Bool {
+    get
+  }
+  public init(fetchServerTime: @escaping @Sendable () async throws -> Foundation.Date, clock: @escaping @Sendable () -> Foundation.Date = { Date() })
+  public func sync() async
+  public func isExpiredForServer(_ expiration: Foundation.Date) -> Swift.Bool
+  @objc deinit
+  @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
+  @_semantics("defaultActor") nonisolated final public var unownedExecutor: Module____Concurrency.UnownedSerialExecutor {
+    get
+  }
+}
+public enum PurseEnvironment : Swift.String, Swift.Sendable, Swift.CaseIterable {
+  case development
+  case test
+  case sandbox
+  case production
+  public var wireValue: Swift.String {
+    get
+  }
+  public var paymentAPIRoot: Swift.String {
+    get
+  }
+  public var datetimeAPIRoot: Swift.String {
+    get
+  }
+  public var monitoringAPIRoot: Swift.String {
+    get
+  }
+  public var walletAPIRoot: Swift.String {
+    get
+  }
+  public static func fromWire(_ value: Swift.String?) -> Module___PurseHeadlessCheckout.PurseEnvironment?
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [Module___PurseHeadlessCheckout.PurseEnvironment]
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [Module___PurseHeadlessCheckout.PurseEnvironment] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public struct PaymentAPIError : Module___PurseHeadlessCheckout.PurseError {
+  public let message: Swift.String
+  public let underlying: (any Swift.Error)?
+  public let status: Swift.Int?
+  public let errorCode: Swift.String?
+  public let path: Swift.String?
+  public let responseBody: Swift.String?
+  public let requestSent: Swift.Bool
+  public var code: Module___PurseHeadlessCheckout.PurseErrorCode {
+    get
+  }
+  public init(_ message: Swift.String, underlying: (any Swift.Error)? = nil, status: Swift.Int? = nil, errorCode: Swift.String? = nil, path: Swift.String? = nil, requestSent: Swift.Bool = true, responseBody: Swift.String? = nil)
+  public var outcomeUnknown: Swift.Bool {
+    get
+  }
+  public var isSessionTerminal: Swift.Bool {
+    get
+  }
+  public var isRetryable: Swift.Bool {
+    get
+  }
+  public static let sessionTerminalErrorCodes: Swift.Set<Swift.String>
+}
+public protocol PurseError : Swift.CustomStringConvertible, Swift.Error {
+  var code: Module___PurseHeadlessCheckout.PurseErrorCode { get }
+  var message: Swift.String { get }
+  var underlying: (any Swift.Error)? { get }
+}
+extension Module___PurseHeadlessCheckout.PurseError {
+  public var underlying: (any Swift.Error)? {
+    get
+  }
+  public var documentationLink: Swift.String {
+    get
+  }
+  public var description: Swift.String {
+    get
+  }
+}
+public enum PurseSessionError : Module___PurseHeadlessCheckout.PurseError {
+  case sessionMalformed(Swift.String)
+  case environmentNotAllowed(Module___PurseHeadlessCheckout.PurseEnvironment)
+  public var code: Module___PurseHeadlessCheckout.PurseErrorCode {
+    get
+  }
+  public var message: Swift.String {
+    get
+  }
+}
+public enum PurseErrorCode : Swift.String, Swift.Sendable, Swift.CaseIterable {
+  case expiredSession
+  case sessionMalformed
+  case environmentNotAllowed
+  case submitBlocked
+  case checkoutTornDown
+  case validateFailed
+  case postValidateFailed
+  case paymentNotFulfilledOnSubmit
+  case elementNotFulfilled
+  case uiValidationFailedError
+  case onBeforeValidateHookFailed
+  case methodNotImplemented
+  case methodDisabled
+  case partnerUIError
+  case failedToInitSecondaryToken
+  case secondaryMethodRequiredCVV
+  case secondaryMethodWrongPANFormat
+  case secondaryMethodWrongCVVFormat
+  case secondaryTokenEmptyBalance
+  case invalidTakeAmount
+  case maxAmountReached
+  case usageLimitError
+  case missingWalletSession
+  case missingToken
+  case setWalletSessionFailed
+  case invalidTokenName
+  case tokenNameExists
+  case tokenNotRegisterable
+  case methodNotRegisterable
+  case failedToDeleteAllTokens
+  case methodIsNotSimulable
+  case invalidLoanSimulation
+  case apiError
+  case unknownError
+  public var documentationLink: Swift.String {
+    get
+  }
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [Module___PurseHeadlessCheckout.PurseErrorCode]
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [Module___PurseHeadlessCheckout.PurseErrorCode] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public enum JSONValue : Swift.Sendable, Swift.Hashable {
+  case null
+  case bool(Swift.Bool)
+  case number(Swift.String)
+  case string(Swift.String)
+  case array([Module___PurseHeadlessCheckout.JSONValue])
+  case object([Swift.String : Module___PurseHeadlessCheckout.JSONValue])
+  public static func == (a: Module___PurseHeadlessCheckout.JSONValue, b: Module___PurseHeadlessCheckout.JSONValue) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+extension Module___PurseHeadlessCheckout.JSONValue {
+  public var stringValue: Swift.String? {
+    get
+  }
+  public var boolValue: Swift.Bool? {
+    get
+  }
+  public var intValue: Swift.Int? {
+    get
+  }
+  public var decimalValue: Foundation.Decimal? {
+    get
+  }
+  public var arrayValue: [Module___PurseHeadlessCheckout.JSONValue]? {
+    get
+  }
+  public var objectValue: [Swift.String : Module___PurseHeadlessCheckout.JSONValue]? {
+    get
+  }
+  public subscript(key: Swift.String) -> Module___PurseHeadlessCheckout.JSONValue? {
+    get
+  }
+}
+extension Module___PurseHeadlessCheckout.JSONValue : Swift.Codable {
+  public init(from decoder: any Swift.Decoder) throws
+  public func encode(to encoder: any Swift.Encoder) throws
+}
+extension Module___PurseHeadlessCheckout.JSONValue : Swift.ExpressibleByStringLiteral {
+  public init(stringLiteral value: Swift.String)
+  public typealias ExtendedGraphemeClusterLiteralType = Swift.String
+  public typealias StringLiteralType = Swift.String
+  public typealias UnicodeScalarLiteralType = Swift.String
+}
+extension Module___PurseHeadlessCheckout.JSONValue : Swift.ExpressibleByBooleanLiteral {
+  public init(booleanLiteral value: Swift.Bool)
+  public typealias BooleanLiteralType = Swift.Bool
+}
+extension Module___PurseHeadlessCheckout.JSONValue : Swift.ExpressibleByIntegerLiteral {
+  public init(integerLiteral value: Swift.Int)
+  public typealias IntegerLiteralType = Swift.Int
+}
+extension Module___PurseHeadlessCheckout.JSONValue : Swift.ExpressibleByNilLiteral {
+  public init(nilLiteral: ())
+}
+public enum CheckoutEventCode : Swift.String, Swift.Sendable, Swift.CaseIterable {
+  case clearPrimarySplit
+  case clientHookError
+  case create
+  case deleteAllTokens
+  case expiredSession
+  case methodGetPaymentElement
+  case methodGetHostedFields
+  case methodDisabled
+  case methodGetSecondaryToken
+  case methodLoanSim
+  case methodRegister
+  case methodSetPrimary
+  case otherError
+  case pageUnload
+  case partnerUIEvent
+  case partnerAPICallStart
+  case partnerAPICallEnd
+  case paymentElementAppendTo
+  case paymentElementRemove
+  case paymentElementSetOptions
+  case paymentElementValidateUI
+  case paymentElementListenerAttached
+  case validationStarted
+  case preValidationFailed
+  case validationSuccess
+  case validationFailed
+  case paymentError
+  case paymentFulfilled
+  case primaryTokenGetPaymentElement
+  case primaryTokenSetAsPrimary
+  case reactiveValueSubscribe
+  case redirection
+  case ready
+  case secondaryTokenRegister
+  case secondaryTokenRemoveFromSplit
+  case secondaryTokenTake
+  case setSession
+  case setWalletSession
+  case setWalletSessionFailed
+  case submitPayment
+  case submitBlocked
+  case tokenDelete
+  case tokenEdit
+  case tokenSetFavorite
+  case uncaughtError
+  case onBeforeValidateHookFailed
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [Module___PurseHeadlessCheckout.CheckoutEventCode]
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [Module___PurseHeadlessCheckout.CheckoutEventCode] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public enum EventLevel : Swift.String, Swift.Sendable {
+  case debug
+  case info
+  case error
+  case success
+  case warning
+  case performance
+  case ui
+  case network
+  public init?(rawValue: Swift.String)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public struct CheckoutMonitoringEvent : Swift.Sendable {
+  public let code: Module___PurseHeadlessCheckout.CheckoutEventCode
+  public let type: Module___PurseHeadlessCheckout.EventLevel
+  public let payload: Module___PurseHeadlessCheckout.JSONValue?
+  public let dateString: Swift.String
+  public init(code: Module___PurseHeadlessCheckout.CheckoutEventCode, type: Module___PurseHeadlessCheckout.EventLevel = .info, payload: Module___PurseHeadlessCheckout.JSONValue? = nil, dateString: Swift.String? = nil)
+}
+public struct MonitoringAPIClient : Swift.Sendable {
+  public init(apiKey: Swift.String, monitoringAPIRoot: Swift.String, envWireValue: Swift.String, platform: Swift.String = "ios", session: Foundation.URLSession = .shared)
+  public func sendLogs(_ events: [Module___PurseHeadlessCheckout.JSONValue], instanceId: Swift.String, extras: [Swift.String : Module___PurseHeadlessCheckout.JSONValue]) async
+}
+public struct ItemPayload : Swift.Sendable, Swift.Equatable {
+  public let partner: Module___PurseHeadlessCheckout.Partner
+  public let method: Module___PurseHeadlessCheckout.PaymentMethod
+  public let amount: Foundation.Decimal
+  public let stepId: Swift.Int?
+  public let paymentData: [Swift.String : Module___PurseHeadlessCheckout.JSONValue]
+  public let partnerData: [Swift.String : Module___PurseHeadlessCheckout.JSONValue]
+  public let order: [Swift.String : Module___PurseHeadlessCheckout.JSONValue]
+  public let paymentPreferences: [Swift.String : Module___PurseHeadlessCheckout.JSONValue]
+  public init(partner: Module___PurseHeadlessCheckout.Partner, method: Module___PurseHeadlessCheckout.PaymentMethod, amount: Foundation.Decimal, stepId: Swift.Int? = nil, paymentData: [Swift.String : Module___PurseHeadlessCheckout.JSONValue] = [:], partnerData: [Swift.String : Module___PurseHeadlessCheckout.JSONValue] = [:], order: [Swift.String : Module___PurseHeadlessCheckout.JSONValue] = [:], paymentPreferences: [Swift.String : Module___PurseHeadlessCheckout.JSONValue] = [:])
+  public func toJSON() -> Module___PurseHeadlessCheckout.JSONValue
+  public static func == (a: Module___PurseHeadlessCheckout.ItemPayload, b: Module___PurseHeadlessCheckout.ItemPayload) -> Swift.Bool
+}
+public typealias ValidateItemPayload = Module___PurseHeadlessCheckout.ItemPayload
+public enum PaymentStatus : Swift.String, Swift.Sendable, Swift.CaseIterable {
+  case success
+  case failed
+  case error
+  case uncertain
+  case waiting
+  case unknown
+  public var wireValue: Swift.String {
+    get
+  }
+  public static func fromWire(_ value: Swift.String) -> Module___PurseHeadlessCheckout.PaymentStatus
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [Module___PurseHeadlessCheckout.PaymentStatus]
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [Module___PurseHeadlessCheckout.PaymentStatus] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public struct ValidationResult : Swift.Sendable, Swift.Equatable {
+  public let globalStatus: Swift.String
+  public let redirection: Module___PurseHeadlessCheckout.ValidationResult.Redirection?
+  public let raw: Module___PurseHeadlessCheckout.JSONValue
+  public init(globalStatus: Swift.String, redirection: Module___PurseHeadlessCheckout.ValidationResult.Redirection?, raw: Module___PurseHeadlessCheckout.JSONValue)
+  public var status: Module___PurseHeadlessCheckout.PaymentStatus {
+    get
+  }
+  public var isSuccess: Swift.Bool {
+    get
+  }
+  public struct Redirection : Swift.Sendable, Swift.Equatable {
+    public let shouldSubmitWidget: Swift.Bool
+    public let url: Swift.String?
+    public let form: Swift.String?
+    public let name: Swift.String?
+    public init(shouldSubmitWidget: Swift.Bool, url: Swift.String?, form: Swift.String?, name: Swift.String?)
+    public static func == (a: Module___PurseHeadlessCheckout.ValidationResult.Redirection, b: Module___PurseHeadlessCheckout.ValidationResult.Redirection) -> Swift.Bool
+  }
+  public static func fromJSON(_ json: Module___PurseHeadlessCheckout.JSONValue) -> Module___PurseHeadlessCheckout.ValidationResult
+  public static func == (a: Module___PurseHeadlessCheckout.ValidationResult, b: Module___PurseHeadlessCheckout.ValidationResult) -> Swift.Bool
+}
+public struct IntegratedToken : Swift.Sendable, Swift.Equatable {
+  public let id: Swift.String
+  public let value: Swift.String
+  public let uniquenessToken: Swift.String?
+  public let pinCode: Swift.String?
+  public let expirationDate: Swift.String?
+  public let favorite: Swift.Bool
+  public let name: Swift.String?
+  public let source: Module___PurseHeadlessCheckout.TokenSource
+  public let createdAt: Swift.String?
+  public let brandName: Swift.String?
+  public let displayToken: Swift.String?
+  public let holderName: Swift.String?
+  public let maskedPAN: Swift.String?
+  public let networkTokenAvailable: Swift.Bool
+  public init(id: Swift.String, value: Swift.String, uniquenessToken: Swift.String?, pinCode: Swift.String? = nil, expirationDate: Swift.String?, favorite: Swift.Bool, name: Swift.String?, source: Module___PurseHeadlessCheckout.TokenSource, createdAt: Swift.String?, brandName: Swift.String?, displayToken: Swift.String?, holderName: Swift.String?, maskedPAN: Swift.String?, networkTokenAvailable: Swift.Bool)
+  public static func == (a: Module___PurseHeadlessCheckout.IntegratedToken, b: Module___PurseHeadlessCheckout.IntegratedToken) -> Swift.Bool
+}
+public enum TokenSource : Swift.String, Swift.Sendable, Swift.CaseIterable {
+  case merchant
+  case sharedWallet
+  public var wireValue: Swift.String {
+    get
+  }
+  public static func fromWire(_ value: Swift.String?) -> Module___PurseHeadlessCheckout.TokenSource
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [Module___PurseHeadlessCheckout.TokenSource]
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [Module___PurseHeadlessCheckout.TokenSource] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public enum IntegrationMode : Swift.String, Swift.Sendable, Swift.CaseIterable {
+  case popup
+  case redirection
+  public var wireValue: Swift.String {
+    get
+  }
+  public static func fromWire(_ value: Swift.String?) -> Module___PurseHeadlessCheckout.IntegrationMode?
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [Module___PurseHeadlessCheckout.IntegrationMode]
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [Module___PurseHeadlessCheckout.IntegrationMode] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public struct LoanProduct : Swift.Sendable {
+  public let amount: Foundation.Decimal
+  public let currencyCode: Swift.String
+  public init(amount: Foundation.Decimal, currencyCode: Swift.String)
+}
+public struct LoanSimulation : Swift.Sendable, Swift.Equatable {
+  public let initialInstallmentAmount: Foundation.Decimal
+  public let finalInstallmentAmount: Foundation.Decimal
+  public let installmentAmount: Foundation.Decimal
+  public let installmentCount: Swift.Int
+  public let totalCost: Foundation.Decimal
+  public let totalAmount: Foundation.Decimal
+  public let legalText: Swift.String?
+  public let aprc: Foundation.Decimal?
+  public init(initialInstallmentAmount: Foundation.Decimal, finalInstallmentAmount: Foundation.Decimal, installmentAmount: Foundation.Decimal, installmentCount: Swift.Int, totalCost: Foundation.Decimal, totalAmount: Foundation.Decimal, legalText: Swift.String?, aprc: Foundation.Decimal?)
+  public static func == (a: Module___PurseHeadlessCheckout.LoanSimulation, b: Module___PurseHeadlessCheckout.LoanSimulation) -> Swift.Bool
+}
+public struct MethodConfiguration : Swift.Sendable, Swift.Equatable {
+  public let stable: Swift.Bool
+  public let template: Swift.String?
+  public let labels: [Swift.String]
+  public let position: Swift.Int?
+  public let vault: Module___PurseHeadlessCheckout.VaultInfo?
+  public let settings: Module___PurseHeadlessCheckout.MethodSettings
+  public init(stable: Swift.Bool, template: Swift.String?, labels: [Swift.String], position: Swift.Int?, vault: Module___PurseHeadlessCheckout.VaultInfo?, settings: Module___PurseHeadlessCheckout.MethodSettings)
+  public var isSecondary: Swift.Bool {
+    get
+  }
+  public static let secondaryLabel: Swift.String
+  public static func == (a: Module___PurseHeadlessCheckout.MethodConfiguration, b: Module___PurseHeadlessCheckout.MethodConfiguration) -> Swift.Bool
+}
+public struct VaultInfo : Swift.Sendable, Swift.Equatable {
+  public let supportedBrands: [Module___PurseHeadlessCheckout.CardBrand]
+  public let vendor: Module___PurseHeadlessCheckout.VaultVendor
+  public let tokenScope: Swift.String?
+  public let externalThreeDSEnabled: Swift.Bool
+  public init(supportedBrands: [Module___PurseHeadlessCheckout.CardBrand], vendor: Module___PurseHeadlessCheckout.VaultVendor, tokenScope: Swift.String?, externalThreeDSEnabled: Swift.Bool)
+  public static func == (a: Module___PurseHeadlessCheckout.VaultInfo, b: Module___PurseHeadlessCheckout.VaultInfo) -> Swift.Bool
+}
+public struct MethodSettings : Swift.Sendable, Swift.Equatable {
+  public let registrationMode: Module___PurseHeadlessCheckout.RegistrationMode
+  public let saveToken: Swift.Bool?
+  public let saveTokenMode: Swift.String?
+  public let directDebit: Swift.Bool
+  public let paymentMinAmount: Foundation.Decimal?
+  public let paymentMaxAmount: Foundation.Decimal?
+  public let usagePerSessionLimit: Swift.Int?
+  public let integrationMode: Module___PurseHeadlessCheckout.IntegrationMode?
+  public let merchantClientId: Swift.String?
+  public let payTokenNoCVV: Swift.Bool
+  public let networkToken: Swift.Bool
+  public init(registrationMode: Module___PurseHeadlessCheckout.RegistrationMode, saveToken: Swift.Bool?, saveTokenMode: Swift.String?, directDebit: Swift.Bool, paymentMinAmount: Foundation.Decimal?, paymentMaxAmount: Foundation.Decimal?, usagePerSessionLimit: Swift.Int?, integrationMode: Module___PurseHeadlessCheckout.IntegrationMode?, merchantClientId: Swift.String? = nil, payTokenNoCVV: Swift.Bool = false, networkToken: Swift.Bool = false)
+  public static func == (a: Module___PurseHeadlessCheckout.MethodSettings, b: Module___PurseHeadlessCheckout.MethodSettings) -> Swift.Bool
+}
+public struct MethodKey : Swift.Sendable, Swift.Hashable {
+  public let partner: Module___PurseHeadlessCheckout.Partner
+  public let method: Module___PurseHeadlessCheckout.PaymentMethod
+  public init(partner: Module___PurseHeadlessCheckout.Partner, method: Module___PurseHeadlessCheckout.PaymentMethod)
+  public var id: Swift.String {
+    get
+  }
+  public static func of(partner: Swift.String, method: Swift.String) -> Module___PurseHeadlessCheckout.MethodKey
+  public static func == (a: Module___PurseHeadlessCheckout.MethodKey, b: Module___PurseHeadlessCheckout.MethodKey) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum Partner : Swift.Sendable, Swift.Hashable {
+  case purse
+  case aci
+  case adyen
+  case paypal
+  case illicado
+  case klarna
+  case other(Swift.String)
+  public var wireValue: Swift.String {
+    get
+  }
+  public static func fromWire(_ value: Swift.String) -> Module___PurseHeadlessCheckout.Partner
+  public static func == (a: Module___PurseHeadlessCheckout.Partner, b: Module___PurseHeadlessCheckout.Partner) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum PaymentMethod : Swift.Sendable, Swift.Hashable {
+  case creditCard
+  case applePay
+  case wallet
+  case giftCard
+  case bnpl
+  case installments
+  case other(Swift.String)
+  public var wireValue: Swift.String {
+    get
+  }
+  public static func fromWire(_ value: Swift.String) -> Module___PurseHeadlessCheckout.PaymentMethod
+  public static func == (a: Module___PurseHeadlessCheckout.PaymentMethod, b: Module___PurseHeadlessCheckout.PaymentMethod) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum RegistrationMode : Swift.String, Swift.Sendable, Swift.CaseIterable {
+  case onSession
+  case offSession
+  case unknown
+  public var wireValue: Swift.String {
+    get
+  }
+  public static func fromWire(_ value: Swift.String?) -> Module___PurseHeadlessCheckout.RegistrationMode
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [Module___PurseHeadlessCheckout.RegistrationMode]
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [Module___PurseHeadlessCheckout.RegistrationMode] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public enum SaveTokenMode : Swift.String, Swift.Sendable, Swift.CaseIterable {
+  case always
+  case prefer
+  case preferNo
+  case never
+  public var canBeRegistered: Swift.Bool {
+    get
+  }
+  public var registeredByDefault: Swift.Bool {
+    get
+  }
+  public static func fromWire(_ value: Swift.String?) -> Module___PurseHeadlessCheckout.SaveTokenMode?
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [Module___PurseHeadlessCheckout.SaveTokenMode]
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [Module___PurseHeadlessCheckout.SaveTokenMode] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
+extension Module___PurseHeadlessCheckout.MethodSettings {
+  public var resolvedSaveTokenMode: Module___PurseHeadlessCheckout.SaveTokenMode {
+    get
+  }
+}
+public enum SDKVersion {
+  public static let value: Swift.String
+}
+public struct LegacyPaymentSession : Swift.Sendable, Swift.Equatable {
+  public let id: Swift.String
+  public let amount: Foundation.Decimal?
+  public let informationRequest: Swift.Bool?
+  public let currencyCode: Swift.String
+  public let expirationDate: Foundation.Date
+  public let success: Swift.String?
+  public let failure: Swift.String?
+  public let redirection: Swift.String?
+  public let protocols: [Module___PurseHeadlessCheckout.Partner : [Module___PurseHeadlessCheckout.PaymentMethod : Module___PurseHeadlessCheckout.MethodEntry]]
+  public let vault: Module___PurseHeadlessCheckout.SessionVault?
+  public init(id: Swift.String, amount: Foundation.Decimal?, informationRequest: Swift.Bool?, currencyCode: Swift.String, expirationDate: Foundation.Date, success: Swift.String?, failure: Swift.String?, redirection: Swift.String?, protocols: [Module___PurseHeadlessCheckout.Partner : [Module___PurseHeadlessCheckout.PaymentMethod : Module___PurseHeadlessCheckout.MethodEntry]], vault: Module___PurseHeadlessCheckout.SessionVault?)
+  public static func == (a: Module___PurseHeadlessCheckout.LegacyPaymentSession, b: Module___PurseHeadlessCheckout.LegacyPaymentSession) -> Swift.Bool
+}
+public struct MethodEntry : Swift.Sendable, Swift.Equatable {
+  public let configurations: Module___PurseHeadlessCheckout.MethodConfiguration
+  public let integratedTokens: [Module___PurseHeadlessCheckout.IntegratedToken]
+  public init(configurations: Module___PurseHeadlessCheckout.MethodConfiguration, integratedTokens: [Module___PurseHeadlessCheckout.IntegratedToken] = [])
+  public static func == (a: Module___PurseHeadlessCheckout.MethodEntry, b: Module___PurseHeadlessCheckout.MethodEntry) -> Swift.Bool
+}
+public struct PurseSessionParams : Swift.Sendable, Swift.Equatable {
+  public let apiKey: Swift.String
+  public let apiURL: Swift.String
+  public let environment: Module___PurseHeadlessCheckout.PurseEnvironment
+  public let entityId: Swift.String
+  public let paymentSession: Module___PurseHeadlessCheckout.LegacyPaymentSession
+  public let walletSession: Module___PurseHeadlessCheckout.WalletSessionParams?
+  public init(apiKey: Swift.String, apiURL: Swift.String, environment: Module___PurseHeadlessCheckout.PurseEnvironment, entityId: Swift.String, paymentSession: Module___PurseHeadlessCheckout.LegacyPaymentSession, walletSession: Module___PurseHeadlessCheckout.WalletSessionParams? = nil)
+  public static func == (a: Module___PurseHeadlessCheckout.PurseSessionParams, b: Module___PurseHeadlessCheckout.PurseSessionParams) -> Swift.Bool
+}
+public struct WalletSessionParams : Swift.Sendable, Swift.Equatable {
+  public let sessionId: Swift.String
+  public let ownerReference: Swift.String
+  public let merchant: Swift.String
+  public let expirationDate: Swift.String?
+  public init(sessionId: Swift.String, ownerReference: Swift.String, merchant: Swift.String, expirationDate: Swift.String?)
+  public static func == (a: Module___PurseHeadlessCheckout.WalletSessionParams, b: Module___PurseHeadlessCheckout.WalletSessionParams) -> Swift.Bool
+}
+public enum SessionCodec {
+  public static func decode(_ widgetData: Swift.String) throws -> Module___PurseHeadlessCheckout.PurseSessionParams
+}
+public enum CardBrand : Swift.String, Swift.Sendable, Swift.CaseIterable {
+  case carteBancaire
+  case visa
+  case mastercard
+  case americanExpress
+  case maestro
+  case dinersClub
+  case discover
+  case unionPay
+  case jcb
+  case oney
+  case unknown
+  public var wireValue: Swift.String {
+    get
+  }
+  public static func fromWire(_ value: Swift.String) -> Module___PurseHeadlessCheckout.CardBrand
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [Module___PurseHeadlessCheckout.CardBrand]
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [Module___PurseHeadlessCheckout.CardBrand] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public struct SessionVault : Swift.Sendable, Swift.Equatable {
+  public let vendorFrontData: Module___PurseHeadlessCheckout.VendorFrontData
+  public init(vendorFrontData: Module___PurseHeadlessCheckout.VendorFrontData)
+  public static func == (a: Module___PurseHeadlessCheckout.SessionVault, b: Module___PurseHeadlessCheckout.SessionVault) -> Swift.Bool
+}
+public struct VendorFrontData : Swift.Sendable, Swift.Equatable {
+  public let purse: Module___PurseHeadlessCheckout.PurseVaultInfo?
+  public let pciProxy: Module___PurseHeadlessCheckout.PCIProxyVaultInfo?
+  public init(purse: Module___PurseHeadlessCheckout.PurseVaultInfo?, pciProxy: Module___PurseHeadlessCheckout.PCIProxyVaultInfo?)
+  public static func == (a: Module___PurseHeadlessCheckout.VendorFrontData, b: Module___PurseHeadlessCheckout.VendorFrontData) -> Swift.Bool
+}
+public struct PurseVaultInfo : Swift.Sendable, Swift.Equatable {
+  public let tenantId: Swift.String
+  public init(tenantId: Swift.String)
+  public static func == (a: Module___PurseHeadlessCheckout.PurseVaultInfo, b: Module___PurseHeadlessCheckout.PurseVaultInfo) -> Swift.Bool
+}
+public struct PCIProxyVaultInfo : Swift.Sendable, Swift.Equatable {
+  public let merchantId: Swift.String
+  public init(merchantId: Swift.String)
+  public static func == (a: Module___PurseHeadlessCheckout.PCIProxyVaultInfo, b: Module___PurseHeadlessCheckout.PCIProxyVaultInfo) -> Swift.Bool
+}
+public enum VaultVendor : Swift.String, Swift.Sendable, Swift.CaseIterable {
+  case purse
+  case pciProxy
+  case none
+  case unknown
+  public var wireValue: Swift.String {
+    get
+  }
+  public static func fromWire(_ value: Swift.String?) -> Module___PurseHeadlessCheckout.VaultVendor
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [Module___PurseHeadlessCheckout.VaultVendor]
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [Module___PurseHeadlessCheckout.VaultVendor] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
+@_hasMissingDesignatedInitializers @Module____Concurrency.MainActor final public class PaymentElement : Module___Combine.ObservableObject {
+  @Module____Concurrency.MainActor final public let item: Module___PurseHeadlessCheckout.PaymentItem
+  @Module____Concurrency.MainActor final public let hasUI: Swift.Bool
+  @Module____Concurrency.MainActor final public let selfSubmitting: Swift.Bool
+  @Module___Combine.Published @_projectedValueProperty($isReady) @Module____Concurrency.MainActor final public var isReady: Swift.Bool {
+    get
+  }
+  @Module____Concurrency.MainActor final public var $isReady: Module___Combine.Published<Swift.Bool>.Publisher {
+    get
+  }
+  @Module____Concurrency.MainActor final public func makeView() -> Module___UIKit.UIView?
+  @Module____Concurrency.MainActor final public func prepare() async
+  @discardableResult
+  @Module____Concurrency.MainActor final public func submit() -> Module____Concurrency.Task<Swift.Void, Swift.Never>
+  public typealias ObjectWillChangePublisher = Module___Combine.ObservableObjectPublisher
+  @objc deinit
+}
+@Module____Concurrency.MainActor public protocol PaymentElementListener : AnyObject {
+  @Module____Concurrency.MainActor func onReady(_ ready: Swift.Bool)
+  @Module____Concurrency.MainActor func onOutcome(_ outcome: Module___PurseHeadlessCheckout.PaymentOutcome)
+  @Module____Concurrency.MainActor func onRequiresAction()
+  @Module____Concurrency.MainActor func onPaymentId(_ paymentId: Swift.String)
+}
+extension Module___PurseHeadlessCheckout.PaymentElementListener {
+  @Module____Concurrency.MainActor public func onReady(_ ready: Swift.Bool)
+  @Module____Concurrency.MainActor public func onOutcome(_ outcome: Module___PurseHeadlessCheckout.PaymentOutcome)
+  @Module____Concurrency.MainActor public func onRequiresAction()
+  @Module____Concurrency.MainActor public func onPaymentId(_ paymentId: Swift.String)
+}
+@Module____Concurrency.MainActor @preconcurrency public struct PaymentElementView : Module___SwiftUI.UIViewRepresentable {
+  @Module____Concurrency.MainActor @preconcurrency public init(_ element: Module___PurseHeadlessCheckout.PaymentElement)
+  @Module____Concurrency.MainActor @preconcurrency public func makeUIView(context: Module___PurseHeadlessCheckout.PaymentElementView.Context) -> Module___UIKit.UIView
+  @Module____Concurrency.MainActor @preconcurrency public func updateUIView(_ uiView: Module___UIKit.UIView, context: Module___PurseHeadlessCheckout.PaymentElementView.Context)
+  @Module____Concurrency.MainActor @preconcurrency public func sizeThatFits(_ proposal: SwiftUICore.ProposedViewSize, uiView: Module___UIKit.UIView, context: Module___PurseHeadlessCheckout.PaymentElementView.Context) -> CoreFoundation.CGSize?
+  public typealias Body = Swift.Never
+  public typealias Coordinator = Swift.Void
+  public typealias UIViewType = Module___UIKit.UIView
+}
+public enum PaymentOutcome {
+  case completed(Module___PurseHeadlessCheckout.ValidationResult)
+  case returnedFromRedirect(url: Foundation.URL?)
+  case canceled
+  case failed(any Module___PurseHeadlessCheckout.PurseError)
+  public var status: Module___PurseHeadlessCheckout.PaymentStatus? {
+    get
+  }
+  public var isSuccess: Swift.Bool {
+    get
+  }
+}
+@Module____Concurrency.MainActor public struct PaymentSurface {
+  @Module____Concurrency.MainActor public let hasUI: Swift.Bool
+  @Module____Concurrency.MainActor public let selfSubmitting: Swift.Bool
+  @Module____Concurrency.MainActor public init(hasUI: Swift.Bool, selfSubmitting: Swift.Bool, makeView: @escaping () -> Module___UIKit.UIView?, prepare: @escaping () async -> Swift.Void = {}, submit: @escaping () async -> Swift.Void)
+  @Module____Concurrency.MainActor public static func headless(prepare: @escaping () async -> Swift.Void = {}, submit: @escaping () async -> Swift.Void) -> Module___PurseHeadlessCheckout.PaymentSurface
+}
+@Module____Concurrency.MainActor public struct SurfaceRequest {
+  @Module____Concurrency.MainActor public let host: any Module___PurseHeadlessCheckout.PluginHost
+  @Module____Concurrency.MainActor public let isToken: Swift.Bool
+  @Module____Concurrency.MainActor public let key: Swift.String
+  @Module____Concurrency.MainActor public let listener: any Module___PurseHeadlessCheckout.PaymentElementListener
+  @Module____Concurrency.MainActor public let appReturnURL: Foundation.URL?
+  @Module____Concurrency.MainActor public let redirectPresenter: (any Module___PurseHeadlessCheckout.RedirectPresenter)?
+  @Module____Concurrency.MainActor public func selectAndCapture() async
+  @Module____Concurrency.MainActor public func captureNow() async
+}
+extension Swift.Error {
+  public func asPurseError() -> any Module___PurseHeadlessCheckout.PurseError
+}
+public enum BrowserData {
+  @Module____Concurrency.MainActor public static func make(locale: Swift.String?) -> [Swift.String : Module___PurseHeadlessCheckout.JSONValue]
+}
+public struct PartnerUIError : Module___PurseHeadlessCheckout.PurseError {
+  public let message: Swift.String
+  public let underlying: (any Swift.Error)?
+  public var code: Module___PurseHeadlessCheckout.PurseErrorCode {
+    get
+  }
+  public init(_ message: Swift.String, underlying: (any Swift.Error)? = nil)
+}
+public protocol PartnerUIPlugin : Swift.Sendable {
+  var partner: Module___PurseHeadlessCheckout.Partner { get }
+  var method: Module___PurseHeadlessCheckout.PaymentMethod { get }
+  func onSessionSet(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws
+  func onAmountUpdate(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws
+  var reloadsOnAmountUpdate: Swift.Bool { get }
+  func preValidation(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws -> Module___PurseHeadlessCheckout.ValidateItemPayload
+  func postValidation(_ result: Module___PurseHeadlessCheckout.ValidationResult, context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws
+  func destroyClient(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws
+  func validateUI(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws -> Swift.Bool
+  func ensureClientCompatibility(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws
+}
+extension Module___PurseHeadlessCheckout.PartnerUIPlugin {
+  public func onSessionSet(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws
+  public func onAmountUpdate(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws
+  public var reloadsOnAmountUpdate: Swift.Bool {
+    get
+  }
+  public func postValidation(_ result: Module___PurseHeadlessCheckout.ValidationResult, context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws
+  public func destroyClient(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws
+  public func validateUI(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws -> Swift.Bool
+  public func ensureClientCompatibility(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws
+}
+public struct PartnerUIContext : Swift.Sendable {
+  public let partner: Module___PurseHeadlessCheckout.Partner
+  public let method: Module___PurseHeadlessCheckout.PaymentMethod
+  public let session: Module___PurseHeadlessCheckout.LegacyPaymentSession
+  public let amount: Foundation.Decimal
+  public let api: Module___PurseHeadlessCheckout.PaymentAPIClient
+  public let register: Swift.Bool
+  public let token: Module___PurseHeadlessCheckout.PayToken?
+  public let collected: [Swift.String : Module___PurseHeadlessCheckout.JSONValue]
+  public let options: Module___PurseHeadlessCheckout.PluginOptions
+  public let dispatchEvent: @Module____Concurrency.MainActor @Sendable (Module___PurseHeadlessCheckout.PluginEvent) -> Swift.Void
+  public init(partner: Module___PurseHeadlessCheckout.Partner, method: Module___PurseHeadlessCheckout.PaymentMethod, session: Module___PurseHeadlessCheckout.LegacyPaymentSession, amount: Foundation.Decimal, api: Module___PurseHeadlessCheckout.PaymentAPIClient, register: Swift.Bool = false, token: Module___PurseHeadlessCheckout.PayToken? = nil, collected: [Swift.String : Module___PurseHeadlessCheckout.JSONValue] = [:], options: Module___PurseHeadlessCheckout.PluginOptions = PluginOptions(), dispatchEvent: @escaping @Module____Concurrency.MainActor @Sendable (Module___PurseHeadlessCheckout.PluginEvent) -> Swift.Void = { _ in })
+  public var configuration: Module___PurseHeadlessCheckout.MethodConfiguration? {
+    get
+  }
+  public var vaultTenantId: Swift.String? {
+    get
+  }
+}
+public struct PluginOptions : Swift.Sendable {
+  public let locale: Swift.String?
+  public let theme: Module___PurseHeadlessCheckout.PurseTheme?
+  public let cardFormTexts: Module___PurseHeadlessCheckout.CardFormTexts
+  public init(locale: Swift.String? = nil, theme: Module___PurseHeadlessCheckout.PurseTheme? = nil, cardFormTexts: Module___PurseHeadlessCheckout.CardFormTexts = CardFormTexts())
+}
+public struct PayToken : Swift.Sendable, Swift.Equatable {
+  public let value: Swift.String
+  public let expirationDate: Swift.String?
+  public let holderName: Swift.String?
+  public let selectedNetwork: Swift.String?
+  public let requiresCVV: Swift.Bool
+  public init(value: Swift.String, expirationDate: Swift.String? = nil, holderName: Swift.String? = nil, selectedNetwork: Swift.String? = nil, requiresCVV: Swift.Bool = false)
+  public func patch(_ paymentData: [Swift.String : Module___PurseHeadlessCheckout.JSONValue] = [:]) -> [Swift.String : Module___PurseHeadlessCheckout.JSONValue]
+  public var wireExpiryDate: Swift.String? {
+    get
+  }
+  public static func == (a: Module___PurseHeadlessCheckout.PayToken, b: Module___PurseHeadlessCheckout.PayToken) -> Swift.Bool
+}
+public enum PluginEvent : Swift.Sendable, Swift.Equatable {
+  case ready
+  case redirect
+  case initFailed(message: Swift.String?)
+  case clientError(message: Swift.String?)
+  case partnerError(message: Swift.String?, recoverable: Swift.Bool)
+  case cancelled
+  case endOfSession
+  public var code: Swift.String {
+    get
+  }
+  public static func == (a: Module___PurseHeadlessCheckout.PluginEvent, b: Module___PurseHeadlessCheckout.PluginEvent) -> Swift.Bool
+}
+public struct CheckoutPluginEvent : Swift.Sendable, Swift.Equatable {
+  public let itemId: Swift.String
+  public let event: Module___PurseHeadlessCheckout.PluginEvent
+  public static func == (a: Module___PurseHeadlessCheckout.CheckoutPluginEvent, b: Module___PurseHeadlessCheckout.CheckoutPluginEvent) -> Swift.Bool
+}
+@Module____Concurrency.MainActor public protocol PluginHost : AnyObject {
+  @Module____Concurrency.MainActor var environment: Module___PurseHeadlessCheckout.PurseEnvironment { get }
+  @Module____Concurrency.MainActor var redirectionReturnURL: Swift.String? { get }
+  @Module____Concurrency.MainActor func buildContext() -> Module___PurseHeadlessCheckout.PartnerUIContext
+  @Module____Concurrency.MainActor func setCollected(_ data: [Swift.String : Module___PurseHeadlessCheckout.JSONValue])
+  @Module____Concurrency.MainActor func setAsPrimary() throws
+  @Module____Concurrency.MainActor func setFulfilled(_ fulfilled: Swift.Bool)
+  @Module____Concurrency.MainActor func submitPayment() async throws -> Module___PurseHeadlessCheckout.ValidationResult
+}
+extension Module___PurseHeadlessCheckout.PluginHost {
+  @Module____Concurrency.MainActor public func dispatch(_ event: Module___PurseHeadlessCheckout.PluginEvent)
+}
+public struct PluginBuilderData : Swift.Sendable {
+  public let partner: Module___PurseHeadlessCheckout.Partner
+  public let method: Module___PurseHeadlessCheckout.PaymentMethod
+}
+public typealias PluginBuilder = @Sendable (Module___PurseHeadlessCheckout.PluginBuilderData) -> any Module___PurseHeadlessCheckout.PartnerUIPlugin
+public protocol PartnerModule : Swift.Sendable {
+  var id: Swift.String { get }
+  @Module____Concurrency.MainActor func register(into registry: Module___PurseHeadlessCheckout.PluginRegistry)
+  @Module____Concurrency.MainActor func renders(_ plugin: any Module___PurseHeadlessCheckout.PartnerUIPlugin) -> Swift.Bool
+  @Module____Concurrency.MainActor func surface(for plugin: any Module___PurseHeadlessCheckout.PartnerUIPlugin, request: Module___PurseHeadlessCheckout.SurfaceRequest) -> Module___PurseHeadlessCheckout.PaymentSurface?
+}
+extension Module___PurseHeadlessCheckout.PartnerModule {
+  @Module____Concurrency.MainActor public func renders(_ plugin: any Module___PurseHeadlessCheckout.PartnerUIPlugin) -> Swift.Bool
+  @Module____Concurrency.MainActor public func surface(for plugin: any Module___PurseHeadlessCheckout.PartnerUIPlugin, request: Module___PurseHeadlessCheckout.SurfaceRequest) -> Module___PurseHeadlessCheckout.PaymentSurface?
+}
+@Module____Concurrency.MainActor final public class PluginRegistry {
+  @Module____Concurrency.MainActor public static let shared: Module___PurseHeadlessCheckout.PluginRegistry
+  @Module____Concurrency.MainActor public init()
+  @Module____Concurrency.MainActor final public var modules: [Swift.String] {
+    get
+  }
+  @Module____Concurrency.MainActor final public func install(_ module: any Module___PurseHeadlessCheckout.PartnerModule)
+  @Module____Concurrency.MainActor final public func module(rendering plugin: any Module___PurseHeadlessCheckout.PartnerUIPlugin) -> (any Module___PurseHeadlessCheckout.PartnerModule)?
+  @Module____Concurrency.MainActor final public func register(partner: Module___PurseHeadlessCheckout.Partner, method: Module___PurseHeadlessCheckout.PaymentMethod, builder: @escaping Module___PurseHeadlessCheckout.PluginBuilder)
+  @Module____Concurrency.MainActor final public func registerGeneric(template: Swift.String, builder: @escaping Module___PurseHeadlessCheckout.PluginBuilder)
+  @Module____Concurrency.MainActor final public func registerFallback(method: Module___PurseHeadlessCheckout.PaymentMethod, builder: @escaping Module___PurseHeadlessCheckout.PluginBuilder)
+  @Module____Concurrency.MainActor final public func registerVault(vendor: Module___PurseHeadlessCheckout.VaultVendor, builder: @escaping Module___PurseHeadlessCheckout.PluginBuilder)
+  @Module____Concurrency.MainActor final public func plugin(partner: Module___PurseHeadlessCheckout.Partner, method: Module___PurseHeadlessCheckout.PaymentMethod, session: Module___PurseHeadlessCheckout.LegacyPaymentSession) -> (any Module___PurseHeadlessCheckout.PartnerUIPlugin)?
+  @Module____Concurrency.MainActor final public func reset()
+  @objc deinit
+}
+public struct CardTokenization : Swift.Sendable, Swift.Equatable {
+  public let vaultFormToken: Swift.String
+  public let bin: Swift.String?
+  public let lastFourDigits: Swift.String?
+  public let selectedNetwork: Module___PurseHeadlessCheckout.CardBrand?
+  public static func == (a: Module___PurseHeadlessCheckout.CardTokenization, b: Module___PurseHeadlessCheckout.CardTokenization) -> Swift.Bool
+}
+public enum CardField : Swift.Sendable, Swift.CaseIterable {
+  case cardNumber, expDate, cvv, holderName
+  public static func == (a: Module___PurseHeadlessCheckout.CardField, b: Module___PurseHeadlessCheckout.CardField) -> Swift.Bool
+  public typealias AllCases = [Module___PurseHeadlessCheckout.CardField]
+  nonisolated public static var allCases: [Module___PurseHeadlessCheckout.CardField] {
+    get
+  }
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public struct CardFieldState : Swift.Sendable, Swift.Equatable {
+  public var isValid: Swift.Bool
+  public var isFocused: Swift.Bool
+  public var hasContent: Swift.Bool
+  public var wasBlurred: Swift.Bool
+  public init(isValid: Swift.Bool = false, isFocused: Swift.Bool = false, hasContent: Swift.Bool = false, wasBlurred: Swift.Bool = false)
+  public static func == (a: Module___PurseHeadlessCheckout.CardFieldState, b: Module___PurseHeadlessCheckout.CardFieldState) -> Swift.Bool
+}
+@objc @Module____Concurrency.MainActor final public class CardCoordinator : ObjectiveC.NSObject, Module___Combine.ObservableObject, Module___PurseSecureFields.SecureFieldsDelegate {
+  public enum Mode : Swift.Sendable, Swift.Equatable {
+    case freshCard
+    case tokenCVV
+    case tokenNoCVV
+    public var rendersForm: Swift.Bool {
+      get
+    }
+    public static func of(_ token: Module___PurseHeadlessCheckout.PayToken?) -> Module___PurseHeadlessCheckout.CardCoordinator.Mode
+    public static func == (a: Module___PurseHeadlessCheckout.CardCoordinator.Mode, b: Module___PurseHeadlessCheckout.CardCoordinator.Mode) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  @Module____Concurrency.MainActor final public let mode: Module___PurseHeadlessCheckout.CardCoordinator.Mode
+  @Module___Combine.Published @_projectedValueProperty($isFormValid) @Module____Concurrency.MainActor final public var isFormValid: Swift.Bool {
+    get
+  }
+  @Module____Concurrency.MainActor final public var $isFormValid: Module___Combine.Published<Swift.Bool>.Publisher {
+    get
+  }
+  @Module___Combine.Published @_projectedValueProperty($detectedBrands) @Module____Concurrency.MainActor final public var detectedBrands: [Module___PurseHeadlessCheckout.CardBrand] {
+    get
+  }
+  @Module____Concurrency.MainActor final public var $detectedBrands: Module___Combine.Published<[Module___PurseHeadlessCheckout.CardBrand]>.Publisher {
+    get
+  }
+  @Module___Combine.Published @_projectedValueProperty($selectedBrand) @Module____Concurrency.MainActor final public var selectedBrand: Module___PurseHeadlessCheckout.CardBrand? {
+    get
+  }
+  @Module____Concurrency.MainActor final public var $selectedBrand: Module___Combine.Published<Module___PurseHeadlessCheckout.CardBrand?>.Publisher {
+    get
+  }
+  @Module___Combine.Published @_projectedValueProperty($fieldStates) @Module____Concurrency.MainActor final public var fieldStates: [Module___PurseHeadlessCheckout.CardField : Module___PurseHeadlessCheckout.CardFieldState] {
+    get
+  }
+  @Module____Concurrency.MainActor final public var $fieldStates: Module___Combine.Published<[Module___PurseHeadlessCheckout.CardField : Module___PurseHeadlessCheckout.CardFieldState]>.Publisher {
+    get
+  }
+  @Module___Combine.Published @_projectedValueProperty($binLookupFailed) @Module____Concurrency.MainActor final public var binLookupFailed: Swift.Bool {
+    get
+  }
+  @Module____Concurrency.MainActor final public var $binLookupFailed: Module___Combine.Published<Swift.Bool>.Publisher {
+    get
+  }
+  @Module____Concurrency.MainActor public init(host: any Module___PurseHeadlessCheckout.PluginHost, tenantId: Swift.String, supportedBrands: [Module___PurseHeadlessCheckout.CardBrand], token: Module___PurseHeadlessCheckout.PayToken? = nil, options: Module___PurseHeadlessCheckout.PluginOptions = PluginOptions())
+  @Module____Concurrency.MainActor final public var fieldViews: [Module___UIKit.UIView] {
+    get
+  }
+  @Module____Concurrency.MainActor final public var fields: [Module___PurseHeadlessCheckout.CardField] {
+    get
+  }
+  @discardableResult
+  @Module____Concurrency.MainActor final public func submit(saveToken: Swift.Bool = false) async throws -> Module___PurseHeadlessCheckout.CardTokenization?
+  @Module____Concurrency.MainActor final public func errorMessage(for field: Module___PurseHeadlessCheckout.CardField) -> Swift.String?
+  @Module____Concurrency.MainActor final public func selectBrand(_ brand: Module___PurseHeadlessCheckout.CardBrand)
+  @Module____Concurrency.MainActor final public func clearField(_ field: Module___PurseHeadlessCheckout.CardField)
+  nonisolated final public func secureFieldsDidTokenize(_ result: Module___PurseSecureFields.TokenizationResult)
+  nonisolated final public func secureFieldsDidFail(_ error: Module___PurseSecureFields.SecureFieldsError)
+  nonisolated final public func secureFieldsFormValidityChanged(_ isValid: Swift.Bool)
+  nonisolated final public func secureFieldsBrandsDetected(_ brands: [Module___PurseSecureFields.CardBrand])
+  nonisolated final public func secureFieldsBrandSelected(_ brand: Module___PurseSecureFields.CardBrand)
+  nonisolated final public func secureFieldsContentChanged()
+  nonisolated final public func secureFieldsFocusChanged(field: Module___PurseSecureFields.SecureField, isFocused: Swift.Bool)
+  nonisolated final public func secureFieldsBinLookupFailed(_ error: Module___PurseSecureFields.SecureFieldsError)
+  public typealias ObjectWillChangePublisher = Module___Combine.ObservableObjectPublisher
+  @objc deinit
+}
+extension Module___PurseHeadlessCheckout.CardField {
+  public var accessibilityIdentifier: Swift.String {
+    get
+  }
+}
+public struct CardPlugin : Module___PurseHeadlessCheckout.PartnerUIPlugin {
+  public enum Collected {
+    public static let token: Swift.String
+    public static let bin: Swift.String
+    public static let network: Swift.String
+  }
+  public let partner: Module___PurseHeadlessCheckout.Partner
+  public let method: Module___PurseHeadlessCheckout.PaymentMethod
+  public init(partner: Module___PurseHeadlessCheckout.Partner)
+  public func validateUI(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws -> Swift.Bool
+  public func preValidation(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws -> Module___PurseHeadlessCheckout.ValidateItemPayload
+}
+@objc @_hasMissingDesignatedInitializers @Module____Concurrency.MainActor final public class CardFormView : Module___UIKit.UIStackView {
+  @Module____Concurrency.MainActor public init(coordinator: Module___PurseHeadlessCheckout.CardCoordinator)
+  @objc deinit
+}
+public struct RedirectionPlugin : Module___PurseHeadlessCheckout.PartnerUIPlugin {
+  public static let template: Swift.String
+  public let partner: Module___PurseHeadlessCheckout.Partner
+  public let method: Module___PurseHeadlessCheckout.PaymentMethod
+  public init(partner: Module___PurseHeadlessCheckout.Partner, method: Module___PurseHeadlessCheckout.PaymentMethod)
+  public func ensureClientCompatibility(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws
+  public func preValidation(_ context: Module___PurseHeadlessCheckout.PartnerUIContext) async throws -> Module___PurseHeadlessCheckout.ValidateItemPayload
+}
+public struct PurseTheme : Swift.Sendable {
+  public struct Text : Swift.Sendable {
+    public var color: Module___UIKit.UIColor?
+    public var font: Module___UIKit.UIFont?
+    public init(color: Module___UIKit.UIColor? = nil, font: Module___UIKit.UIFont? = nil)
+  }
+  public struct FieldStyle : Swift.Sendable {
+    public var color: Module___UIKit.UIColor?
+    public var placeholderColor: Module___UIKit.UIColor?
+    public var backgroundColor: Module___UIKit.UIColor?
+    public var font: Module___UIKit.UIFont?
+    public init(color: Module___UIKit.UIColor? = nil, placeholderColor: Module___UIKit.UIColor? = nil, backgroundColor: Module___UIKit.UIColor? = nil, font: Module___UIKit.UIFont? = nil)
+  }
+  public struct Resolved : Swift.Sendable {
+    public let input: Module___PurseHeadlessCheckout.PurseTheme.FieldStyle
+    public let inputFocus: Module___PurseHeadlessCheckout.PurseTheme.FieldStyle
+    public let inputInvalid: Module___PurseHeadlessCheckout.PurseTheme.FieldStyle
+    public let inputValid: Module___PurseHeadlessCheckout.PurseTheme.FieldStyle
+    public let label: Module___PurseHeadlessCheckout.PurseTheme.Text
+    public let labelInvalid: Module___PurseHeadlessCheckout.PurseTheme.Text
+    public let labelValid: Module___PurseHeadlessCheckout.PurseTheme.Text
+    public let helperText: Module___PurseHeadlessCheckout.PurseTheme.Text
+    public let helperTextInvalid: Module___PurseHeadlessCheckout.PurseTheme.Text
+    public let gap: CoreFoundation.CGFloat
+  }
+  public var global: Module___PurseHeadlessCheckout.PurseTheme.Text?
+  public var globalInvalid: Module___PurseHeadlessCheckout.PurseTheme.Text?
+  public var globalValid: Module___PurseHeadlessCheckout.PurseTheme.Text?
+  public var input: Module___PurseHeadlessCheckout.PurseTheme.FieldStyle?
+  public var inputFocus: Module___PurseHeadlessCheckout.PurseTheme.FieldStyle?
+  public var inputInvalid: Module___PurseHeadlessCheckout.PurseTheme.FieldStyle?
+  public var inputValid: Module___PurseHeadlessCheckout.PurseTheme.FieldStyle?
+  public var label: Module___PurseHeadlessCheckout.PurseTheme.Text?
+  public var labelInvalid: Module___PurseHeadlessCheckout.PurseTheme.Text?
+  public var labelValid: Module___PurseHeadlessCheckout.PurseTheme.Text?
+  public var helperText: Module___PurseHeadlessCheckout.PurseTheme.Text?
+  public var helperTextInvalid: Module___PurseHeadlessCheckout.PurseTheme.Text?
+  public var gap: CoreFoundation.CGFloat?
+  public init(global: Module___PurseHeadlessCheckout.PurseTheme.Text? = nil, globalInvalid: Module___PurseHeadlessCheckout.PurseTheme.Text? = nil, globalValid: Module___PurseHeadlessCheckout.PurseTheme.Text? = nil, input: Module___PurseHeadlessCheckout.PurseTheme.FieldStyle? = nil, inputFocus: Module___PurseHeadlessCheckout.PurseTheme.FieldStyle? = nil, inputInvalid: Module___PurseHeadlessCheckout.PurseTheme.FieldStyle? = nil, inputValid: Module___PurseHeadlessCheckout.PurseTheme.FieldStyle? = nil, label: Module___PurseHeadlessCheckout.PurseTheme.Text? = nil, labelInvalid: Module___PurseHeadlessCheckout.PurseTheme.Text? = nil, labelValid: Module___PurseHeadlessCheckout.PurseTheme.Text? = nil, helperText: Module___PurseHeadlessCheckout.PurseTheme.Text? = nil, helperTextInvalid: Module___PurseHeadlessCheckout.PurseTheme.Text? = nil, gap: CoreFoundation.CGFloat? = nil)
+  public static let `default`: Module___PurseHeadlessCheckout.PurseTheme
+  public func resolve() -> Module___PurseHeadlessCheckout.PurseTheme.Resolved
+}
+public struct CardFormTexts : Swift.Sendable {
+  public var cardNumber: Module___PurseHeadlessCheckout.CardFormTexts.FieldTexts
+  public var expDate: Module___PurseHeadlessCheckout.CardFormTexts.FieldTexts
+  public var cvv: Module___PurseHeadlessCheckout.CardFormTexts.FieldTexts
+  public var holderName: Module___PurseHeadlessCheckout.CardFormTexts.FieldTexts
+  public init(cardNumber: Module___PurseHeadlessCheckout.CardFormTexts.FieldTexts = FieldTexts(), expDate: Module___PurseHeadlessCheckout.CardFormTexts.FieldTexts = FieldTexts(), cvv: Module___PurseHeadlessCheckout.CardFormTexts.FieldTexts = FieldTexts(), holderName: Module___PurseHeadlessCheckout.CardFormTexts.FieldTexts = FieldTexts())
+  public struct FieldTexts : Swift.Sendable {
+    public var label: Swift.String?
+    public var placeholder: Swift.String?
+    public var helperText: Swift.String?
+    public var requiredError: Swift.String?
+    public var formatError: Swift.String?
+    public init(label: Swift.String? = nil, placeholder: Swift.String? = nil, helperText: Swift.String? = nil, requiredError: Swift.String? = nil, formatError: Swift.String? = nil)
+  }
+}
+public enum RedirectAction : Swift.Sendable, Swift.Equatable {
+  case get(url: Swift.String, returnURLPrefix: Swift.String? = nil)
+  case postForm(url: Swift.String, formDataURLEncoded: Swift.String, returnURLPrefix: Swift.String? = nil)
+  case postHTML(html: Swift.String, returnURLPrefix: Swift.String? = nil)
+  public var returnURLPrefix: Swift.String? {
+    get
+  }
+  public var targetURL: Swift.String? {
+    get
+  }
+  public func withReturnURLPrefix(_ prefix: Swift.String?) -> Module___PurseHeadlessCheckout.RedirectAction
+  public static func == (a: Module___PurseHeadlessCheckout.RedirectAction, b: Module___PurseHeadlessCheckout.RedirectAction) -> Swift.Bool
+}
+extension Swift.String {
+  public var isWidgetConfirmationRedirect: Swift.Bool {
+    get
+  }
+  public var isWidgetConfirmationEndpoint: Swift.Bool {
+    get
+  }
+  public var isPayPalApprovalEcho: Swift.Bool {
+    get
+  }
+  public var widgetRedirectionData: Module___PurseHeadlessCheckout.WidgetRedirectionData? {
+    get
+  }
+  public var widgetConfirmationPaymentId: Swift.String? {
+    get
+  }
+}
+public struct WidgetRedirectionData : Swift.Sendable, Swift.Equatable {
+  public let paymentId: Swift.String?
+  public let authorizationStatus: Swift.String?
+  public let clientSessionStatus: Swift.String?
+  public init(paymentId: Swift.String?, authorizationStatus: Swift.String?, clientSessionStatus: Swift.String?)
+  public var isAuthorized: Swift.Bool {
+    get
+  }
+  public static func == (a: Module___PurseHeadlessCheckout.WidgetRedirectionData, b: Module___PurseHeadlessCheckout.WidgetRedirectionData) -> Swift.Bool
+}
+public enum RedirectOutcome : Swift.Sendable, Swift.Equatable {
+  case returned(url: Foundation.URL?)
+  case canceled
+  public static func == (a: Module___PurseHeadlessCheckout.RedirectOutcome, b: Module___PurseHeadlessCheckout.RedirectOutcome) -> Swift.Bool
+}
+@Module____Concurrency.MainActor public protocol RedirectPresenter {
+  @Module____Concurrency.MainActor func present(_ action: Module___PurseHeadlessCheckout.RedirectAction) async throws -> Module___PurseHeadlessCheckout.RedirectOutcome
+}
+public struct RedirectPolicy : Swift.Sendable {
+  public enum Return : Swift.Sendable, Swift.Equatable {
+    case universalLink(host: Swift.String, path: Swift.String)
+    case customScheme(Swift.String)
+    public static func == (a: Module___PurseHeadlessCheckout.RedirectPolicy.Return, b: Module___PurseHeadlessCheckout.RedirectPolicy.Return) -> Swift.Bool
+  }
+  public let returnDestination: Module___PurseHeadlessCheckout.RedirectPolicy.Return
+  public let additionalAllowedHosts: Swift.Set<Swift.String>
+  public init(returnDestination: Module___PurseHeadlessCheckout.RedirectPolicy.Return, additionalAllowedHosts: Swift.Set<Swift.String> = [])
+  public func allowsLoading(_ url: Foundation.URL) -> Swift.Bool
+  public func isReturn(_ url: Foundation.URL) -> Swift.Bool
+}
+public enum RedirectionResolver {
+  public static func resolve(validateResponse: Module___PurseHeadlessCheckout.JSONValue, partner: Swift.String, method: Swift.String, sessionReturnURL: Swift.String? = nil) -> Module___PurseHeadlessCheckout.RedirectAction?
+  public static func widgetConfirmationPaymentId(validateResponse: Module___PurseHeadlessCheckout.JSONValue, partner: Swift.String = "", method: Swift.String = "") -> Swift.String?
+}
+@objc @Module____Concurrency.MainActor final public class WebAuthRedirectPresenter : ObjectiveC.NSObject, Module___PurseHeadlessCheckout.RedirectPresenter {
+  @Module____Concurrency.MainActor public init(policy: Module___PurseHeadlessCheckout.RedirectPolicy, presentingViewController: Module___UIKit.UIViewController? = nil, prefersInAppWebView: Swift.Bool = false)
+  @Module____Concurrency.MainActor final public func present(_ action: Module___PurseHeadlessCheckout.RedirectAction) async throws -> Module___PurseHeadlessCheckout.RedirectOutcome
+  @objc deinit
+}
+extension Module___PurseHeadlessCheckout.WebAuthRedirectPresenter : Module___AuthenticationServices.ASWebAuthenticationPresentationContextProviding {
+  @Module____Concurrency.MainActor @preconcurrency @objc final public func presentationAnchor(for session: Module___AuthenticationServices.ASWebAuthenticationSession) -> Module___AuthenticationServices.ASPresentationAnchor
+}
+extension Module___PurseHeadlessCheckout.DisabledState.Code : Swift.Equatable {}
+extension Module___PurseHeadlessCheckout.DisabledState.Code : Swift.Hashable {}
+extension Module___PurseHeadlessCheckout.DisabledState.Code : Swift.RawRepresentable {}
+extension Module___PurseHeadlessCheckout.SecondaryConfigs : Swift.Sendable {}
+extension Module___PurseHeadlessCheckout.SecondaryTakePolicy : Swift.Equatable {}
+extension Module___PurseHeadlessCheckout.SecondaryTakePolicy : Swift.Hashable {}
+extension Module___PurseHeadlessCheckout.SecondaryTakePolicy : Swift.RawRepresentable {}
+extension Module___PurseHeadlessCheckout.PurseHeadlessCheckout : Swift.Sendable {}
+extension Module___PurseHeadlessCheckout.SessionState : Swift.Equatable {}
+extension Module___PurseHeadlessCheckout.SessionState : Swift.Hashable {}
+extension Module___PurseHeadlessCheckout.SessionState : Swift.RawRepresentable {}
+extension Module___PurseHeadlessCheckout.PaymentSessionBuilder : Swift.Sendable {}
+extension Module___PurseHeadlessCheckout.PurseEnvironment : Swift.Equatable {}
+extension Module___PurseHeadlessCheckout.PurseEnvironment : Swift.Hashable {}
+extension Module___PurseHeadlessCheckout.PurseEnvironment : Swift.RawRepresentable {}
+extension Module___PurseHeadlessCheckout.PurseErrorCode : Swift.Equatable {}
+extension Module___PurseHeadlessCheckout.PurseErrorCode : Swift.Hashable {}
+extension Module___PurseHeadlessCheckout.PurseErrorCode : Swift.RawRepresentable {}
+extension Module___PurseHeadlessCheckout.CheckoutEventCode : Swift.Equatable {}
+extension Module___PurseHeadlessCheckout.CheckoutEventCode : Swift.Hashable {}
+extension Module___PurseHeadlessCheckout.CheckoutEventCode : Swift.RawRepresentable {}
+extension Module___PurseHeadlessCheckout.EventLevel : Swift.Equatable {}
+extension Module___PurseHeadlessCheckout.EventLevel : Swift.Hashable {}
+extension Module___PurseHeadlessCheckout.EventLevel : Swift.RawRepresentable {}
+extension Module___PurseHeadlessCheckout.PaymentStatus : Swift.Equatable {}
+extension Module___PurseHeadlessCheckout.PaymentStatus : Swift.Hashable {}
+extension Module___PurseHeadlessCheckout.PaymentStatus : Swift.RawRepresentable {}
+extension Module___PurseHeadlessCheckout.TokenSource : Swift.Equatable {}
+extension Module___PurseHeadlessCheckout.TokenSource : Swift.Hashable {}
+extension Module___PurseHeadlessCheckout.TokenSource : Swift.RawRepresentable {}
+extension Module___PurseHeadlessCheckout.IntegrationMode : Swift.Equatable {}
+extension Module___PurseHeadlessCheckout.IntegrationMode : Swift.Hashable {}
+extension Module___PurseHeadlessCheckout.IntegrationMode : Swift.RawRepresentable {}
+extension Module___PurseHeadlessCheckout.RegistrationMode : Swift.Equatable {}
+extension Module___PurseHeadlessCheckout.RegistrationMode : Swift.Hashable {}
+extension Module___PurseHeadlessCheckout.RegistrationMode : Swift.RawRepresentable {}
+extension Module___PurseHeadlessCheckout.SaveTokenMode : Swift.Equatable {}
+extension Module___PurseHeadlessCheckout.SaveTokenMode : Swift.Hashable {}
+extension Module___PurseHeadlessCheckout.SaveTokenMode : Swift.RawRepresentable {}
+extension Module___PurseHeadlessCheckout.CardBrand : Swift.Equatable {}
+extension Module___PurseHeadlessCheckout.CardBrand : Swift.Hashable {}
+extension Module___PurseHeadlessCheckout.CardBrand : Swift.RawRepresentable {}
+extension Module___PurseHeadlessCheckout.VaultVendor : Swift.Equatable {}
+extension Module___PurseHeadlessCheckout.VaultVendor : Swift.Hashable {}
+extension Module___PurseHeadlessCheckout.VaultVendor : Swift.RawRepresentable {}
+extension Module___PurseHeadlessCheckout.PaymentElement : Swift.Sendable {}
+extension Module___PurseHeadlessCheckout.PaymentElementView : Swift.Sendable {}
+extension Module___PurseHeadlessCheckout.PaymentSurface : Swift.Sendable {}
+extension Module___PurseHeadlessCheckout.SurfaceRequest : Swift.Sendable {}
+extension Module___PurseHeadlessCheckout.PluginRegistry : Swift.Sendable {}
+extension Module___PurseHeadlessCheckout.CardField : Swift.Equatable {}
+extension Module___PurseHeadlessCheckout.CardField : Swift.Hashable {}
+extension Module___PurseHeadlessCheckout.CardCoordinator : Swift.Sendable {}
+extension Module___PurseHeadlessCheckout.CardCoordinator.Mode : Swift.Hashable {}
+extension Module___PurseHeadlessCheckout.WebAuthRedirectPresenter : Swift.Sendable {}
