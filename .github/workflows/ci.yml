@@ -43,7 +43,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # A build only needs the destination to exist: no boot (about 2 minutes, billed at the macOS rate).
       - uses: ./.github/actions/ios-simulator
+        with:
+          boot: 'false'
 
       # Both configurations. Release is the one that matters: the Demo once referred to a
       # `#if DEBUG` type unconditionally, so it did not compile in Release at all — and nothing

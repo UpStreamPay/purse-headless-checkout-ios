@@ -11,7 +11,9 @@ blocked on any of:
 
 Both run the same way locally — the commands are in [AGENTS.md](../../AGENTS.md#build--verify).
 The simulator is picked by `.github/actions/ios-simulator`, which also waits for it to finish
-booting so a slow boot is not reported as a test failure.
+booting so a slow boot is not reported as a test failure. `Demo App` only builds, so it passes
+`boot: 'false'`: the destination has to exist, not to run, and the boot is about 2 minutes of macOS
+time per run.
 
 ## Pull request titles
 
