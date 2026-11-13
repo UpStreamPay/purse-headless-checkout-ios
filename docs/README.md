@@ -29,6 +29,6 @@ and the Android SDK, in Swift.
 | [Web ↔ Android ↔ iOS map](web-android-ios-map.md) | The file behind each file, and every deliberate divergence. |
 | [AGENTS.md](../AGENTS.md) | Invariants that must not be broken, and why each exists. |
 | [CI and quality gates](contributing/ci.md) | What blocks a merge, and the repository settings behind it. |
-| [Release](contributing/release.md) | release-please, the codeowner approval, the signed XCFrameworks. |
+| [Release](contributing/release.md) | release-please, the release freeze, the codeowner approval, the signed XCFrameworks. |
 
 Requirements: iOS 16, Swift 6.
