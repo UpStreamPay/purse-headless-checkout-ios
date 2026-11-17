@@ -1,0 +1,1332 @@
+{
+  "ABIRoot": {
+    "kind": "Root",
+    "name": "PurseCheckoutApplePay",
+    "printedName": "PurseCheckoutApplePay",
+    "children": [
+      {
+        "kind": "Import",
+        "name": "Foundation",
+        "printedName": "Foundation",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutApplePay",
+        "declAttributes": [
+          "RawDocComment"
+        ]
+      },
+      {
+        "kind": "Import",
+        "name": "PassKit",
+        "printedName": "PassKit",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutApplePay"
+      },
+      {
+        "kind": "Import",
+        "name": "PurseHeadlessCheckout",
+        "printedName": "PurseHeadlessCheckout",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutApplePay"
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "ApplePayConfiguration",
+        "printedName": "ApplePayConfiguration",
+        "children": [
+          {
+            "kind": "Var",
+            "name": "merchantIdentifier",
+            "printedName": "merchantIdentifier",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:21PurseCheckoutApplePay0cD13ConfigurationV18merchantIdentifierSSvp",
+            "mangledName": "$s21PurseCheckoutApplePay0cD13ConfigurationV18merchantIdentifierSSvp",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "HasStorage",
+              "AccessControl"
+            ],
+            "isLet": true,
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:21PurseCheckoutApplePay0cD13ConfigurationV18merchantIdentifierSSvg",
+                "mangledName": "$s21PurseCheckoutApplePay0cD13ConfigurationV18merchantIdentifierSSvg",
+                "moduleName": "PurseCheckoutApplePay",
+                "implicit": true,
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Var",
+            "name": "merchantName",
+            "printedName": "merchantName",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:21PurseCheckoutApplePay0cD13ConfigurationV12merchantNameSSvp",
+            "mangledName": "$s21PurseCheckoutApplePay0cD13ConfigurationV12merchantNameSSvp",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "HasStorage",
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "isLet": true,
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:21PurseCheckoutApplePay0cD13ConfigurationV12merchantNameSSvg",
+                "mangledName": "$s21PurseCheckoutApplePay0cD13ConfigurationV12merchantNameSSvg",
+                "moduleName": "PurseCheckoutApplePay",
+                "implicit": true,
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init(merchantIdentifier:merchantName:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "ApplePayConfiguration",
+                "printedName": "PurseCheckoutApplePay.ApplePayConfiguration",
+                "usr": "s:21PurseCheckoutApplePay0cD13ConfigurationV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:21PurseCheckoutApplePay0cD13ConfigurationV18merchantIdentifier0F4NameACSS_SStcfc",
+            "mangledName": "$s21PurseCheckoutApplePay0cD13ConfigurationV18merchantIdentifier0F4NameACSS_SStcfc",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "AccessControl"
+            ],
+            "init_kind": "Designated"
+          }
+        ],
+        "declKind": "Struct",
+        "usr": "s:21PurseCheckoutApplePay0cD13ConfigurationV",
+        "mangledName": "$s21PurseCheckoutApplePay0cD13ConfigurationV",
+        "moduleName": "PurseCheckoutApplePay",
+        "declAttributes": [
+          "AccessControl",
+          "RawDocComment"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Copyable",
+            "printedName": "Copyable",
+            "usr": "s:s8CopyableP",
+            "mangledName": "$ss8CopyableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Escapable",
+            "printedName": "Escapable",
+            "usr": "s:s9EscapableP",
+            "mangledName": "$ss9EscapableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          }
+        ]
+      },
+      {
+        "kind": "Import",
+        "name": "Foundation",
+        "printedName": "Foundation",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutApplePay",
+        "declAttributes": [
+          "RawDocComment"
+        ]
+      },
+      {
+        "kind": "Import",
+        "name": "PassKit",
+        "printedName": "PassKit",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutApplePay"
+      },
+      {
+        "kind": "Import",
+        "name": "PurseHeadlessCheckout",
+        "printedName": "PurseHeadlessCheckout",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutApplePay"
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "ApplePayCoordinator",
+        "printedName": "ApplePayCoordinator",
+        "children": [
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init(host:configuration:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "ApplePayCoordinator",
+                "printedName": "PurseCheckoutApplePay.ApplePayCoordinator",
+                "usr": "c:@M@PurseCheckoutApplePay@objc(cs)ApplePayCoordinator"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "PluginHost",
+                "printedName": "any PurseHeadlessCheckout.PluginHost",
+                "usr": "s:21PurseHeadlessCheckout10PluginHostP"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "ApplePayConfiguration",
+                "printedName": "PurseCheckoutApplePay.ApplePayConfiguration",
+                "usr": "s:21PurseCheckoutApplePay0cD13ConfigurationV"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:21PurseCheckoutApplePay0cD11CoordinatorC4host13configurationAC0a8HeadlessB010PluginHost_p_AA0cD13ConfigurationVtcfc",
+            "mangledName": "$s21PurseCheckoutApplePay0cD11CoordinatorC4host13configurationAC0a8HeadlessB010PluginHost_p_AA0cD13ConfigurationVtcfc",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "Custom",
+              "AccessControl"
+            ],
+            "init_kind": "Designated"
+          },
+          {
+            "kind": "Var",
+            "name": "canPay",
+            "printedName": "canPay",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Bool",
+                "printedName": "Swift.Bool",
+                "usr": "s:Sb"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:21PurseCheckoutApplePay0cD11CoordinatorC03canD0SbvpZ",
+            "mangledName": "$s21PurseCheckoutApplePay0cD11CoordinatorC03canD0SbvpZ",
+            "moduleName": "PurseCheckoutApplePay",
+            "static": true,
+            "declAttributes": [
+              "Final",
+              "Custom",
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Bool",
+                    "printedName": "Swift.Bool",
+                    "usr": "s:Sb"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:21PurseCheckoutApplePay0cD11CoordinatorC03canD0SbvgZ",
+                "mangledName": "$s21PurseCheckoutApplePay0cD11CoordinatorC03canD0SbvgZ",
+                "moduleName": "PurseCheckoutApplePay",
+                "static": true,
+                "declAttributes": [
+                  "Final"
+                ],
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Function",
+            "name": "canPayWithConfiguredNetworks",
+            "printedName": "canPayWithConfiguredNetworks()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Bool",
+                "printedName": "Swift.Bool",
+                "usr": "s:Sb"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:21PurseCheckoutApplePay0cD11CoordinatorC03canD22WithConfiguredNetworksSbyF",
+            "mangledName": "$s21PurseCheckoutApplePay0cD11CoordinatorC03canD22WithConfiguredNetworksSbyF",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "Custom",
+              "Final",
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "prepare",
+            "printedName": "prepare()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:21PurseCheckoutApplePay0cD11CoordinatorC7prepareyyYaKF",
+            "mangledName": "$s21PurseCheckoutApplePay0cD11CoordinatorC7prepareyyYaKF",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "Custom",
+              "Final",
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "present",
+            "printedName": "present()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:21PurseCheckoutApplePay0cD11CoordinatorC7presentyyYaKF",
+            "mangledName": "$s21PurseCheckoutApplePay0cD11CoordinatorC7presentyyYaKF",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "Custom",
+              "Final",
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "ApplePayCoordinator",
+                "printedName": "PurseCheckoutApplePay.ApplePayCoordinator",
+                "usr": "c:@M@PurseCheckoutApplePay@objc(cs)ApplePayCoordinator"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "c:@M@PurseCheckoutApplePay@objc(cs)ApplePayCoordinator(im)init",
+            "mangledName": "$s21PurseCheckoutApplePay0cD11CoordinatorCACycfc",
+            "moduleName": "PurseCheckoutApplePay",
+            "overriding": true,
+            "implicit": true,
+            "objc_name": "init",
+            "declAttributes": [
+              "Dynamic",
+              "ObjC",
+              "Custom",
+              "Override"
+            ],
+            "init_kind": "Designated"
+          },
+          {
+            "kind": "Function",
+            "name": "paymentAuthorizationController",
+            "printedName": "paymentAuthorizationController(_:didAuthorizePayment:handler:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "PKPaymentAuthorizationController",
+                "printedName": "PassKit.PKPaymentAuthorizationController",
+                "usr": "c:objc(cs)PKPaymentAuthorizationController"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "PKPayment",
+                "printedName": "PassKit.PKPayment",
+                "usr": "c:objc(cs)PKPayment"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(PassKit.PKPaymentAuthorizationResult) -> ()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "PKPaymentAuthorizationResult",
+                    "printedName": "PassKit.PKPaymentAuthorizationResult",
+                    "usr": "c:objc(cs)PKPaymentAuthorizationResult"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@CM@PurseCheckoutApplePay@objc(cs)ApplePayCoordinator(im)paymentAuthorizationController:didAuthorizePayment:handler:",
+            "mangledName": "$s21PurseCheckoutApplePay0cD11CoordinatorC30paymentAuthorizationController_19didAuthorizePayment7handlerySo09PKPaymentgH0C_So0M0CySo0mG6ResultCctF",
+            "moduleName": "PurseCheckoutApplePay",
+            "objc_name": "paymentAuthorizationController:didAuthorizePayment:handler:",
+            "declAttributes": [
+              "Final",
+              "ObjC",
+              "Nonisolated",
+              "AccessControl"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "paymentAuthorizationControllerDidFinish",
+            "printedName": "paymentAuthorizationControllerDidFinish(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "PKPaymentAuthorizationController",
+                "printedName": "PassKit.PKPaymentAuthorizationController",
+                "usr": "c:objc(cs)PKPaymentAuthorizationController"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@CM@PurseCheckoutApplePay@objc(cs)ApplePayCoordinator(im)paymentAuthorizationControllerDidFinish:",
+            "mangledName": "$s21PurseCheckoutApplePay0cD11CoordinatorC39paymentAuthorizationControllerDidFinishyySo09PKPaymentgH0CF",
+            "moduleName": "PurseCheckoutApplePay",
+            "objc_name": "paymentAuthorizationControllerDidFinish:",
+            "declAttributes": [
+              "Final",
+              "ObjC",
+              "Nonisolated",
+              "AccessControl"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          }
+        ],
+        "declKind": "Class",
+        "usr": "c:@M@PurseCheckoutApplePay@objc(cs)ApplePayCoordinator",
+        "mangledName": "$s21PurseCheckoutApplePay0cD11CoordinatorC",
+        "moduleName": "PurseCheckoutApplePay",
+        "declAttributes": [
+          "Final",
+          "AccessControl",
+          "Custom",
+          "RawDocComment",
+          "ObjC"
+        ],
+        "superclassUsr": "c:objc(cs)NSObject",
+        "superclassNames": [
+          "ObjectiveC.NSObject"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Copyable",
+            "printedName": "Copyable",
+            "usr": "s:s8CopyableP",
+            "mangledName": "$ss8CopyableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Escapable",
+            "printedName": "Escapable",
+            "usr": "s:s9EscapableP",
+            "mangledName": "$ss9EscapableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Equatable",
+            "printedName": "Equatable",
+            "usr": "s:SQ",
+            "mangledName": "$sSQ"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Hashable",
+            "printedName": "Hashable",
+            "usr": "s:SH",
+            "mangledName": "$sSH"
+          },
+          {
+            "kind": "Conformance",
+            "name": "CVarArg",
+            "printedName": "CVarArg",
+            "usr": "s:s7CVarArgP",
+            "mangledName": "$ss7CVarArgP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "_KeyValueCodingAndObservingPublishing",
+            "printedName": "_KeyValueCodingAndObservingPublishing",
+            "usr": "s:10Foundation37_KeyValueCodingAndObservingPublishingP",
+            "mangledName": "$s10Foundation37_KeyValueCodingAndObservingPublishingP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "_KeyValueCodingAndObserving",
+            "printedName": "_KeyValueCodingAndObserving",
+            "usr": "s:10Foundation27_KeyValueCodingAndObservingP",
+            "mangledName": "$s10Foundation27_KeyValueCodingAndObservingP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "CustomStringConvertible",
+            "printedName": "CustomStringConvertible",
+            "usr": "s:s23CustomStringConvertibleP",
+            "mangledName": "$ss23CustomStringConvertibleP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "CustomDebugStringConvertible",
+            "printedName": "CustomDebugStringConvertible",
+            "usr": "s:s28CustomDebugStringConvertibleP",
+            "mangledName": "$ss28CustomDebugStringConvertibleP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          }
+        ]
+      },
+      {
+        "kind": "Import",
+        "name": "Foundation",
+        "printedName": "Foundation",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutApplePay",
+        "declAttributes": [
+          "RawDocComment"
+        ]
+      },
+      {
+        "kind": "Import",
+        "name": "PassKit",
+        "printedName": "PassKit",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutApplePay"
+      },
+      {
+        "kind": "Import",
+        "name": "UIKit",
+        "printedName": "UIKit",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutApplePay"
+      },
+      {
+        "kind": "Import",
+        "name": "PurseHeadlessCheckout",
+        "printedName": "PurseHeadlessCheckout",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutApplePay"
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "ApplePayPlugin",
+        "printedName": "ApplePayPlugin",
+        "children": [
+          {
+            "kind": "TypeDecl",
+            "name": "Collected",
+            "printedName": "Collected",
+            "children": [
+              {
+                "kind": "Var",
+                "name": "session",
+                "printedName": "session",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Var",
+                "usr": "s:21PurseCheckoutApplePay0cD6PluginV9CollectedO7sessionSSvpZ",
+                "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV9CollectedO7sessionSSvpZ",
+                "moduleName": "PurseCheckoutApplePay",
+                "static": true,
+                "declAttributes": [
+                  "HasInitialValue",
+                  "HasStorage",
+                  "AccessControl",
+                  "RawDocComment"
+                ],
+                "isLet": true,
+                "hasStorage": true,
+                "accessors": [
+                  {
+                    "kind": "Accessor",
+                    "name": "Get",
+                    "printedName": "Get()",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "String",
+                        "printedName": "Swift.String",
+                        "usr": "s:SS"
+                      }
+                    ],
+                    "declKind": "Accessor",
+                    "usr": "s:21PurseCheckoutApplePay0cD6PluginV9CollectedO7sessionSSvgZ",
+                    "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV9CollectedO7sessionSSvgZ",
+                    "moduleName": "PurseCheckoutApplePay",
+                    "static": true,
+                    "implicit": true,
+                    "accessorKind": "get"
+                  }
+                ]
+              },
+              {
+                "kind": "Var",
+                "name": "fingerprint",
+                "printedName": "fingerprint",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Var",
+                "usr": "s:21PurseCheckoutApplePay0cD6PluginV9CollectedO11fingerprintSSvpZ",
+                "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV9CollectedO11fingerprintSSvpZ",
+                "moduleName": "PurseCheckoutApplePay",
+                "static": true,
+                "declAttributes": [
+                  "HasInitialValue",
+                  "HasStorage",
+                  "AccessControl",
+                  "RawDocComment"
+                ],
+                "isLet": true,
+                "hasStorage": true,
+                "accessors": [
+                  {
+                    "kind": "Accessor",
+                    "name": "Get",
+                    "printedName": "Get()",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "String",
+                        "printedName": "Swift.String",
+                        "usr": "s:SS"
+                      }
+                    ],
+                    "declKind": "Accessor",
+                    "usr": "s:21PurseCheckoutApplePay0cD6PluginV9CollectedO11fingerprintSSvgZ",
+                    "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV9CollectedO11fingerprintSSvgZ",
+                    "moduleName": "PurseCheckoutApplePay",
+                    "static": true,
+                    "implicit": true,
+                    "accessorKind": "get"
+                  }
+                ]
+              },
+              {
+                "kind": "Var",
+                "name": "network",
+                "printedName": "network",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Var",
+                "usr": "s:21PurseCheckoutApplePay0cD6PluginV9CollectedO7networkSSvpZ",
+                "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV9CollectedO7networkSSvpZ",
+                "moduleName": "PurseCheckoutApplePay",
+                "static": true,
+                "declAttributes": [
+                  "HasInitialValue",
+                  "HasStorage",
+                  "AccessControl",
+                  "RawDocComment"
+                ],
+                "isLet": true,
+                "hasStorage": true,
+                "accessors": [
+                  {
+                    "kind": "Accessor",
+                    "name": "Get",
+                    "printedName": "Get()",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "String",
+                        "printedName": "Swift.String",
+                        "usr": "s:SS"
+                      }
+                    ],
+                    "declKind": "Accessor",
+                    "usr": "s:21PurseCheckoutApplePay0cD6PluginV9CollectedO7networkSSvgZ",
+                    "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV9CollectedO7networkSSvgZ",
+                    "moduleName": "PurseCheckoutApplePay",
+                    "static": true,
+                    "implicit": true,
+                    "accessorKind": "get"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Enum",
+            "usr": "s:21PurseCheckoutApplePay0cD6PluginV9CollectedO",
+            "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV9CollectedO",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "conformances": [
+              {
+                "kind": "Conformance",
+                "name": "Copyable",
+                "printedName": "Copyable",
+                "usr": "s:s8CopyableP",
+                "mangledName": "$ss8CopyableP"
+              },
+              {
+                "kind": "Conformance",
+                "name": "Escapable",
+                "printedName": "Escapable",
+                "usr": "s:s9EscapableP",
+                "mangledName": "$ss9EscapableP"
+              }
+            ]
+          },
+          {
+            "kind": "Var",
+            "name": "partner",
+            "printedName": "partner",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Partner",
+                "printedName": "PurseHeadlessCheckout.Partner",
+                "usr": "s:21PurseHeadlessCheckout7PartnerO"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:21PurseCheckoutApplePay0cD6PluginV7partner0a8HeadlessB07PartnerOvp",
+            "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV7partner0a8HeadlessB07PartnerOvp",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "HasStorage",
+              "AccessControl"
+            ],
+            "isLet": true,
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Partner",
+                    "printedName": "PurseHeadlessCheckout.Partner",
+                    "usr": "s:21PurseHeadlessCheckout7PartnerO"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:21PurseCheckoutApplePay0cD6PluginV7partner0a8HeadlessB07PartnerOvg",
+                "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV7partner0a8HeadlessB07PartnerOvg",
+                "moduleName": "PurseCheckoutApplePay",
+                "implicit": true,
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Var",
+            "name": "method",
+            "printedName": "method",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "PaymentMethod",
+                "printedName": "PurseHeadlessCheckout.PaymentMethod",
+                "usr": "s:21PurseHeadlessCheckout13PaymentMethodO"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:21PurseCheckoutApplePay0cD6PluginV6method0a8HeadlessB013PaymentMethodOvp",
+            "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV6method0a8HeadlessB013PaymentMethodOvp",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "HasInitialValue",
+              "HasStorage",
+              "AccessControl"
+            ],
+            "isLet": true,
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "PaymentMethod",
+                    "printedName": "PurseHeadlessCheckout.PaymentMethod",
+                    "usr": "s:21PurseHeadlessCheckout13PaymentMethodO"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:21PurseCheckoutApplePay0cD6PluginV6method0a8HeadlessB013PaymentMethodOvg",
+                "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV6method0a8HeadlessB013PaymentMethodOvg",
+                "moduleName": "PurseCheckoutApplePay",
+                "implicit": true,
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init(partner:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "ApplePayPlugin",
+                "printedName": "PurseCheckoutApplePay.ApplePayPlugin",
+                "usr": "s:21PurseCheckoutApplePay0cD6PluginV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Partner",
+                "printedName": "PurseHeadlessCheckout.Partner",
+                "usr": "s:21PurseHeadlessCheckout7PartnerO"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:21PurseCheckoutApplePay0cD6PluginV7partnerAC0a8HeadlessB07PartnerO_tcfc",
+            "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV7partnerAC0a8HeadlessB07PartnerO_tcfc",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "AccessControl"
+            ],
+            "init_kind": "Designated"
+          },
+          {
+            "kind": "Var",
+            "name": "reloadsOnAmountUpdate",
+            "printedName": "reloadsOnAmountUpdate",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Bool",
+                "printedName": "Swift.Bool",
+                "usr": "s:Sb"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:21PurseCheckoutApplePay0cD6PluginV21reloadsOnAmountUpdateSbvp",
+            "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV21reloadsOnAmountUpdateSbvp",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Bool",
+                    "printedName": "Swift.Bool",
+                    "usr": "s:Sb"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:21PurseCheckoutApplePay0cD6PluginV21reloadsOnAmountUpdateSbvg",
+                "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV21reloadsOnAmountUpdateSbvg",
+                "moduleName": "PurseCheckoutApplePay",
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Function",
+            "name": "ensureClientCompatibility",
+            "printedName": "ensureClientCompatibility(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "PartnerUIContext",
+                "printedName": "PurseHeadlessCheckout.PartnerUIContext",
+                "usr": "s:21PurseHeadlessCheckout16PartnerUIContextV"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:21PurseCheckoutApplePay0cD6PluginV25ensureClientCompatibilityyy0a8HeadlessB016PartnerUIContextVYaKF",
+            "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV25ensureClientCompatibilityyy0a8HeadlessB016PartnerUIContextVYaKF",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "validateUI",
+            "printedName": "validateUI(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Bool",
+                "printedName": "Swift.Bool",
+                "usr": "s:Sb"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "PartnerUIContext",
+                "printedName": "PurseHeadlessCheckout.PartnerUIContext",
+                "usr": "s:21PurseHeadlessCheckout16PartnerUIContextV"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:21PurseCheckoutApplePay0cD6PluginV10validateUIySb0a8HeadlessB016PartnerUIContextVYaKF",
+            "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV10validateUIySb0a8HeadlessB016PartnerUIContextVYaKF",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "preValidation",
+            "printedName": "preValidation(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "ItemPayload",
+                "printedName": "PurseHeadlessCheckout.ItemPayload",
+                "usr": "s:21PurseHeadlessCheckout11ItemPayloadV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "PartnerUIContext",
+                "printedName": "PurseHeadlessCheckout.PartnerUIContext",
+                "usr": "s:21PurseHeadlessCheckout16PartnerUIContextV"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:21PurseCheckoutApplePay0cD6PluginV13preValidationy0a8HeadlessB011ItemPayloadVAE16PartnerUIContextVYaKF",
+            "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV13preValidationy0a8HeadlessB011ItemPayloadVAE16PartnerUIContextVYaKF",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "AccessControl"
+            ],
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          }
+        ],
+        "declKind": "Struct",
+        "usr": "s:21PurseCheckoutApplePay0cD6PluginV",
+        "mangledName": "$s21PurseCheckoutApplePay0cD6PluginV",
+        "moduleName": "PurseCheckoutApplePay",
+        "declAttributes": [
+          "AccessControl",
+          "RawDocComment"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Copyable",
+            "printedName": "Copyable",
+            "usr": "s:s8CopyableP",
+            "mangledName": "$ss8CopyableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Escapable",
+            "printedName": "Escapable",
+            "usr": "s:s9EscapableP",
+            "mangledName": "$ss9EscapableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "PartnerUIPlugin",
+            "printedName": "PartnerUIPlugin",
+            "usr": "s:21PurseHeadlessCheckout15PartnerUIPluginP",
+            "mangledName": "$s21PurseHeadlessCheckout15PartnerUIPluginP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          }
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "ApplePayModule",
+        "printedName": "ApplePayModule",
+        "children": [
+          {
+            "kind": "Var",
+            "name": "id",
+            "printedName": "id",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:21PurseCheckoutApplePay0cD6ModuleV2idSSvp",
+            "mangledName": "$s21PurseCheckoutApplePay0cD6ModuleV2idSSvp",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "HasInitialValue",
+              "HasStorage",
+              "AccessControl"
+            ],
+            "isLet": true,
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:21PurseCheckoutApplePay0cD6ModuleV2idSSvg",
+                "mangledName": "$s21PurseCheckoutApplePay0cD6ModuleV2idSSvg",
+                "moduleName": "PurseCheckoutApplePay",
+                "implicit": true,
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init(configuration:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "ApplePayModule",
+                "printedName": "PurseCheckoutApplePay.ApplePayModule",
+                "usr": "s:21PurseCheckoutApplePay0cD6ModuleV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "PurseCheckoutApplePay.ApplePayConfiguration?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "ApplePayConfiguration",
+                    "printedName": "PurseCheckoutApplePay.ApplePayConfiguration",
+                    "usr": "s:21PurseCheckoutApplePay0cD13ConfigurationV"
+                  }
+                ],
+                "hasDefaultArg": true,
+                "usr": "s:Sq"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:21PurseCheckoutApplePay0cD6ModuleV13configurationAcA0cD13ConfigurationVSg_tcfc",
+            "mangledName": "$s21PurseCheckoutApplePay0cD6ModuleV13configurationAcA0cD13ConfigurationVSg_tcfc",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "AccessControl"
+            ],
+            "init_kind": "Designated"
+          },
+          {
+            "kind": "Function",
+            "name": "register",
+            "printedName": "register(into:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "PluginRegistry",
+                "printedName": "PurseHeadlessCheckout.PluginRegistry",
+                "usr": "s:21PurseHeadlessCheckout14PluginRegistryC"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:21PurseCheckoutApplePay0cD6ModuleV8register4intoy0a8HeadlessB014PluginRegistryC_tF",
+            "mangledName": "$s21PurseCheckoutApplePay0cD6ModuleV8register4intoy0a8HeadlessB014PluginRegistryC_tF",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "AccessControl",
+              "Custom"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "renders",
+            "printedName": "renders(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Bool",
+                "printedName": "Swift.Bool",
+                "usr": "s:Sb"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "PartnerUIPlugin",
+                "printedName": "any PurseHeadlessCheckout.PartnerUIPlugin",
+                "usr": "s:21PurseHeadlessCheckout15PartnerUIPluginP"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:21PurseCheckoutApplePay0cD6ModuleV7rendersySb0a8HeadlessB015PartnerUIPlugin_pF",
+            "mangledName": "$s21PurseCheckoutApplePay0cD6ModuleV7rendersySb0a8HeadlessB015PartnerUIPlugin_pF",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "AccessControl",
+              "Custom"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "surface",
+            "printedName": "surface(for:request:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "PurseHeadlessCheckout.PaymentSurface?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "PaymentSurface",
+                    "printedName": "PurseHeadlessCheckout.PaymentSurface",
+                    "usr": "s:21PurseHeadlessCheckout14PaymentSurfaceV"
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "PartnerUIPlugin",
+                "printedName": "any PurseHeadlessCheckout.PartnerUIPlugin",
+                "usr": "s:21PurseHeadlessCheckout15PartnerUIPluginP"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "SurfaceRequest",
+                "printedName": "PurseHeadlessCheckout.SurfaceRequest",
+                "usr": "s:21PurseHeadlessCheckout14SurfaceRequestV"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:21PurseCheckoutApplePay0cD6ModuleV7surface3for7request0a8HeadlessB014PaymentSurfaceVSgAG15PartnerUIPlugin_p_AG0K7RequestVtF",
+            "mangledName": "$s21PurseCheckoutApplePay0cD6ModuleV7surface3for7request0a8HeadlessB014PaymentSurfaceVSgAG15PartnerUIPlugin_p_AG0K7RequestVtF",
+            "moduleName": "PurseCheckoutApplePay",
+            "declAttributes": [
+              "AccessControl",
+              "Custom"
+            ],
+            "funcSelfKind": "NonMutating"
+          }
+        ],
+        "declKind": "Struct",
+        "usr": "s:21PurseCheckoutApplePay0cD6ModuleV",
+        "mangledName": "$s21PurseCheckoutApplePay0cD6ModuleV",
+        "moduleName": "PurseCheckoutApplePay",
+        "declAttributes": [
+          "AccessControl",
+          "RawDocComment"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Copyable",
+            "printedName": "Copyable",
+            "usr": "s:s8CopyableP",
+            "mangledName": "$ss8CopyableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Escapable",
+            "printedName": "Escapable",
+            "usr": "s:s9EscapableP",
+            "mangledName": "$ss9EscapableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "PartnerModule",
+            "printedName": "PartnerModule",
+            "usr": "s:21PurseHeadlessCheckout13PartnerModuleP",
+            "mangledName": "$s21PurseHeadlessCheckout13PartnerModuleP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          }
+        ]
+      }
+    ],
+    "json_format_version": 8
+  },
+  "ConstValues": [
+    {
+      "filePath": "\/Users\/runner\/work\/purse-headless-checkout-ios\/purse-headless-checkout-ios\/Sources\/PurseCheckoutApplePay\/ApplePayCoordinator.swift",
+      "kind": "BooleanLiteral",
+      "offset": 1047,
+      "length": 5,
+      "value": "false"
+    },
+    {
+      "filePath": "\/Users\/runner\/work\/purse-headless-checkout-ios\/purse-headless-checkout-ios\/Sources\/PurseCheckoutApplePay\/ApplePayPlugin.swift",
+      "kind": "StringLiteral",
+      "offset": 813,
+      "length": 17,
+      "value": "\"applePaySession\""
+    },
+    {
+      "filePath": "\/Users\/runner\/work\/purse-headless-checkout-ios\/purse-headless-checkout-ios\/Sources\/PurseCheckoutApplePay\/ApplePayPlugin.swift",
+      "kind": "StringLiteral",
+      "offset": 922,
+      "length": 21,
+      "value": "\"applePayFingerprint\""
+    },
+    {
+      "filePath": "\/Users\/runner\/work\/purse-headless-checkout-ios\/purse-headless-checkout-ios\/Sources\/PurseCheckoutApplePay\/ApplePayPlugin.swift",
+      "kind": "StringLiteral",
+      "offset": 1064,
+      "length": 18,
+      "value": "\"selected_network\""
+    },
+    {
+      "filePath": "\/Users\/runner\/work\/purse-headless-checkout-ios\/purse-headless-checkout-ios\/Sources\/PurseCheckoutApplePay\/ApplePayPlugin.swift",
+      "kind": "StringLiteral",
+      "offset": 3238,
+      "length": 16,
+      "value": "\"purse.applepay\""
+    }
+  ]
+}

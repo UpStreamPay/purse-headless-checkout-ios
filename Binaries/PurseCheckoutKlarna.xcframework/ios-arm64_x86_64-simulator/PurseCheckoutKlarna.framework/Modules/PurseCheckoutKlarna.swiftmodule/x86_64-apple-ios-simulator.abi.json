@@ -1,0 +1,1454 @@
+{
+  "ABIRoot": {
+    "kind": "Root",
+    "name": "PurseCheckoutKlarna",
+    "printedName": "PurseCheckoutKlarna",
+    "children": [
+      {
+        "kind": "Import",
+        "name": "Foundation",
+        "printedName": "Foundation",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutKlarna",
+        "declAttributes": [
+          "RawDocComment"
+        ]
+      },
+      {
+        "kind": "Import",
+        "name": "Foundation",
+        "printedName": "Foundation",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutKlarna",
+        "declAttributes": [
+          "RawDocComment"
+        ]
+      },
+      {
+        "kind": "Import",
+        "name": "KlarnaCore",
+        "printedName": "KlarnaCore",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutKlarna"
+      },
+      {
+        "kind": "Import",
+        "name": "KlarnaPayments",
+        "printedName": "KlarnaPayments",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutKlarna"
+      },
+      {
+        "kind": "Import",
+        "name": "PurseHeadlessCheckout",
+        "printedName": "PurseHeadlessCheckout",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutKlarna"
+      },
+      {
+        "kind": "Import",
+        "name": "UIKit",
+        "printedName": "UIKit",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutKlarna"
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "KlarnaCoordinator",
+        "printedName": "KlarnaCoordinator",
+        "children": [
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init(host:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "KlarnaCoordinator",
+                "printedName": "PurseCheckoutKlarna.KlarnaCoordinator",
+                "usr": "c:@M@PurseCheckoutKlarna@objc(cs)KlarnaCoordinator"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "PluginHost",
+                "printedName": "any PurseHeadlessCheckout.PluginHost",
+                "usr": "s:21PurseHeadlessCheckout10PluginHostP"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:19PurseCheckoutKlarna0C11CoordinatorC4hostAC0a8HeadlessB010PluginHost_p_tcfc",
+            "mangledName": "$s19PurseCheckoutKlarna0C11CoordinatorC4hostAC0a8HeadlessB010PluginHost_p_tcfc",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "Custom",
+              "AccessControl"
+            ],
+            "init_kind": "Designated"
+          },
+          {
+            "kind": "Function",
+            "name": "prepare",
+            "printedName": "prepare(into:returnURL:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "UIView",
+                "printedName": "UIKit.UIView",
+                "usr": "c:objc(cs)UIView"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "URL",
+                "printedName": "Foundation.URL",
+                "usr": "s:10Foundation3URLV"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:19PurseCheckoutKlarna0C11CoordinatorC7prepare4into9returnURLySo6UIViewC_10Foundation0H0VtYaKF",
+            "mangledName": "$s19PurseCheckoutKlarna0C11CoordinatorC7prepare4into9returnURLySo6UIViewC_10Foundation0H0VtYaKF",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "Custom",
+              "Final",
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "KlarnaCoordinator",
+                "printedName": "PurseCheckoutKlarna.KlarnaCoordinator",
+                "usr": "c:@M@PurseCheckoutKlarna@objc(cs)KlarnaCoordinator"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "c:@M@PurseCheckoutKlarna@objc(cs)KlarnaCoordinator(im)init",
+            "mangledName": "$s19PurseCheckoutKlarna0C11CoordinatorCACycfc",
+            "moduleName": "PurseCheckoutKlarna",
+            "overriding": true,
+            "implicit": true,
+            "objc_name": "init",
+            "declAttributes": [
+              "Dynamic",
+              "ObjC",
+              "Custom",
+              "Override"
+            ],
+            "init_kind": "Designated"
+          },
+          {
+            "kind": "Function",
+            "name": "klarnaInitialized",
+            "printedName": "klarnaInitialized(paymentView:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "KlarnaPaymentView",
+                "printedName": "KlarnaPayments.KlarnaPaymentView",
+                "usr": "c:@M@KlarnaPayments@objc(cs)KlarnaPaymentView"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@CM@PurseCheckoutKlarna@objc(cs)KlarnaCoordinator(im)klarnaInitializedWithPaymentView:",
+            "mangledName": "$s19PurseCheckoutKlarna0C11CoordinatorC17klarnaInitialized11paymentViewy0C8Payments0c7PaymentH0C_tF",
+            "moduleName": "PurseCheckoutKlarna",
+            "objc_name": "klarnaInitializedWithPaymentView:",
+            "declAttributes": [
+              "Final",
+              "ObjC",
+              "Nonisolated",
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "klarnaLoaded",
+            "printedName": "klarnaLoaded(paymentView:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "KlarnaPaymentView",
+                "printedName": "KlarnaPayments.KlarnaPaymentView",
+                "usr": "c:@M@KlarnaPayments@objc(cs)KlarnaPaymentView"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@CM@PurseCheckoutKlarna@objc(cs)KlarnaCoordinator(im)klarnaLoadedWithPaymentView:",
+            "mangledName": "$s19PurseCheckoutKlarna0C11CoordinatorC12klarnaLoaded11paymentViewy0C8Payments0c7PaymentH0C_tF",
+            "moduleName": "PurseCheckoutKlarna",
+            "objc_name": "klarnaLoadedWithPaymentView:",
+            "declAttributes": [
+              "Final",
+              "ObjC",
+              "Nonisolated",
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "klarnaLoadedPaymentReview",
+            "printedName": "klarnaLoadedPaymentReview(paymentView:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "KlarnaPaymentView",
+                "printedName": "KlarnaPayments.KlarnaPaymentView",
+                "usr": "c:@M@KlarnaPayments@objc(cs)KlarnaPaymentView"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@CM@PurseCheckoutKlarna@objc(cs)KlarnaCoordinator(im)klarnaLoadedPaymentReviewWithPaymentView:",
+            "mangledName": "$s19PurseCheckoutKlarna0C11CoordinatorC25klarnaLoadedPaymentReview11paymentViewy0C8Payments0cgJ0C_tF",
+            "moduleName": "PurseCheckoutKlarna",
+            "objc_name": "klarnaLoadedPaymentReviewWithPaymentView:",
+            "declAttributes": [
+              "Final",
+              "ObjC",
+              "Nonisolated",
+              "AccessControl"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "klarnaAuthorized",
+            "printedName": "klarnaAuthorized(paymentView:approved:authToken:finalizeRequired:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "KlarnaPaymentView",
+                "printedName": "KlarnaPayments.KlarnaPaymentView",
+                "usr": "c:@M@KlarnaPayments@objc(cs)KlarnaPaymentView"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Bool",
+                "printedName": "Swift.Bool",
+                "usr": "s:Sb"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "Swift.String?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Bool",
+                "printedName": "Swift.Bool",
+                "usr": "s:Sb"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@CM@PurseCheckoutKlarna@objc(cs)KlarnaCoordinator(im)klarnaAuthorizedWithPaymentView:approved:authToken:finalizeRequired:",
+            "mangledName": "$s19PurseCheckoutKlarna0C11CoordinatorC16klarnaAuthorized11paymentView8approved9authToken16finalizeRequiredy0C8Payments0c7PaymentH0C_SbSSSgSbtF",
+            "moduleName": "PurseCheckoutKlarna",
+            "objc_name": "klarnaAuthorizedWithPaymentView:approved:authToken:finalizeRequired:",
+            "declAttributes": [
+              "Final",
+              "ObjC",
+              "Nonisolated",
+              "AccessControl"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "klarnaReauthorized",
+            "printedName": "klarnaReauthorized(paymentView:approved:authToken:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "KlarnaPaymentView",
+                "printedName": "KlarnaPayments.KlarnaPaymentView",
+                "usr": "c:@M@KlarnaPayments@objc(cs)KlarnaPaymentView"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Bool",
+                "printedName": "Swift.Bool",
+                "usr": "s:Sb"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "Swift.String?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "usr": "s:Sq"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@CM@PurseCheckoutKlarna@objc(cs)KlarnaCoordinator(im)klarnaReauthorizedWithPaymentView:approved:authToken:",
+            "mangledName": "$s19PurseCheckoutKlarna0C11CoordinatorC18klarnaReauthorized11paymentView8approved9authTokeny0C8Payments0c7PaymentH0C_SbSSSgtF",
+            "moduleName": "PurseCheckoutKlarna",
+            "objc_name": "klarnaReauthorizedWithPaymentView:approved:authToken:",
+            "declAttributes": [
+              "Final",
+              "ObjC",
+              "Nonisolated",
+              "AccessControl"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "klarnaFinalized",
+            "printedName": "klarnaFinalized(paymentView:approved:authToken:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "KlarnaPaymentView",
+                "printedName": "KlarnaPayments.KlarnaPaymentView",
+                "usr": "c:@M@KlarnaPayments@objc(cs)KlarnaPaymentView"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Bool",
+                "printedName": "Swift.Bool",
+                "usr": "s:Sb"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "Swift.String?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "usr": "s:Sq"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@CM@PurseCheckoutKlarna@objc(cs)KlarnaCoordinator(im)klarnaFinalizedWithPaymentView:approved:authToken:",
+            "mangledName": "$s19PurseCheckoutKlarna0C11CoordinatorC15klarnaFinalized11paymentView8approved9authTokeny0C8Payments0c7PaymentH0C_SbSSSgtF",
+            "moduleName": "PurseCheckoutKlarna",
+            "objc_name": "klarnaFinalizedWithPaymentView:approved:authToken:",
+            "declAttributes": [
+              "Final",
+              "ObjC",
+              "Nonisolated",
+              "AccessControl"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "klarnaResized",
+            "printedName": "klarnaResized(paymentView:to:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "KlarnaPaymentView",
+                "printedName": "KlarnaPayments.KlarnaPaymentView",
+                "usr": "c:@M@KlarnaPayments@objc(cs)KlarnaPaymentView"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "CGFloat",
+                "printedName": "CoreGraphics.CGFloat",
+                "usr": "s:14CoreFoundation7CGFloatV"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@CM@PurseCheckoutKlarna@objc(cs)KlarnaCoordinator(im)klarnaResizedWithPaymentView:to:",
+            "mangledName": "$s19PurseCheckoutKlarna0C11CoordinatorC13klarnaResized11paymentView2toy0C8Payments0c7PaymentH0C_12CoreGraphics7CGFloatVtF",
+            "moduleName": "PurseCheckoutKlarna",
+            "objc_name": "klarnaResizedWithPaymentView:to:",
+            "declAttributes": [
+              "Final",
+              "ObjC",
+              "Nonisolated",
+              "AccessControl"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "klarnaFailed",
+            "printedName": "klarnaFailed(inPaymentView:withError:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "KlarnaPaymentView",
+                "printedName": "KlarnaPayments.KlarnaPaymentView",
+                "usr": "c:@M@KlarnaPayments@objc(cs)KlarnaPaymentView"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "KlarnaPaymentError",
+                "printedName": "KlarnaCore.KlarnaPaymentError",
+                "usr": "c:@M@KlarnaCore@objc(cs)KlarnaPaymentError"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@CM@PurseCheckoutKlarna@objc(cs)KlarnaCoordinator(im)klarnaFailedInPaymentView:withError:",
+            "mangledName": "$s19PurseCheckoutKlarna0C11CoordinatorC12klarnaFailed13inPaymentView9withErrory0C8Payments0chI0C_0C4Core0chK0CtF",
+            "moduleName": "PurseCheckoutKlarna",
+            "objc_name": "klarnaFailedInPaymentView:withError:",
+            "declAttributes": [
+              "Final",
+              "ObjC",
+              "Nonisolated",
+              "AccessControl"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          }
+        ],
+        "declKind": "Class",
+        "usr": "c:@M@PurseCheckoutKlarna@objc(cs)KlarnaCoordinator",
+        "mangledName": "$s19PurseCheckoutKlarna0C11CoordinatorC",
+        "moduleName": "PurseCheckoutKlarna",
+        "declAttributes": [
+          "Final",
+          "AccessControl",
+          "Custom",
+          "RawDocComment",
+          "ObjC"
+        ],
+        "superclassUsr": "c:objc(cs)NSObject",
+        "superclassNames": [
+          "ObjectiveC.NSObject"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Copyable",
+            "printedName": "Copyable",
+            "usr": "s:s8CopyableP",
+            "mangledName": "$ss8CopyableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Escapable",
+            "printedName": "Escapable",
+            "usr": "s:s9EscapableP",
+            "mangledName": "$ss9EscapableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Equatable",
+            "printedName": "Equatable",
+            "usr": "s:SQ",
+            "mangledName": "$sSQ"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Hashable",
+            "printedName": "Hashable",
+            "usr": "s:SH",
+            "mangledName": "$sSH"
+          },
+          {
+            "kind": "Conformance",
+            "name": "CVarArg",
+            "printedName": "CVarArg",
+            "usr": "s:s7CVarArgP",
+            "mangledName": "$ss7CVarArgP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "_KeyValueCodingAndObservingPublishing",
+            "printedName": "_KeyValueCodingAndObservingPublishing",
+            "usr": "s:10Foundation37_KeyValueCodingAndObservingPublishingP",
+            "mangledName": "$s10Foundation37_KeyValueCodingAndObservingPublishingP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "_KeyValueCodingAndObserving",
+            "printedName": "_KeyValueCodingAndObserving",
+            "usr": "s:10Foundation27_KeyValueCodingAndObservingP",
+            "mangledName": "$s10Foundation27_KeyValueCodingAndObservingP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "CustomStringConvertible",
+            "printedName": "CustomStringConvertible",
+            "usr": "s:s23CustomStringConvertibleP",
+            "mangledName": "$ss23CustomStringConvertibleP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "CustomDebugStringConvertible",
+            "printedName": "CustomDebugStringConvertible",
+            "usr": "s:s28CustomDebugStringConvertibleP",
+            "mangledName": "$ss28CustomDebugStringConvertibleP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "KlarnaPaymentEventListener",
+            "printedName": "KlarnaPaymentEventListener",
+            "usr": "c:@M@KlarnaPayments@objc(pl)KlarnaPaymentEventListener",
+            "mangledName": "$s14KlarnaPayments0A20PaymentEventListenerP"
+          }
+        ]
+      },
+      {
+        "kind": "Import",
+        "name": "Foundation",
+        "printedName": "Foundation",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutKlarna",
+        "declAttributes": [
+          "RawDocComment"
+        ]
+      },
+      {
+        "kind": "Import",
+        "name": "UIKit",
+        "printedName": "UIKit",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutKlarna"
+      },
+      {
+        "kind": "Import",
+        "name": "PurseHeadlessCheckout",
+        "printedName": "PurseHeadlessCheckout",
+        "declKind": "Import",
+        "moduleName": "PurseCheckoutKlarna"
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "KlarnaAuthorizationDeclined",
+        "printedName": "KlarnaAuthorizationDeclined",
+        "children": [
+          {
+            "kind": "Var",
+            "name": "code",
+            "printedName": "code",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "PurseErrorCode",
+                "printedName": "PurseHeadlessCheckout.PurseErrorCode",
+                "usr": "s:21PurseHeadlessCheckout0A9ErrorCodeO"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:19PurseCheckoutKlarna0C21AuthorizationDeclinedV4code0a8HeadlessB00A9ErrorCodeOvp",
+            "mangledName": "$s19PurseCheckoutKlarna0C21AuthorizationDeclinedV4code0a8HeadlessB00A9ErrorCodeOvp",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "AccessControl"
+            ],
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "PurseErrorCode",
+                    "printedName": "PurseHeadlessCheckout.PurseErrorCode",
+                    "usr": "s:21PurseHeadlessCheckout0A9ErrorCodeO"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:19PurseCheckoutKlarna0C21AuthorizationDeclinedV4code0a8HeadlessB00A9ErrorCodeOvg",
+                "mangledName": "$s19PurseCheckoutKlarna0C21AuthorizationDeclinedV4code0a8HeadlessB00A9ErrorCodeOvg",
+                "moduleName": "PurseCheckoutKlarna",
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Var",
+            "name": "message",
+            "printedName": "message",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:19PurseCheckoutKlarna0C21AuthorizationDeclinedV7messageSSvp",
+            "mangledName": "$s19PurseCheckoutKlarna0C21AuthorizationDeclinedV7messageSSvp",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "AccessControl"
+            ],
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:19PurseCheckoutKlarna0C21AuthorizationDeclinedV7messageSSvg",
+                "mangledName": "$s19PurseCheckoutKlarna0C21AuthorizationDeclinedV7messageSSvg",
+                "moduleName": "PurseCheckoutKlarna",
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Var",
+            "name": "underlying",
+            "printedName": "underlying",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "(any Swift.Error)?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Error",
+                    "printedName": "any Swift.Error",
+                    "usr": "s:s5ErrorP"
+                  }
+                ],
+                "usr": "s:Sq"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:19PurseCheckoutKlarna0C21AuthorizationDeclinedV10underlyings5Error_pSgvp",
+            "mangledName": "$s19PurseCheckoutKlarna0C21AuthorizationDeclinedV10underlyings5Error_pSgvp",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "AccessControl"
+            ],
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Optional",
+                    "printedName": "(any Swift.Error)?",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "Error",
+                        "printedName": "any Swift.Error",
+                        "usr": "s:s5ErrorP"
+                      }
+                    ],
+                    "usr": "s:Sq"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:19PurseCheckoutKlarna0C21AuthorizationDeclinedV10underlyings5Error_pSgvg",
+                "mangledName": "$s19PurseCheckoutKlarna0C21AuthorizationDeclinedV10underlyings5Error_pSgvg",
+                "moduleName": "PurseCheckoutKlarna",
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "KlarnaAuthorizationDeclined",
+                "printedName": "PurseCheckoutKlarna.KlarnaAuthorizationDeclined",
+                "usr": "s:19PurseCheckoutKlarna0C21AuthorizationDeclinedV"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:19PurseCheckoutKlarna0C21AuthorizationDeclinedVACycfc",
+            "mangledName": "$s19PurseCheckoutKlarna0C21AuthorizationDeclinedVACycfc",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "AccessControl"
+            ],
+            "init_kind": "Designated"
+          }
+        ],
+        "declKind": "Struct",
+        "usr": "s:19PurseCheckoutKlarna0C21AuthorizationDeclinedV",
+        "mangledName": "$s19PurseCheckoutKlarna0C21AuthorizationDeclinedV",
+        "moduleName": "PurseCheckoutKlarna",
+        "declAttributes": [
+          "AccessControl",
+          "RawDocComment"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Copyable",
+            "printedName": "Copyable",
+            "usr": "s:s8CopyableP",
+            "mangledName": "$ss8CopyableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Escapable",
+            "printedName": "Escapable",
+            "usr": "s:s9EscapableP",
+            "mangledName": "$ss9EscapableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "PurseError",
+            "printedName": "PurseError",
+            "usr": "s:21PurseHeadlessCheckout0A5ErrorP",
+            "mangledName": "$s21PurseHeadlessCheckout0A5ErrorP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "CustomStringConvertible",
+            "printedName": "CustomStringConvertible",
+            "usr": "s:s23CustomStringConvertibleP",
+            "mangledName": "$ss23CustomStringConvertibleP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Error",
+            "printedName": "Error",
+            "usr": "s:s5ErrorP",
+            "mangledName": "$ss5ErrorP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          }
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "KlarnaPlugin",
+        "printedName": "KlarnaPlugin",
+        "children": [
+          {
+            "kind": "TypeDecl",
+            "name": "Collected",
+            "printedName": "Collected",
+            "children": [
+              {
+                "kind": "Var",
+                "name": "stepId",
+                "printedName": "stepId",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Var",
+                "usr": "s:19PurseCheckoutKlarna0C6PluginV9CollectedO6stepIdSSvpZ",
+                "mangledName": "$s19PurseCheckoutKlarna0C6PluginV9CollectedO6stepIdSSvpZ",
+                "moduleName": "PurseCheckoutKlarna",
+                "static": true,
+                "declAttributes": [
+                  "HasInitialValue",
+                  "HasStorage",
+                  "AccessControl",
+                  "RawDocComment"
+                ],
+                "isLet": true,
+                "hasStorage": true,
+                "accessors": [
+                  {
+                    "kind": "Accessor",
+                    "name": "Get",
+                    "printedName": "Get()",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "String",
+                        "printedName": "Swift.String",
+                        "usr": "s:SS"
+                      }
+                    ],
+                    "declKind": "Accessor",
+                    "usr": "s:19PurseCheckoutKlarna0C6PluginV9CollectedO6stepIdSSvgZ",
+                    "mangledName": "$s19PurseCheckoutKlarna0C6PluginV9CollectedO6stepIdSSvgZ",
+                    "moduleName": "PurseCheckoutKlarna",
+                    "static": true,
+                    "implicit": true,
+                    "accessorKind": "get"
+                  }
+                ]
+              },
+              {
+                "kind": "Var",
+                "name": "authorizeToken",
+                "printedName": "authorizeToken",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Var",
+                "usr": "s:19PurseCheckoutKlarna0C6PluginV9CollectedO14authorizeTokenSSvpZ",
+                "mangledName": "$s19PurseCheckoutKlarna0C6PluginV9CollectedO14authorizeTokenSSvpZ",
+                "moduleName": "PurseCheckoutKlarna",
+                "static": true,
+                "declAttributes": [
+                  "HasInitialValue",
+                  "HasStorage",
+                  "AccessControl",
+                  "RawDocComment"
+                ],
+                "isLet": true,
+                "hasStorage": true,
+                "accessors": [
+                  {
+                    "kind": "Accessor",
+                    "name": "Get",
+                    "printedName": "Get()",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "String",
+                        "printedName": "Swift.String",
+                        "usr": "s:SS"
+                      }
+                    ],
+                    "declKind": "Accessor",
+                    "usr": "s:19PurseCheckoutKlarna0C6PluginV9CollectedO14authorizeTokenSSvgZ",
+                    "mangledName": "$s19PurseCheckoutKlarna0C6PluginV9CollectedO14authorizeTokenSSvgZ",
+                    "moduleName": "PurseCheckoutKlarna",
+                    "static": true,
+                    "implicit": true,
+                    "accessorKind": "get"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Enum",
+            "usr": "s:19PurseCheckoutKlarna0C6PluginV9CollectedO",
+            "mangledName": "$s19PurseCheckoutKlarna0C6PluginV9CollectedO",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "conformances": [
+              {
+                "kind": "Conformance",
+                "name": "Copyable",
+                "printedName": "Copyable",
+                "usr": "s:s8CopyableP",
+                "mangledName": "$ss8CopyableP"
+              },
+              {
+                "kind": "Conformance",
+                "name": "Escapable",
+                "printedName": "Escapable",
+                "usr": "s:s9EscapableP",
+                "mangledName": "$ss9EscapableP"
+              }
+            ]
+          },
+          {
+            "kind": "Var",
+            "name": "partner",
+            "printedName": "partner",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Partner",
+                "printedName": "PurseHeadlessCheckout.Partner",
+                "usr": "s:21PurseHeadlessCheckout7PartnerO"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:19PurseCheckoutKlarna0C6PluginV7partner0a8HeadlessB07PartnerOvp",
+            "mangledName": "$s19PurseCheckoutKlarna0C6PluginV7partner0a8HeadlessB07PartnerOvp",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "HasStorage",
+              "AccessControl"
+            ],
+            "isLet": true,
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Partner",
+                    "printedName": "PurseHeadlessCheckout.Partner",
+                    "usr": "s:21PurseHeadlessCheckout7PartnerO"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:19PurseCheckoutKlarna0C6PluginV7partner0a8HeadlessB07PartnerOvg",
+                "mangledName": "$s19PurseCheckoutKlarna0C6PluginV7partner0a8HeadlessB07PartnerOvg",
+                "moduleName": "PurseCheckoutKlarna",
+                "implicit": true,
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Var",
+            "name": "method",
+            "printedName": "method",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "PaymentMethod",
+                "printedName": "PurseHeadlessCheckout.PaymentMethod",
+                "usr": "s:21PurseHeadlessCheckout13PaymentMethodO"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:19PurseCheckoutKlarna0C6PluginV6method0a8HeadlessB013PaymentMethodOvp",
+            "mangledName": "$s19PurseCheckoutKlarna0C6PluginV6method0a8HeadlessB013PaymentMethodOvp",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "HasInitialValue",
+              "HasStorage",
+              "AccessControl"
+            ],
+            "isLet": true,
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "PaymentMethod",
+                    "printedName": "PurseHeadlessCheckout.PaymentMethod",
+                    "usr": "s:21PurseHeadlessCheckout13PaymentMethodO"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:19PurseCheckoutKlarna0C6PluginV6method0a8HeadlessB013PaymentMethodOvg",
+                "mangledName": "$s19PurseCheckoutKlarna0C6PluginV6method0a8HeadlessB013PaymentMethodOvg",
+                "moduleName": "PurseCheckoutKlarna",
+                "implicit": true,
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init(partner:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "KlarnaPlugin",
+                "printedName": "PurseCheckoutKlarna.KlarnaPlugin",
+                "usr": "s:19PurseCheckoutKlarna0C6PluginV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Partner",
+                "printedName": "PurseHeadlessCheckout.Partner",
+                "usr": "s:21PurseHeadlessCheckout7PartnerO"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:19PurseCheckoutKlarna0C6PluginV7partnerAC0a8HeadlessB07PartnerO_tcfc",
+            "mangledName": "$s19PurseCheckoutKlarna0C6PluginV7partnerAC0a8HeadlessB07PartnerO_tcfc",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "AccessControl"
+            ],
+            "init_kind": "Designated"
+          },
+          {
+            "kind": "Var",
+            "name": "reloadsOnAmountUpdate",
+            "printedName": "reloadsOnAmountUpdate",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Bool",
+                "printedName": "Swift.Bool",
+                "usr": "s:Sb"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:19PurseCheckoutKlarna0C6PluginV21reloadsOnAmountUpdateSbvp",
+            "mangledName": "$s19PurseCheckoutKlarna0C6PluginV21reloadsOnAmountUpdateSbvp",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Bool",
+                    "printedName": "Swift.Bool",
+                    "usr": "s:Sb"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:19PurseCheckoutKlarna0C6PluginV21reloadsOnAmountUpdateSbvg",
+                "mangledName": "$s19PurseCheckoutKlarna0C6PluginV21reloadsOnAmountUpdateSbvg",
+                "moduleName": "PurseCheckoutKlarna",
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Function",
+            "name": "preValidation",
+            "printedName": "preValidation(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "ItemPayload",
+                "printedName": "PurseHeadlessCheckout.ItemPayload",
+                "usr": "s:21PurseHeadlessCheckout11ItemPayloadV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "PartnerUIContext",
+                "printedName": "PurseHeadlessCheckout.PartnerUIContext",
+                "usr": "s:21PurseHeadlessCheckout16PartnerUIContextV"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:19PurseCheckoutKlarna0C6PluginV13preValidationy0a8HeadlessB011ItemPayloadVAE16PartnerUIContextVYaKF",
+            "mangledName": "$s19PurseCheckoutKlarna0C6PluginV13preValidationy0a8HeadlessB011ItemPayloadVAE16PartnerUIContextVYaKF",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "AccessControl"
+            ],
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "postValidation",
+            "printedName": "postValidation(_:context:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "ValidationResult",
+                "printedName": "PurseHeadlessCheckout.ValidationResult",
+                "usr": "s:21PurseHeadlessCheckout16ValidationResultV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "PartnerUIContext",
+                "printedName": "PurseHeadlessCheckout.PartnerUIContext",
+                "usr": "s:21PurseHeadlessCheckout16PartnerUIContextV"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:19PurseCheckoutKlarna0C6PluginV14postValidation_7contexty0a8HeadlessB00F6ResultV_AF16PartnerUIContextVtYaKF",
+            "mangledName": "$s19PurseCheckoutKlarna0C6PluginV14postValidation_7contexty0a8HeadlessB00F6ResultV_AF16PartnerUIContextVtYaKF",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          }
+        ],
+        "declKind": "Struct",
+        "usr": "s:19PurseCheckoutKlarna0C6PluginV",
+        "mangledName": "$s19PurseCheckoutKlarna0C6PluginV",
+        "moduleName": "PurseCheckoutKlarna",
+        "declAttributes": [
+          "AccessControl",
+          "RawDocComment"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Copyable",
+            "printedName": "Copyable",
+            "usr": "s:s8CopyableP",
+            "mangledName": "$ss8CopyableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Escapable",
+            "printedName": "Escapable",
+            "usr": "s:s9EscapableP",
+            "mangledName": "$ss9EscapableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "PartnerUIPlugin",
+            "printedName": "PartnerUIPlugin",
+            "usr": "s:21PurseHeadlessCheckout15PartnerUIPluginP",
+            "mangledName": "$s21PurseHeadlessCheckout15PartnerUIPluginP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          }
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "KlarnaModule",
+        "printedName": "KlarnaModule",
+        "children": [
+          {
+            "kind": "Var",
+            "name": "id",
+            "printedName": "id",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:19PurseCheckoutKlarna0C6ModuleV2idSSvp",
+            "mangledName": "$s19PurseCheckoutKlarna0C6ModuleV2idSSvp",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "HasInitialValue",
+              "HasStorage",
+              "AccessControl"
+            ],
+            "isLet": true,
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:19PurseCheckoutKlarna0C6ModuleV2idSSvg",
+                "mangledName": "$s19PurseCheckoutKlarna0C6ModuleV2idSSvg",
+                "moduleName": "PurseCheckoutKlarna",
+                "implicit": true,
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "KlarnaModule",
+                "printedName": "PurseCheckoutKlarna.KlarnaModule",
+                "usr": "s:19PurseCheckoutKlarna0C6ModuleV"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:19PurseCheckoutKlarna0C6ModuleVACycfc",
+            "mangledName": "$s19PurseCheckoutKlarna0C6ModuleVACycfc",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "AccessControl"
+            ],
+            "init_kind": "Designated"
+          },
+          {
+            "kind": "Function",
+            "name": "register",
+            "printedName": "register(into:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "PluginRegistry",
+                "printedName": "PurseHeadlessCheckout.PluginRegistry",
+                "usr": "s:21PurseHeadlessCheckout14PluginRegistryC"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:19PurseCheckoutKlarna0C6ModuleV8register4intoy0a8HeadlessB014PluginRegistryC_tF",
+            "mangledName": "$s19PurseCheckoutKlarna0C6ModuleV8register4intoy0a8HeadlessB014PluginRegistryC_tF",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "AccessControl",
+              "Custom"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "renders",
+            "printedName": "renders(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Bool",
+                "printedName": "Swift.Bool",
+                "usr": "s:Sb"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "PartnerUIPlugin",
+                "printedName": "any PurseHeadlessCheckout.PartnerUIPlugin",
+                "usr": "s:21PurseHeadlessCheckout15PartnerUIPluginP"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:19PurseCheckoutKlarna0C6ModuleV7rendersySb0a8HeadlessB015PartnerUIPlugin_pF",
+            "mangledName": "$s19PurseCheckoutKlarna0C6ModuleV7rendersySb0a8HeadlessB015PartnerUIPlugin_pF",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "AccessControl",
+              "Custom"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "surface",
+            "printedName": "surface(for:request:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "PurseHeadlessCheckout.PaymentSurface?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "PaymentSurface",
+                    "printedName": "PurseHeadlessCheckout.PaymentSurface",
+                    "usr": "s:21PurseHeadlessCheckout14PaymentSurfaceV"
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "PartnerUIPlugin",
+                "printedName": "any PurseHeadlessCheckout.PartnerUIPlugin",
+                "usr": "s:21PurseHeadlessCheckout15PartnerUIPluginP"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "SurfaceRequest",
+                "printedName": "PurseHeadlessCheckout.SurfaceRequest",
+                "usr": "s:21PurseHeadlessCheckout14SurfaceRequestV"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:19PurseCheckoutKlarna0C6ModuleV7surface3for7request0a8HeadlessB014PaymentSurfaceVSgAG15PartnerUIPlugin_p_AG0J7RequestVtF",
+            "mangledName": "$s19PurseCheckoutKlarna0C6ModuleV7surface3for7request0a8HeadlessB014PaymentSurfaceVSgAG15PartnerUIPlugin_p_AG0J7RequestVtF",
+            "moduleName": "PurseCheckoutKlarna",
+            "declAttributes": [
+              "AccessControl",
+              "Custom"
+            ],
+            "funcSelfKind": "NonMutating"
+          }
+        ],
+        "declKind": "Struct",
+        "usr": "s:19PurseCheckoutKlarna0C6ModuleV",
+        "mangledName": "$s19PurseCheckoutKlarna0C6ModuleV",
+        "moduleName": "PurseCheckoutKlarna",
+        "declAttributes": [
+          "AccessControl",
+          "RawDocComment"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Copyable",
+            "printedName": "Copyable",
+            "usr": "s:s8CopyableP",
+            "mangledName": "$ss8CopyableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Escapable",
+            "printedName": "Escapable",
+            "usr": "s:s9EscapableP",
+            "mangledName": "$ss9EscapableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "PartnerModule",
+            "printedName": "PartnerModule",
+            "usr": "s:21PurseHeadlessCheckout13PartnerModuleP",
+            "mangledName": "$s21PurseHeadlessCheckout13PartnerModuleP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          }
+        ]
+      }
+    ],
+    "json_format_version": 8
+  },
+  "ConstValues": [
+    {
+      "filePath": "\/Users\/runner\/work\/purse-headless-checkout-ios\/purse-headless-checkout-ios\/Sources\/PurseCheckoutKlarna\/KlarnaAuthorizationRegistry.swift",
+      "kind": "Dictionary",
+      "offset": 745,
+      "length": 3,
+      "value": "[]"
+    },
+    {
+      "filePath": "\/Users\/runner\/work\/purse-headless-checkout-ios\/purse-headless-checkout-ios\/Sources\/PurseCheckoutKlarna\/KlarnaPlugin.swift",
+      "kind": "StringLiteral",
+      "offset": 1696,
+      "length": 14,
+      "value": "\"klarnaStepId\""
+    },
+    {
+      "filePath": "\/Users\/runner\/work\/purse-headless-checkout-ios\/purse-headless-checkout-ios\/Sources\/PurseCheckoutKlarna\/KlarnaPlugin.swift",
+      "kind": "StringLiteral",
+      "offset": 1853,
+      "length": 22,
+      "value": "\"klarnaAuthorizeToken\""
+    },
+    {
+      "filePath": "\/Users\/runner\/work\/purse-headless-checkout-ios\/purse-headless-checkout-ios\/Sources\/PurseCheckoutKlarna\/KlarnaPlugin.swift",
+      "kind": "StringLiteral",
+      "offset": 3444,
+      "length": 8,
+      "value": "\"klarna\""
+    },
+    {
+      "filePath": "\/Users\/runner\/work\/purse-headless-checkout-ios\/purse-headless-checkout-ios\/Sources\/PurseCheckoutKlarna\/KlarnaPlugin.swift",
+      "kind": "StringLiteral",
+      "offset": 5059,
+      "length": 14,
+      "value": "\"purse.klarna\""
+    }
+  ]
+}

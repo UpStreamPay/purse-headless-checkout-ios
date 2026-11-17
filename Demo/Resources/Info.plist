@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Set via `source scripts/load-env.sh` (see .env.example); resolves to an empty string when
+	     unset, and the app falls back to http://localhost:9001. The name must match .env.example
+	     exactly. MONITORING_API_KEY used to sit here and was read by nothing: the SDK takes its
+	     monitoring key from the session's own api_key and exposes no hook. -->
+	<key>ALFRED_BASE_URL</key>
+	<string>$(ALFRED_BASE_URL)</string>
+	<!-- alfred is a local dev server over plain http. Scoped to local hosts rather than a blanket
+	     allowance; Android's network_security_config.xml is the peer, and is blanket. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<!-- Where a redirect, Klarna and PayPal come back to. The redirect scheme must match the
+	     RedirectPolicy in DemoController. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.purse.headlesscheckout.demo.redirect</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.purse.headlesscheckout.demo.redirect</string>
+				<string>com.purse.headlesscheckout.demo.klarna</string>
+				<string>com.purse.headlesscheckout.demo.paypal</string>
+			</array>
+		</dict>
+	</array>
+	<!-- Albert Sans, the Purse brand face. Only checkout mode uses it; the playground stays on the
+	     system font so the two are told apart at a glance. -->
+	<key>UIAppFonts</key>
+	<array>
+		<string>AlbertSans-Regular.ttf</string>
+		<string>AlbertSans-SemiBold.ttf</string>
+	</array>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+</dict>
+</plist>
