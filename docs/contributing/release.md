@@ -10,13 +10,26 @@ The release is driven from GitHub, exactly like
 
 | Step | Trigger | What happens |
 |---|---|---|
-| 1 | Push to `main` | `release-please.yml`: conventional commits decide the next version; a **release PR** carries the version and the changelog |
+| 1 | Release Please run by hand (the **freeze**) | `release-please.yml`: conventional commits decide the next version; a **release PR** carries the version and the changelog, and its [upcoming release](#upcoming-release) build is what NRT tests |
 | 2 | Release PR merged | release-please creates tag `sdk-v<version>` on `main` and publishes the GitHub release with the changelog |
 | 3 | Release published, after a codeowner approves | `release.yml`: builds and signs the XCFrameworks, rewrites `Package.swift` to binary targets, creates the SPM tag `v<version>` on that commit and attaches the zips |
 
 Merging the release PR is all it takes to start a release; a codeowner then approves it before
-anything is built or signed. Pushes made only of non-releasable commits (`docs:`, `chore:`, …)
-produce no release PR.
+anything is built or signed. If `main` holds only non-releasable commits (`docs:`, `chore:`, …),
+the run opens no release PR.
+
+### Release freeze
+
+1. **Freeze**: Actions → Release Please → Run workflow (on `main`). It opens the release PR, and
+   `upcoming-release.yml` builds it for NRT.
+2. While the release PR is open, `release-freeze.yml` fails the `Release freeze` check on every PR
+   into `main` whose title is not `fix:` or `revert:` (breaking `fix!:` included). When the release PR opens, reopens or closes, the last
+   check of every other open PR is re-run.
+3. **A bug found in NRT**: a normal fix PR into `main`. Merging it updates the release PR, which
+   rebuilds the upcoming release; run the NRT again.
+4. Merge the release PR to release. Closing it instead lifts the freeze without releasing.
+
+Outside a freeze, a push to `main` opens no release PR: release-please only tags a merged one.
 
 ## What gets published
 
@@ -78,7 +91,7 @@ only one set of rules (one reviewer list, one list of refs allowed to deploy):
 | | `release-please` | `release` |
 |---|---|---|
 | Job | `release-please.yml` | `release.yml` |
-| Runs | on every push to `main`, unattended | on a published release (`sdk-v*` tag) |
+| Runs | by hand to freeze, then on every push to `main`, unattended | on a published release (`sdk-v*` tag) |
 | Approval | none: it only opens or updates the release PR, which is reviewed anyway | `@UpStreamPay/pci-dss`: it signs and publishes binaries |
 | Deploys from | `main` | `sdk-v*` tags |
 | Secrets | `TF_REPO_AUTOMATION_PAT` | `TF_REPO_AUTOMATION_PAT`, `APPLE_SIGNING_*` |
@@ -133,7 +146,7 @@ exists.
 
 ## Upcoming release
 
-Every update of the open release PR runs `upcoming-release.yml`. It builds unsigned XCFrameworks
+Opening the release PR (the freeze) and every update of it runs `upcoming-release.yml`. It builds unsigned XCFrameworks
 stamped `<next-version>-SNAPSHOT` (including `SDKVersion.value`) and force-pushes them, committed, to the `upcoming-release`
 branch (one orphan commit, rebuilt each time). Binaries are committed rather than attached to a
 release because the org tag ruleset lets no workflow token create a tag.
