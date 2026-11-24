@@ -393,6 +393,69 @@ struct CardPluginTests {
         #expect(coordinator.fieldStates[.expDate]?.hasContent == true)
     }
 
+    /// SDK-12750: `SecurePANContainer` paints itself `.secondarySystemBackground`, so the card-number
+    /// box stayed grey under a merchant colour while the three boxes the SDK builds took it.
+    @Test func theThemeBackgroundPaintsAllFourBoxes() throws {
+        let amber = UIColor(red: 1, green: 0xf3 / 255, blue: 0xc4 / 255, alpha: 1)
+        let coordinator = CardCoordinator(
+            host: RecordingHost(context: try context()), tenantId: "tenant-1", supportedBrands: [.visa],
+            options: PluginOptions(theme: PurseTheme(input: .init(backgroundColor: amber)))
+        )
+        let boxes = Self.boxes(in: CardFormView(coordinator: coordinator))
+
+        #expect(boxes.count == 4)
+        #expect(boxes.first is SecurePANContainer)
+        for box in boxes { #expect(box.backgroundColor == amber) }
+    }
+
+    /// The box follows the field's state, or the colour Secure Fields paints the field in shows as a
+    /// rectangle inside it.
+    @Test func theBoxFollowsTheFieldState() throws {
+        let coordinator = CardCoordinator(
+            host: RecordingHost(context: try context()), tenantId: "tenant-1", supportedBrands: [.visa],
+            options: PluginOptions(theme: PurseTheme(input: .init(backgroundColor: .white), inputInvalid: .init(backgroundColor: .red)))
+        )
+        let form = CardFormView(coordinator: coordinator)
+        let index = try #require(coordinator.fields.firstIndex(of: .holderName))
+        let box = Self.boxes(in: form)[index]
+        #expect(box.backgroundColor == .white)
+
+        // Content with no validity callback behind it: Secure Fields counts that as invalid.
+        try #require(Self.firstTextField(in: coordinator.fieldViews[index])).text = "J"
+        (coordinator as any SecureFieldsDelegate).secureFieldsContentChanged()
+
+        #expect(coordinator.fieldStates[.holderName] == CardFieldState(hasContent: true))
+        #expect(box.backgroundColor == .red)
+    }
+
+    /// The same order `SecureFieldsStyle.stateStyle` applies to the field inside the box.
+    @Test func theFillResolvesStatesInSecureFieldsOrder() {
+        let theme = PurseTheme(
+            input: .init(backgroundColor: .white),
+            inputFocus: .init(backgroundColor: .blue),
+            inputInvalid: .init(backgroundColor: .red),
+            inputValid: .init(backgroundColor: .green)
+        ).resolve()
+
+        #expect(CardModule.fill(theme, for: CardFieldState()) == .white)
+        #expect(CardModule.fill(theme, for: CardFieldState(isValid: true)) == .white)
+        #expect(CardModule.fill(theme, for: CardFieldState(hasContent: true)) == .red)
+        #expect(CardModule.fill(theme, for: CardFieldState(isValid: true, hasContent: true)) == .green)
+        #expect(CardModule.fill(theme, for: CardFieldState(isFocused: true, hasContent: true)) == .blue)
+    }
+
+    /// The default theme's `.clear` is "paint nothing" for the field, not a colour for the box.
+    @Test func aClearBackgroundFallsBackToTheSystemGrey() {
+        let theme = PurseTheme.default.resolve()
+        #expect(CardModule.fill(theme, for: CardFieldState()) == .secondarySystemBackground)
+        #expect(CardModule.fill(theme, for: CardFieldState(isFocused: true)) == .secondarySystemBackground)
+    }
+
+    /// Each field's box: the middle row of its label / box / message column.
+    private static func boxes(in form: CardFormView) -> [UIView] {
+        form.arrangedSubviews.compactMap { ($0 as? UIStackView)?.arrangedSubviews[1] }
+    }
+
     private static func firstTextField(in view: UIView) -> UITextField? {
         if let field = view as? UITextField { return field }
         return view.subviews.lazy.compactMap(firstTextField).first

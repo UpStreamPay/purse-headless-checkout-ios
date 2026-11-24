@@ -163,18 +163,16 @@ struct CardModule: PartnerModule {
 }
 
 extension CardModule {
-    /// `SecurePANContainer` ships its own 48pt rounded box; the CVV, expiry and holder-name views
-    /// are bare fields with no height and no background, so they get a matching one here.
+    /// The 48pt rounded box a secure field sits in. `SecurePANContainer` is its own box; the CVV,
+    /// expiry and holder-name views are bare fields with no height and no background, so they get a
+    /// matching one here. The box is left unpainted — ``CardFormView`` paints all four from
+    /// ``fill(_:for:)``.
     @MainActor
-    static func matchingPAN(_ view: UIView, theme: PurseTheme.Resolved) -> UIView {
+    static func fieldBox(_ view: UIView) -> UIView {
         guard !(view is SecurePANContainer) else { return view }
 
         view.translatesAutoresizingMaskIntoConstraints = false
         let box = UIView()
-        // `PurseTheme.default`'s `.clear` tells the *field* to paint nothing; it is not a colour for
-        // the box around it.
-        let themed = theme.input.backgroundColor
-        box.backgroundColor = (themed?.cgColor.alpha ?? 0) > 0 ? themed : .secondarySystemBackground
         box.layer.cornerRadius = 10
         box.addSubview(view)
         NSLayoutConstraint.activate([
@@ -185,6 +183,26 @@ extension CardModule {
             box.heightAnchor.constraint(equalToConstant: 48),
         ])
         return box
+    }
+
+    /// What a field's box is painted in for `state`.
+    ///
+    /// The field inside the box paints its own background, inset from the box's edges, so the box
+    /// has to land on the very colour Secure Fields picks for the field, or the field shows up as a
+    /// rectangle inside it. Secure Fields resolves focus first, then valid/invalid once there is
+    /// content, then the base style (`SecureFieldsStyle.stateStyle`); every resolved state carries a
+    /// text colour inherited from `global`, so none is ever `nil` there and the order below is
+    /// exactly the one it applies. Android's `FieldFrame` reads `:focus` only — its field draws no
+    /// background of its own, so nothing has to line up with it.
+    ///
+    /// `PurseTheme.default`'s `.clear` tells the *field* to paint nothing; it is not a colour for the
+    /// box around it, which falls back to the grey `SecurePANContainer` paints by default.
+    static func fill(_ theme: PurseTheme.Resolved, for state: CardFieldState) -> UIColor {
+        let style = state.isFocused ? theme.inputFocus
+            : state.hasContent ? (state.isValid ? theme.inputValid : theme.inputInvalid)
+            : theme.input
+        guard let color = style.backgroundColor, color.cgColor.alpha > 0 else { return .secondarySystemBackground }
+        return color
     }
 }
 
@@ -204,7 +222,7 @@ public final class CardFormView: UIStackView {
         axis = .vertical
         spacing = 12
 
-        var rows: [(CardField, ResolvedFieldTexts, UILabel, UILabel)] = []
+        var rows: [(CardField, ResolvedFieldTexts, UILabel, UIView, UILabel)] = []
         for (field, view) in zip(coordinator.fields, coordinator.fieldViews) {
             guard let texts = coordinator.texts[field] else { continue }
             let label = UILabel()
@@ -215,17 +233,20 @@ public final class CardFormView: UIStackView {
             message.numberOfLines = 0
             message.font = theme.helperText.font
             message.text = " "
-            let column = UIStackView(arrangedSubviews: [label, CardModule.matchingPAN(view, theme: theme), message])
+            let box = CardModule.fieldBox(view)
+            let column = UIStackView(arrangedSubviews: [label, box, message])
             column.axis = .vertical
             column.spacing = 4
             addArrangedSubview(column)
-            rows.append((field, texts, label, message))
+            rows.append((field, texts, label, box, message))
         }
 
         cancellable = coordinator.$fieldStates.sink { [weak self] states in
             var textChanged = false
-            for (field, texts, label, message) in rows {
+            for (field, texts, label, box, message) in rows {
                 let state = states[field] ?? CardFieldState()
+                // SDK-12750: this overrides the grey `SecurePANContainer` hardcodes on itself too.
+                box.backgroundColor = CardModule.fill(theme, for: state)
                 let invalid = texts.error(for: state) != nil
                 label.textColor = (invalid ? theme.labelInvalid.color : theme.label.color) ?? .label
                 message.textColor = (invalid ? theme.helperTextInvalid.color : theme.helperText.color) ?? .secondaryLabel
