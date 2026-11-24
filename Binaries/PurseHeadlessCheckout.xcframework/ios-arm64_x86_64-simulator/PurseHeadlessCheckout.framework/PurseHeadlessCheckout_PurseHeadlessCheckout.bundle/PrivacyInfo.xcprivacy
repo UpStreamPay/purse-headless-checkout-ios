@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<!--
+	Verified empty by grepping this target's own source for every API on Apple's required-reason
+	list (UserDefaults, file timestamps, disk space, active keyboard, system boot time) — none are
+	used. purse-securefields-ios (the mandatory card-entry dependency) was checked the same way and
+	is also clean, but ships no PrivacyInfo.xcprivacy of its own; PayPal and Klarna both bundle their
+	own manifests inside their xcframeworks already, so nothing is owed on their behalf.
+	-->
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array/>
+	<!--
+	NOT YET FILLED IN — needs a privacy/legal decision, not an engineering guess: this SDK's
+	monitoring collector (SDK-12265) sends device model, OS version and screen dimensions (see
+	Checkout/Monitoring/CheckoutMonitoringContext.swift) alongside a self-generated, per-checkout
+	instance id — never an IDFA/IDFV, never linked across apps. Whether that counts as
+	NSPrivacyCollectedDataTypeDeviceID / ...Diagnostics under Apple's taxonomy, and at what linkage
+	level, is a categorization call for whoever signs off the App Store privacy nutrition label
+	(compare against how the web and Android SDKs already disclose the same data). Leaving this
+	array empty until that call is made would misrepresent real collection; do not ship this file
+	as-is without that review.
+	-->
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+</dict>
+</plist>
